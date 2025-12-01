@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/* Root layout: default constrained width */
+/* Root container: keep a comfortable right gutter even when sidebar expands.
+	 Use the CSS variable --sidebar-width (injected by dashboard.jsx) so the
+	 max-width adapts to the current sidebar width. */
+#root {
+	/* cap at 1280px but also ensure we leave room for the sidebar */
+	max-width: min(1280px, calc(100% - var(--sidebar-width, 72px) - 1rem));
+	margin: 0 auto;
+	padding: 0.5rem;
+	box-sizing: border-box;
+	transition: max-width 160ms ease;
+	text-align: left;
+}
+
+/* When the sidebar is collapsed allow the root to use almost full width
+	 but still keep a small horizontal padding */
+.sidebar-collapsed #root {
+	max-width: calc(100% - 0.5rem);
+	padding-left: 0.5rem;
+	padding-right: 0.1rem;
+	margin-right: 0.5rem;
+}
+
+/* When the sidebar is expanded, allow the root to grow wider but keep a minimal
+ 	 right gutter so content doesn't touch the browser edge. Desktop rules are
+ 	 applied inside the media query below; mobile explicitly keeps no left margin. */
+
+@media (min-width: 1024px) {
+	.sidebar-expanded #root {
+		/* When sidebar is expanded, allow the root to use the full viewport
+		   width (minus a tiny right gutter) so the main dashboard can sit
+		   flush next to the sidebar with minimal left padding. */
+		max-width: calc(100% - 0.25rem);
+		margin-left: 0;
+		margin-right: 0.25rem;
+		padding-left: 0.25rem;
+		padding-right: 0.25rem;
+	}
+}
+
+/* Ensure mobile (below lg) doesn't get a left gutter from the expanded class */
+@media (max-width: 1023px) {
+	.sidebar-expanded #root {
+		margin-left: 0;
+		max-width: 100%;
+		padding-left: 0.1rem;
+		padding-right: 0.1rem;
+	}
+}
+
+/* Theme surface variables - central place to control shared surface colors */
+:root {
+  /* main surface used by top navbar and sidebar background */
+  --app-surface: #ffffff; /* change this to #f3f4f6 for light-gray */
+  /* card/panel surface that sits above the main surface (search boxes, icon chips) */
+  --app-surface-card: #f8fafc; /* subtle off-white */
+	/* header height used by layout (kept in sync with Dashboard.jsx HEADER_HEIGHT) */
+	--header-height: 64px;
+}
+
+.app-surface {
+  background-color: var(--app-surface) !important;
+}
+
+.app-surface-card {
+  background-color: var(--app-surface-card) !important;
+}
+
+/* Ensure content below a sticky header isn't hidden; use this on the main content container */
+.content-below-header {
+	padding-top: var(--header-height);
+}
+
+/* Utility to hide vertical scrollbars while keeping scroll functionality.
+	 - keeps scrolling via mouse wheel / touch / keyboard but hides the visual scrollbar
+	 - supported across modern browsers */
+.hide-vertical-scroll {
+	overflow-y: auto;
+	-ms-overflow-style: none; /* IE and Edge */
+	scrollbar-width: none; /* Firefox */
+}
+.hide-vertical-scroll::-webkit-scrollbar {
+	width: 0;
+	height: 0;
+	display: none;
+}
+
