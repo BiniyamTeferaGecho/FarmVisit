@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { setAuthToken } from '../utils/api';
-
-const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : 'http://localhost:3000/api';
+import { setAuthToken, baseURL as API_BASE } from '../utils/api';
 
 // Lightweight JWT payload decoder for browser (no verification)
 function decodeJwt(token) {
