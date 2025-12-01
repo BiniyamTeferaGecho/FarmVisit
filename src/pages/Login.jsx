@@ -100,7 +100,8 @@ export default function Login() {
 		let mounted = true
 		const loadEmployees = async () => {
 			try {
-				const r = await api.get('/employees')
+				// Backend mounts employee routes under /api/advisor — use the public active employees endpoint
+				const r = await api.get('/advisor/active')
 				if (!mounted) return
 				setEmployees(normalizeList(r))
 			} catch (e) {
