@@ -87,3 +87,22 @@
 	display: none;
 }
 
+/* Reverse (invert) mode: invert most page colors but re-invert media so images
+	 and videos remain visually correct. This provides a simple "high contrast /
+	 reverse" mode toggle. We apply the filter on <html> so it affects the
+	 whole page; media elements are re-inverted to cancel the effect on them. */
+html.reverse {
+	filter: invert(1) hue-rotate(180deg);
+	/* preserve stacking context and rendering speed */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+html.reverse img,
+html.reverse video,
+html.reverse svg,
+html.reverse canvas {
+	/* undo the invert for media so images show normally */
+	filter: invert(1) hue-rotate(180deg);
+}
+
+

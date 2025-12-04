@@ -188,27 +188,22 @@ export default function Login() {
 					{/* subtle overlay to improve contrast */}
 					<div className="absolute inset-0 bg-black/20" />
 				</div>
-			<div className="w-full max-w-[950px] bg-white/95 rounded-2xl overflow-auto max-h-[calc(100vh-4rem)] relative z-20 p-6">
-				<div className="flex items-center max-md:flex-col w-full gap-y-4 h-full">
-				<div className="md:max-w-[420px] w-full h-full flex items-center justify-center">
-					<div className="relative w-72 h-72 md:w-96 md:h-96">
-						<img
-							src={reactLogo}
-							className="w-full h-full object-contain transition-transform duration-300 ease-out"
-							alt="Logo"
-						/>
+			<div className="w-full max-w-[950px] bg-white/95 rounded-2xl overflow-auto max-h-[calc(100vh-4rem)] relative z-20 p-4 sm:p-6">
+				<div className="flex flex-col md:flex-row items-stretch w-full gap-6 h-full">
+				<div className="w-full h-full px-4 sm:px-6 md:px-8 lg:px-20 py-6 md:py-8 order-1 md:order-2">
+					{/* compact mobile logo (hidden on md+) */}
+					<div className="md:hidden flex items-center justify-center mb-4">
+						<img src={reactLogo} alt="Logo" className="h-20 w-auto object-contain" />
 					</div>
-				</div>
-				<div className="w-full h-full px-8 lg:px-20 py-8 max-md:-order-1">
 					{message && (
 						<div className={`mb-4 w-full md:max-w-md mx-auto p-3 rounded ${message.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
 							{message.text}
 						</div>
 					)}
 					{mode === 'login' && (
-						<form onSubmit={handleLogin} className="md:max-w-md w-full mx-auto">
-					<div className="mb-12">
-						<h3 className="text-4xl font-bold text-slate-900">Sign in</h3>
+						<form onSubmit={handleLogin} className="w-full mx-auto">
+					<div className="mb-6">
+						<h3 className="text-3xl sm:text-4xl font-bold text-slate-900">Sign in</h3>
 					</div>
 
 					<div>
@@ -225,7 +220,7 @@ export default function Login() {
 						</div>
 					</div>
 
-					<div className="mt-8">
+						<div className="mt-6">
 						<div className="relative flex items-center">
 							<input
 								name="password"
@@ -240,7 +235,7 @@ export default function Login() {
 						</div>
 					</div>
 
-					<div className="flex flex-wrap items-center justify-between gap-4 mt-6">
+						<div className="flex flex-wrap items-center justify-between gap-4 mt-4">
 						<div className="flex items-center">
 							<input id="remember-me" name="remember-me" type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 shrink-0 text-blue-600 focus:ring-blue-500 border-gray-300 rounded-sm" />
 							<label htmlFor="remember-me" className="text-slate-600 ml-3 block text-sm">Remember me</label>
@@ -250,12 +245,12 @@ export default function Login() {
 						</div>
 					</div>
 
-					<div className="mt-4">
-						<button disabled={loading} type="submit" className="w-full shadow-xl py-2 px-4 text-[15px] font-medium tracking-wide rounded-md cursor-pointer text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">{loading ? 'Signing in...' : 'Sign in'}</button>
-						<p className="text-slate-600 text-sm text-center mt-4">Don't have an account <button type="button" onClick={() => { setMode('register'); setMessage(null) }} className="text-blue-600 font-medium hover:underline ml-1 whitespace-nowrap">Register here</button></p>
-						<p className="text-slate-600 text-sm text-center mt-2">Forgot your password? <button type="button" onClick={() => { setMode('forgot'); setMessage(null) }} className="text-blue-600 font-medium hover:underline ml-1 whitespace-nowrap">Reset here</button></p>
-					</div>
-					</form>
+						<div className="mt-4">
+							<button disabled={loading} type="submit" className="w-full shadow-xl py-2 px-4 text-[15px] font-medium tracking-wide rounded-md cursor-pointer text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">{loading ? 'Signing in...' : 'Sign in'}</button>
+							<p className="text-slate-600 text-sm text-center mt-4">Don't have an account <button type="button" onClick={() => { setMode('register'); setMessage(null) }} className="text-blue-600 font-medium hover:underline ml-1 whitespace-nowrap">Register here</button></p>
+							<p className="text-slate-600 text-sm text-center mt-2">Forgot your password? <button type="button" onClick={() => { setMode('forgot'); setMessage(null) }} className="text-blue-600 font-medium hover:underline ml-1 whitespace-nowrap">Reset here</button></p>
+						</div>
+						</form>
 					)}
 
 					{/* Forgot password form */}
@@ -347,6 +342,16 @@ export default function Login() {
 							</div>
 						</form>
 					)}
+				</div>
+				{/* large logo / art panel — hidden on small screens */}
+				<div className="hidden md:flex md:max-w-[420px] w-full h-full items-center justify-center order-2 md:order-1">
+					<div className="relative w-72 h-72 md:w-96 md:h-96">
+						<img
+							src={reactLogo}
+							className="w-full h-full object-contain transition-transform duration-300 ease-out"
+							alt="Logo"
+						/>
+					</div>
 				</div>
 				</div>
 			</div>

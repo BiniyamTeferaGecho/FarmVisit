@@ -41,7 +41,7 @@ Tip: If you prefer a monorepo (single repo with BackEnd + FrontEnd), push the wh
   - Output Directory: dist
 - Add Environment Variable(s):
   - Key: `VITE_API_URL`
-  - Value: (your backend URL, e.g. https://d4e50b100c94.ngrok-free.app or https://api.yourdomain.com)
+  - Value: (your backend URL, e.g. https://overcontrite-oversteady-clifford.ngrok-free.dev or https://api.yourdomain.com)
   - Set for Preview/Production as appropriate.
 - Deploy.
 

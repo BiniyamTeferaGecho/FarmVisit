@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fa';
 import DateRangePicker from './DateRangePicker';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { baseURL as API_BASE } from '../../utils/api'
 
 const StatCard = ({ label, value, icon, color = 'blue' }) => {
   const colors = {
