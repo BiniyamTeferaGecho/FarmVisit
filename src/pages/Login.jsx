@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import api from '../utils/api'
+import api, { getActiveApiBase } from '../utils/api'
 import reactLogo from '../assets/images/AKF Logo.png'
 import bgImage from '../assets/images/BackGround.jpg'
 
@@ -33,6 +33,29 @@ export default function Login() {
 	const location = useLocation()
 	const from = location.state?.from?.pathname || '/'
 
+	// normalize server messages into strings for safe rendering
+	const formatMessage = (m) => {
+		if (m === null || m === undefined) return '';
+		if (typeof m === 'string') return m;
+		if (typeof m === 'number') return String(m);
+		if (typeof m === 'object') {
+			if (m.message && typeof m.message === 'string') return m.message;
+			if (m.error && typeof m.error === 'string') return m.error;
+			// try common nested shapes
+			if (m.errors) {
+				try { return JSON.stringify(m.errors); } catch (e) { /* fallthrough */ }
+			}
+			// fallback to a compact JSON representation
+			try {
+				const s = JSON.stringify(m);
+				return s.length > 200 ? s.slice(0, 200) + '…' : s;
+			} catch (e) {
+				return String(m);
+			}
+		}
+		return String(m);
+	}
+
 	const handleLogin = async (e) => {
 		e.preventDefault()
 		setLoading(true)
@@ -42,25 +65,36 @@ export default function Login() {
 			// Post to the auth login endpoint which sets an HttpOnly refresh cookie
 			// Debug: log minimal payload info (avoid logging raw password)
 			console.debug('Login: sending payload', { username: identifier, passwordPresent: !!password })
-			const res = await api.post('/auth/login', { username: identifier, password }, { withCredentials: true })
+			// Use absolute API login endpoint to ensure deployed frontend calls the intended backend
+			// getActiveApiBase() returns the API root (e.g. "https://055a2395cc07.ngrok-free.app/api")
+			const activeApi = (typeof getActiveApiBase === 'function') ? getActiveApiBase() : null;
+			const loginUrl = activeApi ? `${activeApi.replace(/\/$/, '')}/auth/login` : '/auth/login';
+			const res = await api.post(loginUrl, { username: identifier, password }, { withCredentials: true })
 			const data = res?.data ?? {}
 			// backend may return either { accessToken } (auth controller) or { token } (user controller)
 			const token = data.accessToken || data.token || data.access_token || null;
 			const userObj = data.user || data.user || (data.session && data.session.user) || null;
 			if (res.status === 200 && token) {
 				// set auth state via provider helper
-				auth.setAuth(token, userObj);
-				setMessage({ type: 'success', text: 'Signed in successfully' });
+				if (auth && typeof auth.setAuth === 'function') {
+					auth.setAuth(token, userObj);
+				} else {
+					// Fallback: persist token and set axios auth header so the app can recover
+					try { localStorage.setItem('accessToken', token); } catch (e) { /* ignore */ }
+					try { const { setAuthToken } = await import('../utils/api'); setAuthToken(token); } catch (e) { /* ignore */ }
+					console.warn('Auth provider not available; persisted token to localStorage as fallback.');
+				}
+				setMessage({ type: 'success', text: formatMessage('Signed in successfully') });
 				navigate('/dashboard', { replace: true });
 			} else {
-				setMessage({ type: 'error', text: data.message || 'Login failed' });
+				setMessage({ type: 'error', text: formatMessage(data.message || 'Login failed') });
 			}
 		} catch (err) {
 			const status = err?.response?.status
-			const serverMsg = err?.response?.data?.message || err?.response?.data || err.message
-			if (status === 401) setMessage({ type: 'error', text: serverMsg || 'Invalid credentials' })
-			else if (status === 423) setMessage({ type: 'error', text: serverMsg || 'Account locked' })
-			else setMessage({ type: 'error', text: serverMsg || 'Network error' })
+				const serverMsg = err?.response?.data?.message ?? err?.response?.data ?? err.message
+				if (status === 401) setMessage({ type: 'error', text: formatMessage(serverMsg || 'Invalid credentials') })
+				else if (status === 423) setMessage({ type: 'error', text: formatMessage(serverMsg || 'Account locked') })
+				else setMessage({ type: 'error', text: formatMessage(serverMsg || 'Network error') })
 		} finally {
 			setLoading(false)
 		}
@@ -260,8 +294,8 @@ export default function Login() {
 							try {
 								const res = await api.post('/api/auth/forgot-password', { email: forgotEmail })
 								const data = res?.data ?? {}
-								setMessage({ type: res.status === 200 ? 'success' : 'error', text: data.message || 'If an account exists, a reset link was sent' });
-							} catch (err) { setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Network error' }) } finally { setLoading(false) }
+								setMessage({ type: res.status === 200 ? 'success' : 'error', text: formatMessage(data.message || 'If an account exists, a reset link was sent') });
+							} catch (err) { setMessage({ type: 'error', text: formatMessage(err.response?.data?.message ?? err.message ?? 'Network error') }) } finally { setLoading(false) }
 						}} className="md:max-w-md w-full mx-auto">
 							<div className="mb-6">
 								<h3 className="text-2xl font-semibold text-slate-900">Reset password</h3>
@@ -286,7 +320,7 @@ export default function Login() {
 							try {
 								// employee selection is mandatory as requested
 								if (!regEmployeeId) {
-									setMessage({ type: 'error', text: 'Please select the employee this account will be linked to.' });
+									setMessage({ type: 'error', text: formatMessage('Please select the employee this account will be linked to.') });
 									setLoading(false);
 									return;
 								}
@@ -304,7 +338,7 @@ export default function Login() {
 								const res = await api.post('/api/users', payload)
 								const data = res?.data ?? {}
 								if (res.status === 201 || (data && data.success)) {
-									setMessage({ type: 'success', text: 'Registration successful' });
+									setMessage({ type: 'success', text: formatMessage('Registration successful') });
 									// after successful registration, switch to login and prefill the identifier
 									setMode('login');
 									// prefer email as login identifier, fallback to username
@@ -312,9 +346,9 @@ export default function Login() {
 									setIdentifier(identifierPrefill);
 									setPassword('');
 								} else {
-									setMessage({ type: 'error', text: data.message || data.error || 'Registration failed' });
+									setMessage({ type: 'error', text: formatMessage(data.message || data.error || 'Registration failed') });
 								}
-							} catch (err) { setMessage({ type: 'error', text: err.response?.data?.message ?? err.message ?? 'Network error' }) } finally { setLoading(false) }
+							} catch (err) { setMessage({ type: 'error', text: formatMessage(err.response?.data?.message ?? err.message ?? 'Network error') }) } finally { setLoading(false) }
 						}} className="md:max-w-md w-full mx-auto">
 							<div className="mb-6">
 								<h3 className="text-2xl font-semibold text-slate-900">Create account</h3>

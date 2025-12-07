@@ -6,7 +6,7 @@ export default function FarmType() {
   const { user } = useAuth()
   const isAdmin = !!(user && Array.isArray(user.roles) && (user.roles.includes('ROLE_ADMIN') || user.roles.includes('ROLE_SUPER_ADMIN')))
 
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
   const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -14,7 +14,7 @@ export default function FarmType() {
   const [search, setSearch] = useState('')
   const [isActiveFilter, setIsActiveFilter] = useState('') // '', '1', '0'
 
-  const [activeLookup, setActiveLookup] = useState([])
+  const [, setActiveLookup] = useState([])
 
   // form state
   const emptyForm = { FarmTypeID: '', TypeName: '', TypeCode: '', Description: '', IsActive: true, SortOrder: null }
@@ -57,7 +57,7 @@ export default function FarmType() {
   }, [page, pageSize, search, isActiveFilter])
 
   useEffect(() => { loadActiveLookup(); }, [loadActiveLookup])
-  useEffect(() => { loadPaged(1, pageSize, search, isActiveFilter) }, [loadPaged])
+  useEffect(() => { loadPaged(1, pageSize, search, isActiveFilter) }, [loadPaged, pageSize, search, isActiveFilter])
 
   const resetForm = () => { setForm(emptyForm); setEditing(false); setFormError(null) }
 
@@ -103,8 +103,8 @@ export default function FarmType() {
         await loadPaged(1, pageSize, search, isActiveFilter)
         resetForm()
       } else {
-        payload.CreatedBy = user?.id || user?.sub || null
-        const res = await api.post('/farm-types', payload)
+  payload.CreatedBy = user?.id || user?.sub || null
+  await api.post('/farm-types', payload)
         // on success, reload list and lookup
         await loadPaged(1, pageSize, search, isActiveFilter)
         await loadActiveLookup()
@@ -139,7 +139,38 @@ export default function FarmType() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
+      
+
+        <div>
+          <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
+            <h3 className="text-lg font-semibold mb-2">{editing ? 'Edit Farm Type' : 'Create Farm Type'}</h3>
+            <form onSubmit={handleSubmit} className="space-y-2">
+              <div>
+                <label className="text-sm block">TypeName</label>
+                <input value={form.TypeName} onChange={(e)=>setForm({...form, TypeName: e.target.value})} className="w-full px-2 py-1 border rounded" />
+              </div>
+              <div>
+                <label className="text-sm block">TypeCode</label>
+                <input value={form.TypeCode} onChange={(e)=>setForm({...form, TypeCode: e.target.value})} className="w-full px-2 py-1 border rounded" />
+              </div>
+              <div>
+                <label className="text-sm block">Description</label>
+                <textarea value={form.Description} onChange={(e)=>setForm({...form, Description: e.target.value})} className="w-full px-2 py-1 border rounded" rows={3} />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={!!form.IsActive} onChange={(e)=>setForm({...form, IsActive: e.target.checked})} /> Active</label>
+                <label className="text-sm">SortOrder</label>
+                <input type="number" value={form.SortOrder || ''} onChange={(e)=>setForm({...form, SortOrder: e.target.value ? Number(e.target.value) : null})} className="px-2 py-1 border rounded w-24" />
+              </div>
+              {formError && <div className="text-sm text-red-500">{formError}</div>}
+              <div className="flex gap-2">
+                <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded">{editing ? 'Save' : 'Create'}</button>
+                <button type="button" onClick={resetForm} className="px-3 py-1 border rounded">Reset</button>
+              </div>
+            </form>
+          </div>
+        </div>
+          <div className="lg:col-span-2">
           <div className="flex items-center gap-2 mb-3">
             <input placeholder="Search" value={search} onChange={(e)=>setSearch(e.target.value)} className="px-2 py-1 border rounded w-64" />
             <select value={isActiveFilter} onChange={(e)=>setIsActiveFilter(e.target.value)} className="px-2 py-1 border rounded">
@@ -191,36 +222,6 @@ export default function FarmType() {
                 {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-          </div>
-        </div>
-
-        <div>
-          <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
-            <h3 className="text-lg font-semibold mb-2">{editing ? 'Edit Farm Type' : 'Create Farm Type'}</h3>
-            <form onSubmit={handleSubmit} className="space-y-2">
-              <div>
-                <label className="text-sm block">TypeName</label>
-                <input value={form.TypeName} onChange={(e)=>setForm({...form, TypeName: e.target.value})} className="w-full px-2 py-1 border rounded" />
-              </div>
-              <div>
-                <label className="text-sm block">TypeCode</label>
-                <input value={form.TypeCode} onChange={(e)=>setForm({...form, TypeCode: e.target.value})} className="w-full px-2 py-1 border rounded" />
-              </div>
-              <div>
-                <label className="text-sm block">Description</label>
-                <textarea value={form.Description} onChange={(e)=>setForm({...form, Description: e.target.value})} className="w-full px-2 py-1 border rounded" rows={3} />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-2"><input type="checkbox" checked={!!form.IsActive} onChange={(e)=>setForm({...form, IsActive: e.target.checked})} /> Active</label>
-                <label className="text-sm">SortOrder</label>
-                <input type="number" value={form.SortOrder || ''} onChange={(e)=>setForm({...form, SortOrder: e.target.value ? Number(e.target.value) : null})} className="px-2 py-1 border rounded w-24" />
-              </div>
-              {formError && <div className="text-sm text-red-500">{formError}</div>}
-              <div className="flex gap-2">
-                <button type="submit" className="px-3 py-1 bg-blue-600 text-white rounded">{editing ? 'Save' : 'Create'}</button>
-                <button type="button" onClick={resetForm} className="px-3 py-1 border rounded">Reset</button>
-              </div>
-            </form>
           </div>
         </div>
       </div>
