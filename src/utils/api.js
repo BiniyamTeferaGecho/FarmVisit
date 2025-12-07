@@ -1,10 +1,11 @@
 import axios from 'axios';
 
 
-// Helper: normalize a base (remove trailing slash)
+// Helper: normalize a base (trim whitespace and remove trailing slash)
 function normalizeBase(u) {
   if (!u) return null;
-  return u.replace(/\/$/, '');
+  // ensure it's a string, trim surrounding whitespace, then remove a single trailing slash
+  return String(u).trim().replace(/\/$/, '');
 }
 
 // Runtime override sources (in priority order):
