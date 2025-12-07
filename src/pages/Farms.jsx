@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import FarmForm from './FarmForm';
 import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
@@ -9,25 +10,18 @@ import { FaPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaU
 
 const initialForm = {
     FarmName: '',
-    FarmType: '',
-    FarmOwner: '',
-    ContactPerson: '',
-    ContactPhone: '',
-    ContactEmail: '',
+    FarmCode: '',
     Address: '',
-    Region: '',
     Zone: '',
-    Woreda: '',
-    Kebele: '',
-    FarmStatus: '',
-    OwnershipType: '',
-    ProductionSystem: '',
-    WaterSource: '',
+    Wereda: '',
+    Region: '',
+    CityTown: '',
+    GPSLocation: '',
     FarmSize: '',
-    NumberOfPlots: '',
+    FarmTypeID: '',
+    OwnerName: '',
+    ContactPhone: '',
     IsActive: true,
-    Latitude: '',
-    Longitude: '',
 };
 
 // Validation helpers
@@ -45,6 +39,9 @@ export default function Farms() {
     const [list, setList] = useState([]);
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState(initialForm);
+    const [farmTypes, setFarmTypes] = useState([]);
+    const [farmTypesLoadError, setFarmTypesLoadError] = useState(null);
+    const [farmTypeNameCache, setFarmTypeNameCache] = useState({});
     const [editingId, setEditingId] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [showDelete, setShowDelete] = useState(false);
@@ -60,6 +57,37 @@ export default function Farms() {
 
     useEffect(() => { fetchList() }, []);
 
+    useEffect(() => { fetchFarmTypes() }, []);
+
+    const fetchFarmTypes = async () => {
+        try {
+            setFarmTypesLoadError(null);
+            const res = await fetchWithAuth({ url: `/farm-types/views/active`, method: 'get' });
+            const payload = res.data?.data || res.data;
+            // tolerant parsing
+            let arr = null;
+            if (Array.isArray(payload)) arr = payload;
+            else if (Array.isArray(payload.items)) arr = payload.items;
+            else if (Array.isArray(payload.recordset)) arr = payload.recordset;
+            else if (Array.isArray(payload.rows)) arr = payload.rows;
+            else if (Array.isArray(payload.data)) arr = payload.data;
+            if (!arr && payload && typeof payload === 'object') {
+                for (const k of Object.keys(payload)) if (Array.isArray(payload[k])) { arr = payload[k]; break; }
+            }
+            setFarmTypes(arr || []);
+            if (!arr || arr.length === 0) {
+                // treat empty result as non-fatal but note for the user
+                setFarmTypesLoadError('No farm types found. You can still enter a farm but Farm Type will be saved as provided.');
+            }
+        } catch (err) {
+            // Surface a friendly message so the user knows why the dropdown may be empty
+            const msg = err?.response?.data?.message || err?.message || 'Failed to load farm types';
+            console.debug('Failed to load farm types', msg);
+            setFarmTypes([]);
+            setFarmTypesLoadError('Failed to load farm types. You can still enter a farm but the dropdown is unavailable.');
+        }
+    };
+
     // auto-open error modal when `error` is set
     useEffect(() => {
         if (error) setShowErrorModal(true);
@@ -73,7 +101,154 @@ export default function Farms() {
             if (data.message) return data.message;
             if (data.error) return data.error;
             return JSON.stringify(data);
-        } catch (e) { return err?.message || 'Unknown error' }
+    } catch { return err?.message || 'Unknown error' }
+    };
+
+    // utility: pick the first defined/non-empty value from an object for a list of possible keys
+    const extractScalar = (v) => {
+        if (v === undefined || v === null) return '';
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return String(v);
+        if (Array.isArray(v) && v.length > 0) return extractScalar(v[0]);
+        if (typeof v === 'object') {
+            // try common scalar keys (both camel and snake/case variants)
+            const keys = ['Region', 'RegionName', 'region', 'regionName', 'region_name', 'name', 'label', 'Name', 'Label', 'CityTown', 'City', 'Town', 'city', 'town', 'Zone', 'zone', 'ZoneName', 'Wereda', 'Woreda', 'wereda', 'woreda'];
+            for (const k of keys) {
+                if (v[k] !== undefined && v[k] !== null && String(v[k]).trim() !== '') return String(v[k]);
+            }
+            // try toString
+            try { const s = JSON.stringify(v); if (s && s !== '{}') return s; } catch { /* ignore circular */ }
+            return '';
+        }
+        return '';
+    };
+
+    // Safe recursive search for candidate keys in nested objects (bounded depth and seen set to avoid cycles)
+    const findKeyRec = (obj, keys, maxDepth = 3, seen = new Set()) => {
+        if (!obj || typeof obj !== 'object' || maxDepth < 0) return null;
+        if (seen.has(obj)) return null;
+        seen.add(obj);
+        for (const k of keys) {
+            if (Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== undefined && obj[k] !== null) return obj[k];
+        }
+        // traverse object properties (but not long strings or arrays of primitives)
+        for (const prop of Object.keys(obj)) {
+            try {
+                const val = obj[prop];
+                if (val && typeof val === 'object') {
+                    const found = findKeyRec(val, keys, maxDepth - 1, seen);
+                    if (found !== null && found !== undefined) return found;
+                }
+            } catch { /* ignore property access errors */ }
+        }
+        return null;
+    };
+
+    const pickFirst = (obj, keys) => {
+        if (!obj || typeof obj !== 'object') return '';
+        for (const k of keys) {
+            const v = obj[k];
+            if (v !== undefined && v !== null) {
+                const s = extractScalar(v);
+                if (s !== '') return s;
+            }
+        }
+        // try a bounded recursive search for nested/aliased keys
+        try {
+            const found = findKeyRec(obj, keys, 3, new Set());
+            if (found !== null && found !== undefined) {
+                const s = extractScalar(found);
+                if (s !== '') return s;
+            }
+    } catch { /* swallow */ }
+        return '';
+    };
+
+    // pickFirst that also returns which key matched (for debugging and finer mapping)
+    const pickFirstWithKey = (obj, keys) => {
+        if (!obj || typeof obj !== 'object') return { value: '', key: null };
+        for (const k of keys) {
+            const v = obj[k];
+            if (v !== undefined && v !== null) {
+                const s = extractScalar(v);
+                if (s !== '') return { value: s, key: k };
+            }
+        }
+        try {
+            const found = findKeyRec(obj, keys, 3, new Set());
+            if (found !== null && found !== undefined) {
+                const s = extractScalar(found);
+                if (s !== '') return { value: s, key: '__nested__' };
+            }
+    } catch { /* swallow */ }
+        return { value: '', key: null };
+    };
+
+    // Heuristic: recursively search object keys for substrings (e.g. 'region','zone','wered','city') and return the first scalar found
+    const findByKeySubstring = (obj, substrings, maxDepth = 4, seen = new Set()) => {
+        if (!obj || typeof obj !== 'object' || maxDepth < 0) return null;
+        if (seen.has(obj)) return null;
+        seen.add(obj);
+        for (const k of Object.keys(obj)) {
+            try {
+                const lower = String(k).toLowerCase();
+                if (substrings.some(s => lower.includes(s))) {
+                    const v = obj[k];
+                    const s = extractScalar(v);
+                    if (s) return s;
+                }
+                const val = obj[k];
+                if (val && typeof val === 'object') {
+                    const found = findByKeySubstring(val, substrings, maxDepth - 1, seen);
+                    if (found) return found;
+                }
+            } catch { /* ignore */ }
+        }
+        return null;
+    };
+
+    // Common alias lists (shared between list rendering and mapFarmToForm)
+    const regionAliases = ['Region', 'RegionName', 'LocationRegion', 'Area', 'RegionLabel', 'region', 'regionName', 'Region_Name', 'RegionInfo', 'RegionDescription'];
+    const zoneAliases = ['Zone', 'ZoneName', 'zone', 'ZoneInfo', 'ZoneLabel'];
+    const weredaAliases = ['Wereda', 'Woreda', 'District', 'wereda', 'woreda', 'DistrictName'];
+    const cityAliases = ['CityTown', 'City', 'Town', 'City_Town', 'city', 'town', 'Municipality'];
+
+    // Map a farm record (from list or API) to the form shape used in the modal.
+    const mapFarmToForm = (d) => {
+        if (!d || typeof d !== 'object') return { ...initialForm };
+        // handle nested structures and multiple property name variants
+        const FarmTypeID = pickFirst(d, ['FarmTypeID', 'farmTypeID', 'FarmTypeId', 'FarmType', 'TypeID']);
+        const FarmType = pickFirst(d, ['FarmTypeName', 'FarmType', 'TypeName', 'Type', 'FarmTypeLabel']);
+        const Latitude = pickFirst(d, ['Latitude', 'latitude', 'GPSLat', 'Lat']);
+        const Longitude = pickFirst(d, ['Longitude', 'longitude', 'GPSLon', 'Lon']);
+        const IsActive = d.IsActive === undefined ? (d.isActive === undefined ? true : !!d.isActive) : !!d.IsActive;
+
+    const rFound = pickFirstWithKey(d, regionAliases);
+    const zFound = pickFirstWithKey(d, zoneAliases);
+    const wFound = pickFirstWithKey(d, weredaAliases);
+    const cFound = pickFirstWithKey(d, cityAliases);
+
+        const result = {
+            FarmName: pickFirst(d, ['FarmName', 'Name', 'Farm']),
+            FarmCode: pickFirst(d, ['FarmCode', 'Code']),
+            Address: pickFirst(d, ['Address', 'Street', 'Location', 'Addr']),
+            Zone: zFound.value || pickFirst(d, ['Zone', 'ZoneName', 'zone']) || findByKeySubstring(d, ['zone', 'zonename']),
+            Wereda: wFound.value || pickFirst(d, ['Wereda', 'Woreda', 'District']) || findByKeySubstring(d, ['wereda', 'woreda', 'district']),
+            Region: rFound.value || pickFirst(d, ['Region', 'RegionName', 'region']) || findByKeySubstring(d, ['region', 'regionname']),
+            CityTown: cFound.value || pickFirst(d, ['CityTown', 'City', 'Town']) || findByKeySubstring(d, ['city', 'town', 'municipality', 'kebele']),
+            GPSLocation: pickFirst(d, ['GPSLocation', 'gpsLocation', 'GPS', 'GPSCoords', 'GPS_Location']),
+            FarmSize: pickFirst(d, ['FarmSize', 'Size']),
+            FarmTypeID,
+            OwnerName: pickFirst(d, ['OwnerName', 'FarmOwner', 'Owner', 'FarmerName']),
+            ContactPhone: pickFirst(d, ['ContactPhone', 'ContactNumber', 'Phone', 'WorkPhone']),
+            IsActive,
+        };
+        // Debug: show which alias matched for location fields
+        try {
+            console.debug('mapFarmToForm input:', d);
+            console.debug('mapFarmToForm resolved keys:', { Region: rFound, Zone: zFound, Wereda: wFound, CityTown: cFound });
+            console.debug('mapFarmToForm result:', result);
+    } catch { /* ignore logging errors */ }
+        return result;
     };
 
     const fetchList = async () => {
@@ -111,33 +286,95 @@ export default function Farms() {
         } finally { setLoading(false) }
     };
 
+    // Resolve FarmType names for the current list by calling /api/farm-types/:id and caching results
+    useEffect(() => {
+        if (!Array.isArray(list) || list.length === 0) return;
+        const ids = new Set();
+        for (const f of list) {
+            const id = f?.FarmTypeID || f?.farmTypeID || f?.FarmType || null;
+            if (id) ids.add(String(id));
+        }
+        const toResolve = Array.from(ids).filter(id => id && !farmTypeNameCache[id]);
+        if (toResolve.length === 0) return;
+
+        let cancelled = false;
+        (async () => {
+            const updates = {};
+                await Promise.all(toResolve.map(async (id) => {
+                try {
+                    const r = await fetchWithAuth({ url: `/farm-types/${encodeURIComponent(id)}`, method: 'get' });
+                    const payload = r?.data?.data || r?.data || r;
+                    let rec = payload;
+                    if (Array.isArray(payload)) rec = payload[0];
+                    else if (payload && payload.recordset && Array.isArray(payload.recordset)) rec = payload.recordset[0];
+                    const name = (rec && (rec.TypeName || rec.Type || rec.Name || rec.Label)) || String(id);
+                    updates[id] = name;
+                } catch {
+                    updates[id] = String(id);
+                }
+            }));
+            if (!cancelled) setFarmTypeNameCache(prev => ({ ...prev, ...updates }));
+        })();
+        return () => { cancelled = true; };
+    }, [list]);
+
     const openCreate = () => { setEditingId(null); setForm(initialForm); setFieldErrors({}); setShowForm(true) };
 
-    const openEdit = async (id) => {
-        setLoading(true); setError(null);
+    const openEdit = async (idOrObj) => {
+        // Accept either an id string or the farm object from the list.
+        setError(null);
+        // Accept either an id string or the farm object from the list.
+        setLoading(true);
         try {
-            const res = await fetchWithAuth({ url: `/farms/${id}`, method: 'get' });
-            const d = res.data?.data || res.data;
-            if (d) {
-                setForm({
-                    FarmName: d.FarmName || '', FarmType: d.FarmType || '', FarmOwner: d.FarmOwner || '',
-                    ContactPerson: d.ContactPerson || '', ContactPhone: d.ContactPhone || '', ContactEmail: d.ContactEmail || '',
-                    Address: d.Address || '', Region: d.Region || '', Zone: d.Zone || '', Woreda: d.Woreda || '', Kebele: d.Kebele || '',
-                    FarmStatus: d.FarmStatus || '', OwnershipType: d.OwnershipType || '', ProductionSystem: d.ProductionSystem || '',
-                    WaterSource: d.WaterSource || '', FarmSize: d.FarmSize || '', NumberOfPlots: d.NumberOfPlots || '',
-                    IsActive: d.IsActive === undefined ? true : !!d.IsActive, Latitude: d.Latitude || '', Longitude: d.Longitude || ''
-                });
-                setEditingId(id);
-                setShowForm(true);
+            let id = null;
+            if (idOrObj && typeof idOrObj === 'object') {
+                id = idOrObj.FarmID || idOrObj.id || idOrObj.FarmId || null;
+            } else {
+                id = idOrObj;
             }
-        } catch (err) { setError(getErrorMessage(err) || 'Failed to load') } finally { setLoading(false) }
+
+            if (!id) {
+                // No id available; fall back to using the provided object if any
+                if (idOrObj && typeof idOrObj === 'object') {
+                    setForm(mapFarmToForm(idOrObj));
+                    setEditingId(idOrObj.FarmID || idOrObj.id || idOrObj.FarmId || null);
+                    setShowForm(true);
+                    return;
+                }
+                return setError('Farm ID is required to edit');
+            }
+
+            // Always fetch the authoritative record from backend (include deleted) to ensure modal has full/consistent shape
+            try {
+                const res = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}?includeDeleted=1`, method: 'get' });
+                const d = res.data?.data || res.data;
+                if (d) {
+                    setForm(mapFarmToForm(d));
+                    setEditingId(id);
+                    setShowForm(true);
+                    return;
+                }
+            } catch (fetchErr) {
+                // if fetch fails, fallback to using the supplied object (if present) so editing is still possible
+                if (idOrObj && typeof idOrObj === 'object') {
+                    console.debug('openEdit: backend fetch failed, falling back to list object', fetchErr);
+                    setForm(mapFarmToForm(idOrObj));
+                    setEditingId(id);
+                    setShowForm(true);
+                    return;
+                }
+                throw fetchErr;
+            }
+        } catch (err) {
+            setError(getErrorMessage(err) || 'Failed to load');
+            if (err?.response?.status === 401) navigate('/login');
+        } finally { setLoading(false) }
     };
 
     const validateForm = (f) => {
         const errs = {};
         if (!f.FarmName) errs.FarmName = 'Farm name is required';
-        if (!f.FarmType) errs.FarmType = 'Farm type is required';
-        if (!validators.farmType(f.FarmType)) errs.FarmType = 'Invalid farm type';
+        if (!f.FarmTypeID) errs.FarmTypeID = 'Farm type is required';
         if (!validators.phone(f.ContactPhone)) errs.ContactPhone = 'Invalid phone number';
         if (!validators.email(f.ContactEmail)) errs.ContactEmail = 'Invalid email address';
         if (!validators.farmStatus(f.FarmStatus)) errs.FarmStatus = 'Invalid farm status';
@@ -146,6 +383,14 @@ export default function Farms() {
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
+        if (name === 'FarmTypeID') {
+            // when a FarmType is selected, also store a friendly name for backward compatibility
+            const id = value;
+            const sel = farmTypes.find(f => (f.FarmTypeID || f.Id || f.id || f.ID || '').toString() === id?.toString());
+            const friendly = sel ? (sel.TypeName || sel.Type || sel.Name || sel.Label || '') : '';
+            setForm(s => ({ ...s, FarmTypeID: id, FarmType: friendly }));
+            return;
+        }
         setForm(s => ({ ...s, [name]: type === 'checkbox' ? checked : value }));
     };
 
@@ -155,7 +400,8 @@ export default function Farms() {
         if (Object.keys(errs).length) { setFieldErrors(errs); return }
         setLoading(true);
         try {
-            const payload = { ...form, CreatedBy: user?.UserID || user?.id };
+            // Send FarmTypeID to backend (expecting ID not free-text type)
+            const payload = { ...form, FarmTypeID: form.FarmTypeID || null, CreatedBy: user?.UserID || user?.id };
             if (editingId) {
                 await fetchWithAuth({ url: `/farms/${editingId}`, method: 'put', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
             } else {
@@ -281,45 +527,7 @@ export default function Farms() {
         }, { enableHighAccuracy: true, timeout: 10000 });
     };
 
-    const InputField = ({ icon, label, name, value, onChange, error, ...props }) => (
-        <div>
-            <label className="text-left text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-            <div className="text-left relative mt-1">
-                <div className="text-left absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    {icon}
-                </div>
-                <input
-                    name={name}
-                    value={value}
-                    onChange={onChange}
-                    className="text-left block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-                    {...props}
-                />
-            </div>
-            {error && <p className="text-left mt-1 text-xs text-red-500">{error}</p>}
-        </div>
-    );
-
-    const SelectField = ({ icon, label, name, value, onChange, error, children, ...props }) => (
-        <div>
-            <label className="text-left text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-            <div className="text-left relative mt-1">
-                <div className="text-left absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                    {icon}
-                </div>
-                <select
-                    name={name}
-                    value={value}
-                    onChange={onChange}
-                    className="text-left block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    {...props}
-                >
-                    {children}
-                </select>
-            </div>
-            {error && <p className="text-left mt-1 text-xs text-red-500">{error}</p>}
-        </div>
-    );
+    // Farm form fields are rendered by `FarmForm` component (see ./FarmForm.jsx)
 
     return (
         <main className="text-left flex-1 p-6 bg-gray-100 dark:bg-gray-900">
@@ -355,11 +563,17 @@ export default function Farms() {
                         <FaSync className="mr-2" /> Refresh
                     </button>
                 </div>
+                {farmTypesLoadError ? (
+                    <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded">
+                        {farmTypesLoadError}
+                    </div>
+                ) : null}
 
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
                         <thead className="bg-gray-50 dark:bg-gray-700 text-xs text-gray-700 dark:text-gray-300 uppercase">
                             <tr>
+                                <th className="px-4 py-3">Farm Code</th>
                                 <th className="px-4 py-3">#</th>
                                 <th className="px-4 py-3">Farm Name</th>
                                 <th className="px-4 py-3">Type</th>
@@ -377,19 +591,29 @@ export default function Farms() {
                                 <tr><td colSpan={8} className="text-center p-4">No farms found.</td></tr>
                             ) : list.map((it, idx) => (
                                 <tr key={it.FarmID || idx} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                    <td className="px-4 py-3">{it.FarmCode || it.Code || ''}</td>
                                     <td className="px-4 py-3">{idx + 1}</td>
                                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FarmName || ''}</td>
-                                    <td className="px-4 py-3">{it.FarmType || it.Type || it.FarmTypeCode || it.FarmTypeName || ''}</td>
+                                    <td className="px-4 py-3">{
+                                        (() => {
+                                            const idKey = (it?.FarmTypeID || it?.farmTypeID || it?.FarmType || '')?.toString();
+                                            return (idKey && farmTypeNameCache[idKey]) ? farmTypeNameCache[idKey] : (it.FarmTypeName || it.FarmType || it.Type || it.FarmTypeCode || '');
+                                        })()
+                                    }</td>
                                     <td className="px-4 py-3">{it.FarmOwner || it.OwnerName || it.Owner || it.FarmerName || it.ContactPerson || ''}</td>
                                     <td className="px-4 py-3">{it.ContactPhone || it.ContactNumber || it.Phone || it.WorkPhone || it.ContactEmail || ''}</td>
-                                    <td className="px-4 py-3">{it.Region || it.RegionName || it.LocationRegion || it.Area || ''}</td>
+                                    <td className="px-4 py-3">{(() => {
+                                        // Use pickFirst and substring heuristic so Region displays whether it's nested, aliased, or oddly named
+                                        const val = pickFirst(it, regionAliases) || findByKeySubstring(it, ['region', 'regionname', 'region_label']);
+                                        return val || '';
+                                    })()}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded-full text-xs ${it.IsActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                             {it.IsActive ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 flex items-center justify-center space-x-2">
-                                        <button onClick={() => openEdit(it.FarmID)} className="text-indigo-500 hover:text-indigo-700"><FaEdit /></button>
+                                        <button onClick={() => openEdit(it)} className="text-indigo-500 hover:text-indigo-700"><FaEdit /></button>
                                         <button onClick={() => openGpsModal(it)} className="text-blue-500 hover:text-blue-700"><FaMapMarkerAlt /></button>
                                         {it.DeletedAt ? (
                                             <>
@@ -408,50 +632,17 @@ export default function Farms() {
             </div>
 
             <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit Farm' : 'Create New Farm'}>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InputField icon={<FaBuilding />} label="Farm Name" name="FarmName" value={form.FarmName} onChange={handleChange} error={fieldErrors.FarmName} placeholder="e.g. Green Valley Farms" />
-                        <SelectField icon={<FaInfoCircle />} label="Farm Type" name="FarmType" value={form.FarmType} onChange={handleChange} error={fieldErrors.FarmType}>
-                            <option value="">Select Type</option>
-                            <option>Dairy</option>
-                            <option>Layer</option>
-                            <option>Broiler</option>
-                        </SelectField>
-                        <InputField icon={<FaUser />} label="Farm Owner" name="FarmOwner" value={form.FarmOwner} onChange={handleChange} placeholder="e.g. John Doe" />
-                        <InputField icon={<FaUser />} label="Contact Person" name="ContactPerson" value={form.ContactPerson} onChange={handleChange} placeholder="e.g. Jane Doe" />
-                        <InputField icon={<FaPhone />} label="Contact Phone" name="ContactPhone" value={form.ContactPhone} onChange={handleChange} error={fieldErrors.ContactPhone} placeholder="0912345678" />
-                        <InputField icon={<FaEnvelope />} label="Contact Email" name="ContactEmail" value={form.ContactEmail} onChange={handleChange} error={fieldErrors.ContactEmail} placeholder="contact@farm.com" />
-                        <InputField icon={<FaMapMarkerAlt />} label="Address" name="Address" value={form.Address} onChange={handleChange} placeholder="123 Main St" />
-                        <InputField icon={<FaMapMarkerAlt />} label="Region" name="Region" value={form.Region} onChange={handleChange} placeholder="e.g. Amhara" />
-                        <InputField icon={<FaMapMarkerAlt />} label="Zone" name="Zone" value={form.Zone} onChange={handleChange} placeholder="e.g. North Shewa" />
-                        <InputField icon={<FaMapMarkerAlt />} label="Woreda" name="Woreda" value={form.Woreda} onChange={handleChange} placeholder="e.g. Debre Berhan" />
-                        <InputField icon={<FaMapMarkerAlt />} label="Kebele" name="Kebele" value={form.Kebele} onChange={handleChange} placeholder="e.g. 01" />
-                        <SelectField icon={<FaInfoCircle />} label="Farm Status" name="FarmStatus" value={form.FarmStatus} onChange={handleChange} error={fieldErrors.FarmStatus}>
-                            <option value="">Select Status</option>
-                            <option>Active</option>
-                            <option>Inactive</option>
-                            <option>Under Construction</option>
-                        </SelectField>
-                        <InputField icon={<FaGlobe />} label="Ownership Type" name="OwnershipType" value={form.OwnershipType} onChange={handleChange} placeholder="e.g. Private, Cooperative" />
-                        <InputField icon={<FaGlobe />} label="Production System" name="ProductionSystem" value={form.ProductionSystem} onChange={handleChange} placeholder="e.g. Intensive, Extensive" />
-                        <InputField icon={<FaGlobe />} label="Water Source" name="WaterSource" value={form.WaterSource} onChange={handleChange} placeholder="e.g. Borehole, River" />
-                        <InputField icon={<FaGlobe />} label="Farm Size (in ha)" name="FarmSize" value={form.FarmSize} onChange={handleChange} type="number" placeholder="100" />
-                        <InputField icon={<FaGlobe />} label="Number of Plots" name="NumberOfPlots" value={form.NumberOfPlots} onChange={handleChange} type="number" placeholder="5" />
-                        <InputField icon={<FaMapMarkerAlt />} label="Latitude" name="Latitude" value={form.Latitude} onChange={handleChange} placeholder="e.g. 9.0000" />
-                        <InputField icon={<FaMapMarkerAlt />} label="Longitude" name="Longitude" value={form.Longitude} onChange={handleChange} placeholder="e.g. 38.0000" />
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                            <input type="checkbox" name="IsActive" checked={!!form.IsActive} onChange={handleChange} className="rounded text-indigo-600 focus:ring-indigo-500" /> Active
-                        </label>
-                    </div>
-                    <div className="flex justify-end gap-4 pt-4">
-                        <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
-                        <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" disabled={loading}>
-                            {loading ? 'Saving...' : 'Save'}
-                        </button>
-                    </div>
-                </form>
+                <FarmForm
+                    form={form}
+                    setForm={setForm}
+                    onFieldChange={handleChange}
+                    editingId={editingId}
+                    fieldErrors={fieldErrors}
+                    farmTypes={farmTypes}
+                    loading={loading}
+                    onCancel={() => setShowForm(false)}
+                    onSubmit={handleSubmit}
+                />
             </Modal>
 
             <Modal open={gpsModalOpen} onClose={() => setGpsModalOpen(false)} title={`Update GPS for ${gpsFor?.FarmName}`}>

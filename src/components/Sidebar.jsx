@@ -11,6 +11,7 @@ const menu = [
         children: [
             { key: 'lookups', label: 'Lookups', icon: FaChartBar, href: '/dashboard?tab=lookups', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
             { key: 'lookuptypes', label: 'Lookup Type', icon: FaTags, href: '/dashboard?tab=lookuptypes', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
+            { key: 'farmtypes', label: 'Farm Types', icon: FaTags, href: '/dashboard?tab=farmtypes', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
             { key: 'farmers', label: 'Farmers', icon: FaUserPlus, href: '/dashboard?tab=farmers', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
             { key: 'employees', label: 'Employees', icon: FaUsers, href: '/dashboard?tab=employees', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
             { key: 'farms', label: 'Farm', icon: FaIndustry, href: '/dashboard?tab=farms', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'] },
@@ -25,7 +26,15 @@ const menu = [
             { key: 'advisorvisits', label: 'My Visits', icon: FaCalendarAlt, href: '/dashboard?tab=advisorvisits', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'] },
         ]
     },
-    { key: 'reports', label: 'Report', href: '/dashboard?tab=reports', icon: FaChartBar, rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
+    {
+        key: 'reports', label: 'Reports', href: '/dashboard?tab=reports', icon: FaChartBar, rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'],
+        children: [
+            { key: 'reports-farm', label: 'Farm', icon: FaIndustry, href: '/dashboard?tab=reports_farm', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
+            { key: 'reports-farmers', label: 'Farmers', icon: FaUserPlus, href: '/dashboard?tab=reports_farmers', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
+            { key: 'reports-visit', label: 'Visit', icon: FaCalendarAlt, href: '/dashboard?tab=reports_visit', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
+            { key: 'reports-advisor', label: 'Advisor', icon: FaUsers, href: '/dashboard?tab=reports_advisor', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
+        ]
+    },
     {
         key: 'settings', label: 'Settings', href: '/settings', icon: FaCog,
         // Settings is restricted to admin roles

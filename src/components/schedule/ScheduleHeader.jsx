@@ -92,6 +92,14 @@ const ScheduleHeader = ({
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm space-y-4"> 
         <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Left side: keep compact filters toggle for mobile */}
+          <div className="flex items-center gap-2">
+            <button onClick={() => setFiltersOpen(s => !s)} className="md:hidden flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              {filtersOpen ? <FaTimes /> : <FaBars />} Filters
+            </button>
+          </div>
+
+          {/* Right side: actions (New, Refresh) */}
           <div className="flex items-center gap-2">
             <button onClick={handleAction(onNew)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 transition-all">
               <FaPlus /> New Schedule
@@ -100,20 +108,6 @@ const ScheduleHeader = ({
               <FaSync /> Refresh
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleAction(onBulkUpload)} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-              <FaUpload /> Bulk Upload
-            </button>
-            <button onClick={handleAction(onDownloadTemplate)} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-              <FaFileAlt /> Template
-            </button>
-            <button onClick={handleAction(onShowDrafts)} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-              <FaThLarge /> Drafts
-            </button>
-          </div>
-          <button onClick={() => setFiltersOpen(s => !s)} className="md:hidden flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-            {filtersOpen ? <FaTimes /> : <FaBars />} Filters
-          </button>
         </div>
         
         <div className={`${filtersOpen ? 'block' : 'hidden'} md:grid md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700`}>
