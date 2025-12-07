@@ -4,8 +4,16 @@ import axios from 'axios';
 // Helper: normalize a base (trim whitespace and remove trailing slash)
 function normalizeBase(u) {
   if (!u) return null;
-  // ensure it's a string, trim surrounding whitespace, then remove a single trailing slash
-  return String(u).trim().replace(/\/$/, '');
+  // Ensure string, remove any literal backslash-escaped CR/LF sequences that may have
+  // been introduced when piping values on Windows ("\r" / "\n"), strip control
+  // characters, trim surrounding whitespace, then remove a single trailing slash.
+  let s = String(u);
+  // Remove literal backslash sequences like "\r" and "\n"
+  s = s.replace(/\\r/g, '').replace(/\\n/g, '');
+  // Strip any ASCII control characters (just in case)
+  s = s.replace(/[\x00-\x1F\x7F]/g, '');
+  s = s.trim();
+  return s.replace(/\/$/, '');
 }
 
 // Runtime override sources (in priority order):
