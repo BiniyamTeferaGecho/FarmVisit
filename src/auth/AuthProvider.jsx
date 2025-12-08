@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { setAuthToken, baseURL as API_BASE } from '../utils/api';
+import api from '../utils/api';
+import { useNavigate } from 'react-router-dom';
 
 // Lightweight JWT payload decoder for browser (no verification)
 function decodeJwt(token) {
@@ -86,8 +88,30 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  const navigate = useNavigate();
+
   const login = (accessToken) => setToken(accessToken);
-  const logout = () => { setToken(null); setUser(null); localStorage.removeItem('accessToken'); };
+  const logout = async () => {
+    // Attempt server-side logout to clear HttpOnly refresh cookie and server session
+    try {
+      await api.post('/auth/logout', {}, { withCredentials: true });
+    } catch (e) {
+      // ignore network errors; proceed to clear client state
+    }
+    // Clear client-side auth state
+    setToken(null);
+    setUser(null);
+    try { localStorage.removeItem('accessToken'); } catch (e) { /* ignore */ }
+    try { setAuthToken(null); } catch (e) { /* ignore */ }
+    // Redirect to canonical landing page
+    try {
+      // Use a full navigation to ensure cookies & auth state reset across origins
+      window.location.href = 'https://farm-visit.vercel.app/';
+    } catch (e) {
+      // Fallback to react-router navigation if window.location is unavailable
+      try { navigate('/'); } catch (e2) { /* ignore */ }
+    }
+  };
 
   // Backwards-compatible setter used by older code: auth.setAuth(accessToken, userObj)
   const setAuth = (accessToken, userObj) => {
