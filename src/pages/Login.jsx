@@ -95,6 +95,21 @@ export default function Login() {
 				// request a short-lived access token from the session endpoint
 				// which reads the cookie and returns an access token if available.
 				let didAuth = false;
+				// If server included a debug access token in the login response (useful
+				// during local/ngrok testing), use it as a fallback so users can log
+				// in even when cross-site cookies are blocked.
+				try {
+					const debugAccess = data?.debug?.accessToken || data?.accessToken || data?.token || null;
+					if (debugAccess) {
+						if (auth && typeof auth.setAuth === 'function') {
+							auth.setAuth(debugAccess, userObj);
+						} else {
+							try { localStorage.setItem('accessToken', debugAccess); } catch (e) { /* ignore */ }
+							try { const { setAuthToken } = await import('../utils/api'); setAuthToken(debugAccess); } catch (e) { /* ignore */ }
+						}
+						didAuth = true;
+					}
+				} catch (e) { /* ignore debug fallback failures */ }
 				try {
 					const sessionUrl = activeApi ? `${activeApi.replace(/\/$/, '')}/auth/session` : '/auth/session';
 					const sessRes = await api.get(sessionUrl, { withCredentials: true });
