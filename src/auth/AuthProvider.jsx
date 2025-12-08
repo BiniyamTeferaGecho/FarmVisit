@@ -88,6 +88,33 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
+  // On mount, try to obtain an access token via the HttpOnly refresh cookie
+  // This allows server-set cookies (cross-site) to bootstrap a client session
+  // without requiring the login response to contain tokens. We set `loading`
+  // while the check is in progress so ProtectedRoute can show a spinner.
+  useEffect(() => {
+    let mounted = true;
+    const trySession = async () => {
+      if (token) return; // already have a token
+      setLoading(true);
+      try {
+        const res = await api.get('/auth/session', { withCredentials: true });
+        if (!mounted) return;
+        const access = res?.data?.accessToken || null;
+        if (access) {
+          // set token which will decode user via existing effect
+          setToken(access);
+        }
+      } catch (e) {
+        // ignore: user not authenticated or network error
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    trySession();
+    return () => { mounted = false };
+  }, []);
+
   const navigate = useNavigate();
 
   const login = (accessToken) => setToken(accessToken);
