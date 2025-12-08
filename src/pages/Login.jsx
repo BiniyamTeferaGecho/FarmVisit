@@ -70,17 +70,27 @@ export default function Login() {
 			const loginUrl = activeApi ? `${activeApi.replace(/\/$/, '')}/auth/login` : '/auth/login';
 			const res = await api.post(loginUrl, { username: identifier, password }, { withCredentials: true })
 			const data = res?.data ?? {}
-			// backend may return either { accessToken } (auth controller) or { token } (user controller)
-			const token = data.accessToken || data.token || data.access_token || null;
-			const userObj = data.user || data.user || (data.session && data.session.user) || null;
-			if (res.status === 200 && token) {
-				// set auth state via provider helper
-				if (auth && typeof auth.setAuth === 'function') {
-					auth.setAuth(token, userObj);
-				} else {
-					// Fallback: persist token and set axios auth header so the app can recover
-					try { localStorage.setItem('accessToken', token); } catch (e) { /* ignore */ }
-					try { const { setAuthToken } = await import('../utils/api'); setAuthToken(token); } catch (e) { /* ignore */ }
+			const userObj = data.user || (data.session && data.session.user) || null;
+			if (res.status === 200) {
+				// Server sets HttpOnly refresh cookie on login. To avoid exposing
+				// tokens in the login response body (which appear in Network tab),
+				// request a short-lived access token from the session endpoint
+				// which reads the cookie and returns an access token if available.
+				try {
+					const sessionUrl = activeApi ? `${activeApi.replace(/\/$/, '')}/auth/session` : '/auth/session';
+					const sessRes = await api.get(sessionUrl, { withCredentials: true });
+					const access = sessRes?.data?.accessToken || null;
+					if (access) {
+						if (auth && typeof auth.setAuth === 'function') {
+							auth.setAuth(access, userObj);
+						} else {
+							try { localStorage.setItem('accessToken', access); } catch (e) { /* ignore */ }
+							try { const { setAuthToken } = await import('../utils/api'); setAuthToken(access); } catch (e) { /* ignore */ }
+						}
+					}
+				} catch (e) {
+					// If session endpoint didn't return an access token, continue
+					// anyway; frontend may rely on cookie-based auth for subsequent calls.
 				}
 				setMessage({ type: 'success', text: formatMessage('Signed in successfully') });
 				navigate('/dashboard', { replace: true });
