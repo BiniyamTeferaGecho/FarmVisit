@@ -63,8 +63,7 @@ export default function Login() {
 		try {
 			// Post credentials directly using the shared axios instance so we have control over payload
 			// Post to the auth login endpoint which sets an HttpOnly refresh cookie
-			// Debug: log minimal payload info (avoid logging raw password)
-			console.debug('Login: sending payload', { username: identifier, passwordPresent: !!password })
+			// Debug: minimal payload info was logged here previously; removed for production
 			// Use absolute API login endpoint to ensure deployed frontend calls the intended backend
 			// getActiveApiBase() returns the API root (e.g. "https://055a2395cc07.ngrok-free.app/api")
 			const activeApi = (typeof getActiveApiBase === 'function') ? getActiveApiBase() : null;
@@ -82,7 +81,6 @@ export default function Login() {
 					// Fallback: persist token and set axios auth header so the app can recover
 					try { localStorage.setItem('accessToken', token); } catch (e) { /* ignore */ }
 					try { const { setAuthToken } = await import('../utils/api'); setAuthToken(token); } catch (e) { /* ignore */ }
-					console.warn('Auth provider not available; persisted token to localStorage as fallback.');
 				}
 				setMessage({ type: 'success', text: formatMessage('Signed in successfully') });
 				navigate('/dashboard', { replace: true });
@@ -139,7 +137,7 @@ export default function Login() {
 				if (!mounted) return
 				setEmployees(normalizeList(r))
 			} catch (e) {
-				console.error('Failed to load employees for registration dropdown', e)
+				// Failed to load employees for registration dropdown; ignore silently in UI
 			}
 		}
 		loadEmployees()

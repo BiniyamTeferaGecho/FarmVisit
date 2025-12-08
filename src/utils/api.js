@@ -13,6 +13,12 @@ function normalizeBase(u) {
   // Strip any ASCII control characters (just in case)
   s = s.replace(/[\x00-\x1F\x7F]/g, '');
   s = s.trim();
+  // If the string contains other garbage after the URL (e.g. trailing ' y' or
+  // other characters introduced by shell piping), prefer to extract the first
+  // valid URL-looking substring. This ensures we don't accidentally include
+  // whitespace or stray letters that break DNS resolution (producing %20y).
+  const m = s.match(/https?:\/\/[^\s"'<>]+/i);
+  if (m && m[0]) return m[0].replace(/\/$/, '');
   return s.replace(/\/$/, '');
 }
 
@@ -43,7 +49,7 @@ else if (envURL) base = normalizeBase(envURL);
 // Special-case: when served from farm-visit.vercel.app, prefer using the ngrok tunnel for quick testing.
 // This is temporary and requires a redeploy to take effect on the live build.
 else if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname === 'farm-visit.vercel.app') {
-  base = 'https://055a2395cc07.ngrok-free.app';
+  base = 'https://1803afb14fe6.ngrok-free.app';
 } else if (typeof window !== 'undefined' && window.location && window.location.hostname && !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
   // when served from a host (e.g., Vercel), assume same-origin API path
   base = `${window.location.origin}`;
