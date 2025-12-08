@@ -6,6 +6,24 @@ import reactLogo from '../assets/images/AKF Logo.png'
 import bgImage from '../assets/images/BackGround.jpg'
 
 export default function Login() {
+
+	// Ensure production builds run on the canonical Vercel origin. When the
+	// login page loads in production on a different host (e.g. preview or a
+	// temporary domain), redirect to the canonical production host so the
+	// frontend URL is consistent and cookies/sessions behave as expected.
+	// This redirect only runs in production builds to avoid disrupting local dev.
+	React.useEffect(() => {
+		try {
+			if (typeof window !== 'undefined' && import.meta && import.meta.env && import.meta.env.PROD) {
+				const canonical = 'https://farm-visit.vercel.app';
+				if (window.location.origin !== canonical) {
+					// Redirect to the canonical login path
+					window.location.href = `${canonical}/login`;
+				}
+			}
+		} catch (e) { /* ignore */ }
+	}, []);
+
 	const [mode, setMode] = useState('login') // 'login' | 'forgot' | 'register'
 
 	// login fields (identifier can be username, email or phone)
