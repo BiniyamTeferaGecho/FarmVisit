@@ -76,6 +76,7 @@ export default function Login() {
 				// tokens in the login response body (which appear in Network tab),
 				// request a short-lived access token from the session endpoint
 				// which reads the cookie and returns an access token if available.
+				let didAuth = false;
 				try {
 					const sessionUrl = activeApi ? `${activeApi.replace(/\/$/, '')}/auth/session` : '/auth/session';
 					const sessRes = await api.get(sessionUrl, { withCredentials: true });
@@ -87,13 +88,20 @@ export default function Login() {
 							try { localStorage.setItem('accessToken', access); } catch (e) { /* ignore */ }
 							try { const { setAuthToken } = await import('../utils/api'); setAuthToken(access); } catch (e) { /* ignore */ }
 						}
+						didAuth = true;
 					}
 				} catch (e) {
 					// If session endpoint didn't return an access token, continue
-					// anyway; frontend may rely on cookie-based auth for subsequent calls.
+					// and handle below.
 				}
-				setMessage({ type: 'success', text: formatMessage('Signed in successfully') });
-				navigate('/dashboard', { replace: true });
+
+				if (didAuth || (auth && auth.isAuthenticated)) {
+					setMessage({ type: 'success', text: formatMessage('Signed in successfully') });
+					navigate('/dashboard', { replace: true });
+				} else {
+					// Session wasn't established (cookie missing or blocked). Inform the user.
+					setMessage({ type: 'error', text: formatMessage('Signed in, but session cookie was not established. Please enable cross-site cookies or try again.') });
+				}
 			} else {
 				setMessage({ type: 'error', text: formatMessage(data.message || 'Login failed') });
 			}
