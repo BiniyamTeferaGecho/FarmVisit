@@ -14,6 +14,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/login" element={<LoginPage />} />
           <Route path="" element={<LoginPage />} />
           {/* allow explicit /dashboard path used by sidebar links */}
           <Route path="/dashboard/*" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
