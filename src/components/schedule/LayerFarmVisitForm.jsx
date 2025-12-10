@@ -73,6 +73,8 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
   const { fetchWithAuth, user } = auth || {}
   const [internalSaving, setInternalSaving] = useState(false)
   const [errors, setErrors] = useState({})
+  const [breedOptions, setBreedOptions] = useState([])
+  const [breedLoading, setBreedLoading] = useState(false)
 
   const [imagePreviews, setImagePreviews] = useState([]);
   const createdBlobUrlsRef = useRef([]);
@@ -237,6 +239,69 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
   };
 
   useEffect(() => {
+    let mounted = true
+
+    const loadBreeds = async () => {
+      try {
+        setBreedLoading(true)
+
+        const tryRequest = async (opts) => {
+          try {
+            if (typeof fetchWithAuth === 'function') return await fetchWithAuth(opts)
+            const api = await import('../../utils/api').then(m => m.default).catch(() => null)
+            if (!api) throw new Error('No HTTP client available')
+            return await api.request(opts)
+          } catch (err) {
+            // return the error so caller can continue to fallback
+            return err
+          }
+        }
+
+        const extractItems = (res) => {
+          if (!res) return []
+          // axios-style response
+          const d = res.data !== undefined ? res.data : res
+          // common wrapper: { success: true, data: [...] }
+          if (d && Array.isArray(d.data)) return d.data
+          // sometimes direct array is returned
+          if (Array.isArray(d)) return d
+          // mssql style recordset
+          if (d && Array.isArray(d.recordset)) return d.recordset
+          // direct object with items property
+          if (d && Array.isArray(d.items)) return d.items
+          return []
+        }
+
+        // Try the explicit ngrok API first (requested), then fallback to relative endpoints
+        const endpoints = [
+          //{ url: 'https://farmvisit.ngrok.app/api/lookups/by-type-name/Breed', method: 'GET' },
+          { url: '/lookups/by-type-name/Breed', method: 'GET' },
+          { url: '/lookups/by-type', method: 'GET', params: { typeName: 'Breed' } },
+          { url: '/lookups/by-type', method: 'GET', params: { lookupTypeId: null, typeName: 'Breed' } },
+        ]
+
+        let items = []
+        for (const ep of endpoints) {
+          try {
+            const resp = await tryRequest(ep)
+            // if resp is an Error, skip
+            if (resp instanceof Error) continue
+            const got = extractItems(resp)
+            if (got && got.length) { items = got; break }
+          } catch (e) { /* ignore and try next */ }
+        }
+
+        if (mounted) setBreedOptions(items || [])
+      } catch (e) {
+        console.error('loadBreeds error', e)
+        if (mounted) setBreedOptions([])
+      } finally {
+        if (mounted) setBreedLoading(false)
+      }
+    }
+
+    loadBreeds()
+
     // If initial/updated data contains string URLs, show them.
     if (Array.isArray(data.AnyRelatedEvidenceImage) && data.AnyRelatedEvidenceImage.length > 0) {
       const arr = data.AnyRelatedEvidenceImage.map((it) => (it instanceof File ? URL.createObjectURL(it) : String(it)));
@@ -261,11 +326,12 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     }
 
     return () => {
+      mounted = false
       // cleanup created blob urls
       createdBlobUrlsRef.current.forEach((u) => { try { URL.revokeObjectURL(u); } catch {} });
       createdBlobUrlsRef.current = [];
     };
-  }, [data, readOnly]);
+  }, [data, readOnly, fetchWithAuth]);
 
   const handleGetLocation = () => {
     if (readOnly) return;
@@ -337,7 +403,40 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
             )}
           </div>
           <InputField disabled={readOnly} label="Farm ID (GUID)" name="FarmID" value={data.FarmID || data.farmId} onChange={handleChange} placeholder="Optional Farm GUID" error={errors && errors.FarmID} />
-          <InputField disabled={readOnly} label="Breed" name="Breed" value={data.Breed} onChange={handleChange} error={errors && errors.Breed} />
+          <div>
+            <label htmlFor="Breed" className="block text-sm font-medium text-gray-700 text-left mb-1">Breed</label>
+            <div className="relative">
+              <select
+                id="Breed"
+                name="Breed"
+                value={data.Breed || ''}
+                onChange={handleChange}
+                disabled={readOnly}
+                className={`mt-1 block w-full rounded-md ${errors && errors.Breed ? 'border-red-500' : 'border-gray-300'} shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              >
+                {breedLoading ? (
+                  <option value="" disabled>Loading breeds…</option>
+                ) : (breedOptions && breedOptions.length ? (
+                  <>
+                    <option value="">Select Breed</option>
+                    {breedOptions.map(b => {
+                      const lookupValue = (b.LookupValue || b.lookupValue || '').toString();
+                      const lookupCode = (b.LookupCode || b.lookupcode || b.LookupCode || b.Code || '').toString();
+                      const lookupId = (b.LookupID || b.lookupId || b.lookupID || b.Id || '').toString();
+                      const val = lookupValue || lookupId || lookupCode || ''
+                      const labelBase = lookupValue || lookupCode || lookupId || ''
+                      const label = lookupCode ? `${labelBase} (${lookupCode})` : `${labelBase}`
+                      const key = lookupId || lookupValue || lookupCode || Math.random().toString(36).slice(2,8)
+                      return <option key={key} value={val}>{label}</option>
+                    })}
+                  </>
+                ) : (
+                  <option value="" disabled>No breeds available</option>
+                ))}
+              </select>
+            </div>
+            {errors && errors.Breed && <div className="text-sm text-red-600 mt-1">{errors.Breed}</div>}
+          </div>
           <InputField disabled={readOnly} label="Size of House (m²)" name="SizeOfTheHouseinM2" type="number" step="0.01" value={data.SizeOfTheHouseinM2} onChange={handleChange} />
           <InputField disabled={readOnly} label="Flock Size" name="FlockSize" type="number" min="0" value={data.FlockSize} onChange={handleChange} error={errors && errors.FlockSize} />
           <InputField disabled={readOnly} label="Feed Distribution Frequency (per day)" name="FreqFeedDistPerDay" type="number" value={data.FreqFeedDistPerDay} onChange={handleChange} />
