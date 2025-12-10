@@ -339,7 +339,6 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField disabled={readOnly} label="Farm ID (GUID)" name="FarmID" value={data.FarmID || data.farmId} onChange={handleChange} placeholder="Optional Farm GUID" error={errors && errors.FarmID} />
           <InputField disabled={readOnly} label="Breed" name="Breed" value={data.Breed} onChange={handleChange} error={errors && errors.Breed} />
           <InputField disabled={readOnly} label="Size of House (m²)" name="SizeOfTheHouseinM2" type="number" step="0.01" value={data.SizeOfTheHouseinM2} onChange={handleChange} />
-          <InputField disabled={readOnly} label="Flock Density (birds/m²)" name="FlockDenPChickenm2" type="number" step="0.01" value={data.FlockDenPChickenm2} onChange={handleChange} />
           <InputField disabled={readOnly} label="Flock Size" name="FlockSize" type="number" min="0" value={data.FlockSize} onChange={handleChange} error={errors && errors.FlockSize} />
           <InputField disabled={readOnly} label="Feed Distribution Frequency (per day)" name="FreqFeedDistPerDay" type="number" value={data.FreqFeedDistPerDay} onChange={handleChange} />
           <InputField disabled={readOnly} label="Time of Feed Dist & How Much" name="TimeofFeedDistandHowMuch" type="text" value={data.TimeofFeedDistandHowMuch} onChange={handleChange} />
@@ -386,8 +385,8 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField disabled={readOnly} label="Egg Production (%)" name="CurrEggProdinPercent" type="number" min="0" max="100" step="0.01" value={data.CurrEggProdinPercent ?? data.EggProductionPercent} onChange={handleChange} error={errors && errors.CurrEggProdinPercent} />
           <InputField disabled={readOnly} label="Egg Size Avg Weight (g)" name="EggSizeAvgWeightGm" type="number" min="0" max="200" step="0.01" value={data.EggSizeAvgWeightGm} onChange={handleChange} />
           <TextAreaField disabled={readOnly} label="Egg Abnormality" name="EggAbnormality" value={data.EggAbnormality} onChange={handleChange} placeholder="Describe any egg abnormalities..." />
-          <InputField disabled={readOnly} label="Yolk Color (1-15)" name="YolkColor" type="number" min="1" max="15" value={data.YolkColor} onChange={handleChange} />
-          <InputField disabled={readOnly} label="Eggshell Color (1-10)" name="EggShellColor" type="number" min="1" max="10" value={data.EggShellColor} onChange={handleChange} />
+          <InputField disabled={readOnly} label="Yolk Color (1-18)" name="YolkColor" type="number" min="1" max="15" value={data.YolkColor} onChange={handleChange} />
+          <InputField disabled={readOnly} label="Eggshell Color (1-18)" name="EggShellColor" type="number" min="1" max="10" value={data.EggShellColor} onChange={handleChange} />
           <TextAreaField disabled={readOnly} label="Egg Production Decline (prev 1-3 weeks)" name="RecentEggProdDeclinePrev1to3Weeks" value={data.RecentEggProdDeclinePrev1to3Weeks || data.EggProductionDeclinePrev1Week} onChange={handleChange} placeholder="Notes on production decline over the past 1-3 weeks..." />
           <InputField disabled={readOnly} label="Total Mortality" name="MortalityTotal" type="number" min="0" value={data.MortalityTotal} onChange={handleChange} error={errors && errors.MortalityTotal} />
           <InputField disabled={readOnly} label="Recent Mortality (1-3 weeks)" name="RecentMortalityPrev1to3Weeks" type="number" min="0" value={data.RecentMortalityPrev1to3Weeks ?? data.MortalityRecent2Weeks} onChange={handleChange} error={errors && errors.RecentMortalityPrev1to3Weeks} />
@@ -395,20 +394,13 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
         <SectionCard title="Diagnostics & Recommendations" icon={<Pill className="text-purple-600" />}>
           <TextAreaField disabled={readOnly} label="Disease History" name="ExplainAnyDiseaseHistory" value={data.ExplainAnyDiseaseHistory || data.DiseaseHistory} onChange={handleChange} placeholder="Enter past diseases..." />
-          <TextAreaField disabled={readOnly} label="Abnormal Signs / Postmortem" name="AbnormalSigns" value={data.AbnormalSigns} onChange={handleChange} placeholder="Describe any abnormal signs or findings..." />
+          <TextAreaField disabled={readOnly} label="Abnormal Disease Signs" name="AbnormalSigns" value={data.AbnormalSigns} onChange={handleChange} placeholder="Describe any abnormal signs or findings..." />
           <TextAreaField disabled={readOnly} label="Postmortem Findings" name="ExplainPostmortemFindings" value={data.ExplainPostmortemFindings || data.PostmortemFindings} onChange={handleChange} placeholder="Postmortem findings..." />
-          <TextAreaField disabled={readOnly} label="Recommendations" name="RecommendationAdvice" value={data.RecommendationAdvice || data.RecommendationGiven} onChange={handleChange} placeholder="Enter recommendations..." />
+          
         </SectionCard>
 
-        <SectionCard title="Sampling" icon={<Microscope className="text-teal-600" />}>
-          <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
-            <CheckboxField disabled={readOnly} label="Sample Taken" name="SampleTaken" checked={data.SampleTaken} onChange={handleChange} />
-            <div className="flex-grow">
-              <InputField disabled={readOnly} label="Sample Type" name="SampleType" value={data.SampleType} onChange={handleChange} placeholder="e.g., blood, tissue" />
-            </div>
-          </div>
-          <InputField disabled={readOnly} label="Batch Number" name="BatchNumber" value={data.BatchNumber} onChange={handleChange} placeholder="Batch number if applicable" />
-          <TextAreaField disabled={readOnly} label="Analysis Request" name="AnalyzeRequested" value={data.AnalyzeRequested || data.AnalysisRequest} onChange={handleChange} placeholder="Specify analysis required..." />
+        
+          
           <TextAreaField disabled={readOnly} label="Customer Feedback on AKF" name="FeedBackOnAKF" value={data.FeedBackOnAKF || data.CustomerFeedbackOnAKF} onChange={handleChange} placeholder="Customer feedback..." />
           {!readOnly && (
           <div className="col-span-1 md:col-span-2">
@@ -440,6 +432,16 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
             )}
            </div>
            )}
+           <SectionCard title="Sampling" icon={<Microscope className="text-teal-600" />}>
+           <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
+            <CheckboxField disabled={readOnly} label="Sample Taken" name="SampleTaken" checked={data.SampleTaken} onChange={handleChange} />
+            <div className="flex-grow">
+              <InputField disabled={readOnly} label="Sample Type" name="SampleType" value={data.SampleType} onChange={handleChange} placeholder="e.g., blood, tissue, feed" />
+            </div>
+          </div>
+          <InputField disabled={readOnly} label="Batch Number/Production Date" name="BatchNumber" value={data.BatchNumber} onChange={handleChange} placeholder="Batch number if applicable" />
+          <TextAreaField disabled={readOnly} label="Analysis Request" name="AnalyzeRequested" value={data.AnalyzeRequested || data.AnalysisRequest} onChange={handleChange} placeholder="Specify analysis required..." />
+           <TextAreaField disabled={readOnly} label="Recommendations for Customer" name="RecommendationAdvice" value={data.RecommendationAdvice || data.RecommendationGiven} onChange={handleChange} placeholder="Enter recommendations..." />
         </SectionCard>
       </div>
 
