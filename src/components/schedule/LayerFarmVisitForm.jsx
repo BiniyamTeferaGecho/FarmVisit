@@ -75,6 +75,10 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
   const [errors, setErrors] = useState({})
   const [breedOptions, setBreedOptions] = useState([])
   const [breedLoading, setBreedLoading] = useState(false)
+  const [feederOptions, setFeederOptions] = useState([])
+  const [feederLoading, setFeederLoading] = useState(false)
+  const [drinkerOptions, setDrinkerOptions] = useState([])
+  const [drinkerLoading, setDrinkerLoading] = useState(false)
 
   const [imagePreviews, setImagePreviews] = useState([]);
   const createdBlobUrlsRef = useRef([]);
@@ -95,59 +99,58 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     }
   };
 
-  const validate = () => {
-    const errs = {}
-    const toNum = (v) => {
-      if (v === null || v === undefined || v === '') return null
-      const n = Number(v)
-      return Number.isFinite(n) ? n : NaN
+    const validate = () => {
+      const errs = {}
+      const toNum = (v) => {
+        if (v === null || v === undefined || v === '') return null
+        const n = Number(v)
+        return Number.isFinite(n) ? n : NaN
+      }
+
+      // Location required (table: Location NOT NULL)
+      if (!data.Location && !data.location) errs.Location = 'Location is required'
+
+      // FlockSize must be > 0
+      const flock = toNum(data.FlockSize)
+      if (flock === null) {
+        // not required
+      } else if (Number.isNaN(flock) || flock <= 0) {
+        errs.FlockSize = 'Flock size must be a number > 0'
+      }
+
+      // AgeInWeeks 18-100
+      const age = toNum(data.AgeInWeeks)
+      if (age !== null && !Number.isNaN(age)) {
+        if (age < 18 || age > 100) errs.AgeInWeeks = 'Age in weeks must be between 18 and 100'
+      }
+
+      // CurrEggProdinPercent 0-100
+      const eggProd = toNum(data.CurrEggProdinPercent || data.EggProductionPercent)
+      if (eggProd !== null && !Number.isNaN(eggProd)) {
+        if (eggProd < 0 || eggProd > 100) errs.CurrEggProdinPercent = 'Egg production percent must be between 0 and 100'
+      }
+
+      // HouseTemperature 10-40
+      const temp = toNum(data.HouseTemperature)
+      if (temp !== null && !Number.isNaN(temp)) {
+        if (temp < 10 || temp > 40) errs.HouseTemperature = 'House temperature must be between 10 and 40 °C'
+      }
+
+      // RecentMortalityPrev1to3Weeks <= FlockSize
+      const mortTotal = toNum(data.MortalityTotal)
+      const mortRecent = toNum(data.RecentMortalityPrev1to3Weeks || data.MortalityRecent2Weeks)
+      if (mortRecent !== null && !Number.isNaN(mortRecent)) {
+        if (mortRecent < 0) errs.RecentMortalityPrev1to3Weeks = 'Recent mortality must be >= 0'
+        if (flock !== null && !Number.isNaN(flock) && mortRecent > flock) errs.RecentMortalityPrev1to3Weeks = 'Recent mortality cannot exceed flock size'
+      }
+
+      ;['FeedIntakePerChickenGm','WaterInTakePerChickenPerDay','AverageBodyWeightKG','NumberofDrinker','NumberofFeeder','MortalityTotal'].forEach(k => {
+        const v = toNum(data[k])
+        if (v !== null && !Number.isNaN(v) && v < 0) errs[k] = `${k} must be >= 0`
+      })
+
+      return errs
     }
-
-    // Location required (table: Location NOT NULL)
-    if (!data.Location && !data.location) errs.Location = 'Location is required'
-
-    // FlockSize must be > 0 (table constraint)
-    const flock = toNum(data.FlockSize)
-    if (flock === null) {
-      // not required but SP/db expects positive when provided; encourage user to enter
-    } else if (Number.isNaN(flock) || flock <= 0) {
-      errs.FlockSize = 'Flock size must be a number > 0'
-    }
-
-    // AgeInWeeks 18-100 (CK constraint)
-    const age = toNum(data.AgeInWeeks)
-    if (age !== null && !Number.isNaN(age)) {
-      if (age < 18 || age > 100) errs.AgeInWeeks = 'Age in weeks must be between 18 and 100'
-    }
-
-    // CurrEggProdinPercent 0-100 (CK)
-    const eggProd = toNum(data.CurrEggProdinPercent || data.EggProductionPercent)
-    if (eggProd !== null && !Number.isNaN(eggProd)) {
-      if (eggProd < 0 || eggProd > 100) errs.CurrEggProdinPercent = 'Egg production percent must be between 0 and 100'
-    }
-
-    // HouseTemperature 10-40 (CK)
-    const temp = toNum(data.HouseTemperature)
-    if (temp !== null && !Number.isNaN(temp)) {
-      if (temp < 10 || temp > 40) errs.HouseTemperature = 'House temperature must be between 10 and 40 °C'
-    }
-
-    // RecentMortalityPrev1to3Weeks <= FlockSize
-    const mortTotal = toNum(data.MortalityTotal)
-    const mortRecent = toNum(data.RecentMortalityPrev1to3Weeks || data.MortalityRecent2Weeks)
-    if (mortRecent !== null && !Number.isNaN(mortRecent)) {
-      if (mortRecent < 0) errs.RecentMortalityPrev1to3Weeks = 'Recent mortality must be >= 0'
-      if (flock !== null && !Number.isNaN(flock) && mortRecent > flock) errs.RecentMortalityPrev1to3Weeks = 'Recent mortality cannot exceed flock size'
-    }
-
-    // Other numeric sanity checks (non-negative)
-    ;['FeedIntakePerChickenGm','WaterInTakePerChickenPerDay','AverageBodyWeightKG','NumberofDrinker','NumberofFeeder','MortalityTotal'].forEach(k => {
-      const v = toNum(data[k])
-      if (v !== null && !Number.isNaN(v) && v < 0) errs[k] = `${k} must be >= 0`
-    })
-
-    return errs
-  }
 
   const handleSave = async () => {
     const errs = validate()
@@ -301,6 +304,110 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     }
 
     loadBreeds()
+    
+    const loadFeeders = async () => {
+      try {
+        setFeederLoading(true)
+
+        const tryRequestLocal = async (opts) => {
+          try {
+            if (typeof fetchWithAuth === 'function') return await fetchWithAuth(opts)
+            const api = await import('../../utils/api').then(m => m.default).catch(() => null)
+            if (!api) throw new Error('No HTTP client available')
+            return await api.request(opts)
+          } catch (err) {
+            return err
+          }
+        }
+
+        const extractItemsLocal = (res) => {
+          if (!res) return []
+          const d = res.data !== undefined ? res.data : res
+          if (d && Array.isArray(d.data)) return d.data
+          if (Array.isArray(d)) return d
+          if (d && Array.isArray(d.recordset)) return d.recordset
+          if (d && Array.isArray(d.items)) return d.items
+          return []
+        }
+
+        const endpoints = [
+          { url: 'https://farmvisit.ngrok.app/api/lookups/by-type-name/Feeder%20Type', method: 'GET' },
+          { url: '/lookups/by-type-name', method: 'GET', params: { typeName: 'Feeder Type', includeInactive: 0 } },
+          { url: '/lookups/by-type', method: 'GET', params: { typeName: 'Feeder Type' } },
+        ]
+
+        let items = []
+        for (const ep of endpoints) {
+          try {
+            const resp = await tryRequestLocal(ep)
+            if (resp instanceof Error) continue
+            const got = extractItemsLocal(resp)
+            if (got && got.length) { items = got; break }
+          } catch (e) { /* ignore and try next */ }
+        }
+
+        if (mounted) setFeederOptions(items || [])
+      } catch (e) {
+        console.error('loadFeeders error', e)
+        if (mounted) setFeederOptions([])
+      } finally {
+        if (mounted) setFeederLoading(false)
+      }
+    }
+
+    loadFeeders()
+
+    const loadDrinkers = async () => {
+      try {
+        setDrinkerLoading(true)
+
+        const tryRequestLocal = async (opts) => {
+          try {
+            if (typeof fetchWithAuth === 'function') return await fetchWithAuth(opts)
+            const api = await import('../../utils/api').then(m => m.default).catch(() => null)
+            if (!api) throw new Error('No HTTP client available')
+            return await api.request(opts)
+          } catch (err) {
+            return err
+          }
+        }
+
+        const extractItemsLocal = (res) => {
+          if (!res) return []
+          const d = res.data !== undefined ? res.data : res
+          if (d && Array.isArray(d.data)) return d.data
+          if (Array.isArray(d)) return d
+          if (d && Array.isArray(d.recordset)) return d.recordset
+          if (d && Array.isArray(d.items)) return d.items
+          return []
+        }
+
+        const endpoints = [
+          { url: 'https://farmvisit.ngrok.app/api/lookups/by-type-name/Drinker%20Type', method: 'GET' },
+          { url: '/lookups/by-type-name', method: 'GET', params: { typeName: 'Drinker Type', includeInactive: 0 } },
+          { url: '/lookups/by-type', method: 'GET', params: { typeName: 'Drinker Type' } },
+        ]
+
+        let items = []
+        for (const ep of endpoints) {
+          try {
+            const resp = await tryRequestLocal(ep)
+            if (resp instanceof Error) continue
+            const got = extractItemsLocal(resp)
+            if (got && got.length) { items = got; break }
+          } catch (e) { /* ignore and try next */ }
+        }
+
+        if (mounted) setDrinkerOptions(items || [])
+      } catch (e) {
+        console.error('loadDrinkers error', e)
+        if (mounted) setDrinkerOptions([])
+      } finally {
+        if (mounted) setDrinkerLoading(false)
+      }
+    }
+
+    loadDrinkers()
 
     // If initial/updated data contains string URLs, show them.
     if (Array.isArray(data.AnyRelatedEvidenceImage) && data.AnyRelatedEvidenceImage.length > 0) {
@@ -457,9 +564,75 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
             <InputField disabled={readOnly} label="Litter Condition" name="LitterCondition" value={data.LitterCondition} onChange={handleChange} />
             <InputField disabled={readOnly} label="Uniformity of Flock (%)" name="UnifermityofTheFlock" type="number" min="0" max="100" value={data.UnifermityofTheFlock} onChange={handleChange} />
           <InputField disabled={readOnly} label="Ventilation Status" name="VentilationStatus" value={data.VentilationStatus || data.Ventilation} onChange={handleChange} />
-          <InputField disabled={readOnly} label="Drinker Type" name="DrinkerType" value={data.DrinkerType} onChange={handleChange} />
+          <div>
+            <label htmlFor="DrinkerType" className="block text-sm font-medium text-gray-700 text-left mb-1">Drinker Type</label>
+            <div className="relative">
+              <select
+                id="DrinkerType"
+                name="DrinkerType"
+                value={data.DrinkerType || ''}
+                onChange={handleChange}
+                disabled={readOnly}
+                className={`mt-1 block w-full rounded-md ${errors && errors.DrinkerType ? 'border-red-500' : 'border-gray-300'} shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              >
+                {drinkerLoading ? (
+                  <option value="" disabled>Loading drinker types…</option>
+                ) : (drinkerOptions && drinkerOptions.length ? (
+                  <>
+                    <option value="">Select Drinker Type</option>
+                    {drinkerOptions.map(d => {
+                      const lookupValue = (d.LookupValue || d.lookupValue || '').toString();
+                      const lookupCode = (d.LookupCode || d.lookupcode || d.Code || '').toString();
+                      const lookupId = (d.LookupID || d.lookupId || d.Id || '').toString();
+                      const val = lookupValue || lookupId || lookupCode || ''
+                      const labelBase = lookupValue || lookupCode || lookupId || ''
+                      const label = lookupCode ? `${labelBase} (${lookupCode})` : `${labelBase}`
+                      const key = lookupId || lookupValue || lookupCode || Math.random().toString(36).slice(2,8)
+                      return <option key={key} value={val}>{label}</option>
+                    })}
+                  </>
+                ) : (
+                  <option value="" disabled>No drinker types available</option>
+                ))}
+              </select>
+            </div>
+            {errors && errors.DrinkerType && <div className="text-sm text-red-600 mt-1">{errors.DrinkerType}</div>}
+          </div>
           <InputField disabled={readOnly} label="Number of Drinkers" name="NumberofDrinker" type="number" min="0" value={data.NumberofDrinker} onChange={handleChange} />
-          <InputField disabled={readOnly} label="Feeder Type" name="FeederType" value={data.FeederType} onChange={handleChange} />
+          <div>
+            <label htmlFor="FeederType" className="block text-sm font-medium text-gray-700 text-left mb-1">Feeder Type</label>
+            <div className="relative">
+              <select
+                id="FeederType"
+                name="FeederType"
+                value={data.FeederType || ''}
+                onChange={handleChange}
+                disabled={readOnly}
+                className={`mt-1 block w-full rounded-md ${errors && errors.FeederType ? 'border-red-500' : 'border-gray-300'} shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              >
+                {feederLoading ? (
+                  <option value="" disabled>Loading feeder types…</option>
+                ) : (feederOptions && feederOptions.length ? (
+                  <>
+                    <option value="">Select Feeder Type</option>
+                    {feederOptions.map(f => {
+                      const lookupValue = (f.LookupValue || f.lookupValue || '').toString();
+                      const lookupCode = (f.LookupCode || f.lookupcode || f.Code || '').toString();
+                      const lookupId = (f.LookupID || f.lookupId || f.Id || '').toString();
+                      const val = lookupValue || lookupId || lookupCode || ''
+                      const labelBase = lookupValue || lookupCode || lookupId || ''
+                      const label = lookupCode ? `${labelBase} (${lookupCode})` : `${labelBase}`
+                      const key = lookupId || lookupValue || lookupCode || Math.random().toString(36).slice(2,8)
+                      return <option key={key} value={val}>{label}</option>
+                    })}
+                  </>
+                ) : (
+                  <option value="" disabled>No feeder types available</option>
+                ))}
+              </select>
+            </div>
+            {errors && errors.FeederType && <div className="text-sm text-red-600 mt-1">{errors.FeederType}</div>}
+          </div>
           <InputField disabled={readOnly} label="Number of Feeders" name="NumberofFeeder" type="number" min="0" value={data.NumberofFeeder} onChange={handleChange} />
         </SectionCard>
 
