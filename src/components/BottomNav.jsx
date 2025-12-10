@@ -4,7 +4,8 @@ import { Home, Calendar, Clock, BarChart2, Settings } from 'lucide-react'
 
 const items = [
   { key: 'dashboard', label: 'Home', icon: Home },
-  { key: 'farmvisit', label: 'Visits', icon: Calendar },
+  // Wire mobile "Visits" button to the Visit Schedules tab
+  { key: 'farmvisitschedule', label: 'Visits', icon: Calendar },
   { key: 'createschedule', label: 'Create', icon: Clock },
   { key: 'schedules', label: 'List', icon: BarChart2 },
   { key: 'settings', label: 'Settings', icon: Settings },
