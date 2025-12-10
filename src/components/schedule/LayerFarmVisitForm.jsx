@@ -79,6 +79,12 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
   const [feederLoading, setFeederLoading] = useState(false)
   const [drinkerOptions, setDrinkerOptions] = useState([])
   const [drinkerLoading, setDrinkerLoading] = useState(false)
+  const [ventilationOptions, setVentilationOptions] = useState([])
+  const [ventilationLoading, setVentilationLoading] = useState(false)
+  const [litterOptions, setLitterOptions] = useState([])
+  const [litterLoading, setLitterLoading] = useState(false)
+  const [sourceOptions, setSourceOptions] = useState([])
+  const [sourceLoading, setSourceLoading] = useState(false)
 
   const [imagePreviews, setImagePreviews] = useState([]);
   const createdBlobUrlsRef = useRef([]);
@@ -409,6 +415,162 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
     loadDrinkers()
 
+    const loadVentilation = async () => {
+      try {
+        setVentilationLoading(true)
+
+        const tryRequestLocal = async (opts) => {
+          try {
+            if (typeof fetchWithAuth === 'function') return await fetchWithAuth(opts)
+            const api = await import('../../utils/api').then(m => m.default).catch(() => null)
+            if (!api) throw new Error('No HTTP client available')
+            return await api.request(opts)
+          } catch (err) {
+            return err
+          }
+        }
+
+        const extractItemsLocal = (res) => {
+          if (!res) return []
+          const d = res.data !== undefined ? res.data : res
+          if (d && Array.isArray(d.data)) return d.data
+          if (Array.isArray(d)) return d
+          if (d && Array.isArray(d.recordset)) return d.recordset
+          if (d && Array.isArray(d.items)) return d.items
+          return []
+        }
+
+        const endpoints = [
+          { url: 'https://farmvisit.ngrok.app/api/lookups/by-type-name/Ventilation', method: 'GET' },
+          { url: '/lookups/by-type-name', method: 'GET', params: { typeName: 'Ventilation', includeInactive: 0 } },
+          { url: '/lookups/by-type', method: 'GET', params: { typeName: 'Ventilation' } },
+        ]
+
+        let items = []
+        for (const ep of endpoints) {
+          try {
+            const resp = await tryRequestLocal(ep)
+            if (resp instanceof Error) continue
+            const got = extractItemsLocal(resp)
+            if (got && got.length) { items = got; break }
+          } catch (e) { /* ignore and try next */ }
+        }
+
+        if (mounted) setVentilationOptions(items || [])
+      } catch (e) {
+        console.error('loadVentilation error', e)
+        if (mounted) setVentilationOptions([])
+      } finally {
+        if (mounted) setVentilationLoading(false)
+      }
+    }
+
+    loadVentilation()
+
+    const loadLitter = async () => {
+      try {
+        setLitterLoading(true)
+
+        const tryRequestLocal = async (opts) => {
+          try {
+            if (typeof fetchWithAuth === 'function') return await fetchWithAuth(opts)
+            const api = await import('../../utils/api').then(m => m.default).catch(() => null)
+            if (!api) throw new Error('No HTTP client available')
+            return await api.request(opts)
+          } catch (err) {
+            return err
+          }
+        }
+
+        const extractItemsLocal = (res) => {
+          if (!res) return []
+          const d = res.data !== undefined ? res.data : res
+          if (d && Array.isArray(d.data)) return d.data
+          if (Array.isArray(d)) return d
+          if (d && Array.isArray(d.recordset)) return d.recordset
+          if (d && Array.isArray(d.items)) return d.items
+          return []
+        }
+
+        const endpoints = [
+          { url: 'https://farmvisit.ngrok.app/api/lookups/by-type-name/Litter%20condition', method: 'GET' },
+          { url: '/lookups/by-type-name', method: 'GET', params: { typeName: 'Litter condition', includeInactive: 0 } },
+          { url: '/lookups/by-type', method: 'GET', params: { typeName: 'Litter condition' } },
+        ]
+
+        let items = []
+        for (const ep of endpoints) {
+          try {
+            const resp = await tryRequestLocal(ep)
+            if (resp instanceof Error) continue
+            const got = extractItemsLocal(resp)
+            if (got && got.length) { items = got; break }
+          } catch (e) { /* ignore and try next */ }
+        }
+
+        if (mounted) setLitterOptions(items || [])
+      } catch (e) {
+        console.error('loadLitter error', e)
+        if (mounted) setLitterOptions([])
+      } finally {
+        if (mounted) setLitterLoading(false)
+      }
+    }
+
+    loadLitter()
+
+    const loadSources = async () => {
+      try {
+        setSourceLoading(true)
+
+        const tryRequestLocal = async (opts) => {
+          try {
+            if (typeof fetchWithAuth === 'function') return await fetchWithAuth(opts)
+            const api = await import('../../utils/api').then(m => m.default).catch(() => null)
+            if (!api) throw new Error('No HTTP client available')
+            return await api.request(opts)
+          } catch (err) {
+            return err
+          }
+        }
+
+        const extractItemsLocal = (res) => {
+          if (!res) return []
+          const d = res.data !== undefined ? res.data : res
+          if (d && Array.isArray(d.data)) return d.data
+          if (Array.isArray(d)) return d
+          if (d && Array.isArray(d.recordset)) return d.recordset
+          if (d && Array.isArray(d.items)) return d.items
+          return []
+        }
+
+        const endpoints = [
+          { url: 'https://farmvisit.ngrok.app/api/lookups/by-type-name/Source%20of%20water', method: 'GET' },
+          { url: '/lookups/by-type-name', method: 'GET', params: { typeName: 'Source of water', includeInactive: 0 } },
+          { url: '/lookups/by-type', method: 'GET', params: { typeName: 'Source of water' } },
+        ]
+
+        let items = []
+        for (const ep of endpoints) {
+          try {
+            const resp = await tryRequestLocal(ep)
+            if (resp instanceof Error) continue
+            const got = extractItemsLocal(resp)
+            if (got && got.length) { items = got; break }
+          } catch (e) { /* ignore and try next */ }
+        }
+
+        if (mounted) setSourceOptions(items || [])
+      } catch (e) {
+        console.error('loadSources error', e)
+        if (mounted) setSourceOptions([])
+      } finally {
+        if (mounted) setSourceLoading(false)
+      }
+    }
+
+    loadSources()
+
     // If initial/updated data contains string URLs, show them.
     if (Array.isArray(data.AnyRelatedEvidenceImage) && data.AnyRelatedEvidenceImage.length > 0) {
       const arr = data.AnyRelatedEvidenceImage.map((it) => (it instanceof File ? URL.createObjectURL(it) : String(it)));
@@ -549,7 +711,40 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField disabled={readOnly} label="Feed Distribution Frequency (per day)" name="FreqFeedDistPerDay" type="number" value={data.FreqFeedDistPerDay} onChange={handleChange} />
           <InputField disabled={readOnly} label="Time of Feed Dist & How Much" name="TimeofFeedDistandHowMuch" type="text" value={data.TimeofFeedDistandHowMuch} onChange={handleChange} />
           <InputField disabled={readOnly} label="Feed Left Over (g/bird)" name="HowMuchFeedLOvergmPerChicken" type="number" step="0.01" value={data.HowMuchFeedLOvergmPerChicken} onChange={handleChange} />
-          <InputField disabled={readOnly} label="Source Of Water" name="SourceOfWater" value={data.SourceOfWater} onChange={handleChange} />
+          <div>
+            <label htmlFor="SourceOfWater" className="block text-sm font-medium text-gray-700 text-left mb-1">Source Of Water</label>
+            <div className="relative">
+              <select
+                id="SourceOfWater"
+                name="SourceOfWater"
+                value={data.SourceOfWater || ''}
+                onChange={handleChange}
+                disabled={readOnly}
+                className={`mt-1 block w-full rounded-md ${errors && errors.SourceOfWater ? 'border-red-500' : 'border-gray-300'} shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              >
+                {sourceLoading ? (
+                  <option value="" disabled>Loading source options…</option>
+                ) : (sourceOptions && sourceOptions.length ? (
+                  <>
+                    <option value="">Select Source Of Water</option>
+                    {sourceOptions.map(s => {
+                      const lookupValue = (s.LookupValue || s.lookupValue || '').toString();
+                      const lookupCode = (s.LookupCode || s.lookupcode || s.Code || '').toString();
+                      const lookupId = (s.LookupID || s.lookupId || s.Id || '').toString();
+                      const val = lookupValue || lookupId || lookupCode || ''
+                      const labelBase = lookupValue || lookupCode || lookupId || ''
+                      const label = lookupCode ? `${labelBase} (${lookupCode})` : `${labelBase}`
+                      const key = lookupId || lookupValue || lookupCode || Math.random().toString(36).slice(2,8)
+                      return <option key={key} value={val}>{label}</option>
+                    })}
+                  </>
+                ) : (
+                  <option value="" disabled>No sources available</option>
+                ))}
+              </select>
+            </div>
+            {errors && errors.SourceOfWater && <div className="text-sm text-red-600 mt-1">{errors.SourceOfWater}</div>}
+          </div>
           <InputField disabled={readOnly} label="Age (weeks)" name="AgeInWeeks" type="number" min="0" max="200" value={data.AgeInWeeks} onChange={handleChange} unit="weeks" error={errors && errors.AgeInWeeks} />
           <InputField disabled={readOnly} label="Feed Intake per Chicken (g)" name="FeedIntakePerChickenGm" type="number" step="0.01" value={data.FeedIntakePerChickenGm} onChange={handleChange} error={errors && errors.FeedIntakePerChickenGm} />
           <InputField disabled={readOnly} label="Water Intake per Chicken per Day (ml)" name="WaterInTakePerChickenPerDay" type="number" step="0.01" value={data.WaterInTakePerChickenPerDay} onChange={handleChange} error={errors && errors.WaterInTakePerChickenPerDay} />
@@ -561,9 +756,76 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField disabled={readOnly} label="Average Body Weight (kg)" name="AverageBodyWeightKG" type="number" min="0" step="0.01" value={data.AverageBodyWeightKG} onChange={handleChange} error={errors && errors.AverageBodyWeightKG} />
           <InputField disabled={readOnly} label="House Temperature (°C)" name="HouseTemperature" type="number" min="10" max="35" step="0.01" value={data.HouseTemperature} onChange={handleChange} error={errors && errors.HouseTemperature} />
           <InputField disabled={readOnly} label="Humidity (%)" name="Humidity" type="number" min="30" max="85" step="0.01" value={data.Humidity} onChange={handleChange} error={errors && errors.Humidity} />
-            <InputField disabled={readOnly} label="Litter Condition" name="LitterCondition" value={data.LitterCondition} onChange={handleChange} />
+              {/* Litter Condition as lookup-driven dropdown */}
+            <div>
+              <label htmlFor="LitterCondition" className="block text-sm font-medium text-gray-700 text-left mb-1">Litter Condition</label>
+              <div className="relative">
+                <select
+                  id="LitterCondition"
+                  name="LitterCondition"
+                  value={data.LitterCondition || ''}
+                  onChange={handleChange}
+                  disabled={readOnly}
+                  className={`mt-1 block w-full rounded-md ${errors && errors.LitterCondition ? 'border-red-500' : 'border-gray-300'} shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                >
+                  {litterLoading ? (
+                    <option value="" disabled>Loading litter conditions…</option>
+                  ) : (litterOptions && litterOptions.length ? (
+                    <>
+                      <option value="">Select Litter Condition</option>
+                      {litterOptions.map(l => {
+                        const lookupValue = (l.LookupValue || l.lookupValue || '').toString();
+                        const lookupCode = (l.LookupCode || l.lookupcode || l.Code || '').toString();
+                        const lookupId = (l.LookupID || l.lookupId || l.Id || '').toString();
+                        const val = lookupValue || lookupId || lookupCode || ''
+                        const labelBase = lookupValue || lookupCode || lookupId || ''
+                        const label = lookupCode ? `${labelBase} (${lookupCode})` : `${labelBase}`
+                        const key = lookupId || lookupValue || lookupCode || Math.random().toString(36).slice(2,8)
+                        return <option key={key} value={val}>{label}</option>
+                      })}
+                    </>
+                  ) : (
+                    <option value="" disabled>No litter conditions available</option>
+                  ))}
+                </select>
+              </div>
+              {errors && errors.LitterCondition && <div className="text-sm text-red-600 mt-1">{errors.LitterCondition}</div>}
+            </div>
             <InputField disabled={readOnly} label="Uniformity of Flock (%)" name="UnifermityofTheFlock" type="number" min="0" max="100" value={data.UnifermityofTheFlock} onChange={handleChange} />
-          <InputField disabled={readOnly} label="Ventilation Status" name="VentilationStatus" value={data.VentilationStatus || data.Ventilation} onChange={handleChange} />
+          <div>
+            <label htmlFor="VentilationStatus" className="block text-sm font-medium text-gray-700 text-left mb-1">Ventilation Status</label>
+            <div className="relative">
+              <select
+                id="VentilationStatus"
+                name="VentilationStatus"
+                value={data.VentilationStatus || ''}
+                onChange={handleChange}
+                disabled={readOnly}
+                className={`mt-1 block w-full rounded-md ${errors && errors.VentilationStatus ? 'border-red-500' : 'border-gray-300'} shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11 ${readOnly ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              >
+                {ventilationLoading ? (
+                  <option value="" disabled>Loading ventilation types…</option>
+                ) : (ventilationOptions && ventilationOptions.length ? (
+                  <>
+                    <option value="">Select Ventilation</option>
+                    {ventilationOptions.map(v => {
+                      const lookupValue = (v.LookupValue || v.lookupValue || '').toString();
+                      const lookupCode = (v.LookupCode || v.lookupcode || v.Code || '').toString();
+                      const lookupId = (v.LookupID || v.lookupId || v.Id || '').toString();
+                      const val = lookupValue || lookupId || lookupCode || ''
+                      const labelBase = lookupValue || lookupCode || lookupId || ''
+                      const label = lookupCode ? `${labelBase} (${lookupCode})` : `${labelBase}`
+                      const key = lookupId || lookupValue || lookupCode || Math.random().toString(36).slice(2,8)
+                      return <option key={key} value={val}>{label}</option>
+                    })}
+                  </>
+                ) : (
+                  <option value="" disabled>No ventilation types available</option>
+                ))}
+              </select>
+            </div>
+            {errors && errors.VentilationStatus && <div className="text-sm text-red-600 mt-1">{errors.VentilationStatus}</div>}
+          </div>
           <div>
             <label htmlFor="DrinkerType" className="block text-sm font-medium text-gray-700 text-left mb-1">Drinker Type</label>
             <div className="relative">
