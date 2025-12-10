@@ -12,7 +12,7 @@ import { CalendarIcon } from '@heroicons/react/24/outline';
 
 // Provide a local API_BASE derived from the shared axios client so
 // files constructing full URLs can reuse the centralized baseURL.
-const API_BASE = apiClient.defaults?.baseURL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : 'http://localhost:3000/api');
+const API_BASE = apiClient.defaults?.baseURL || (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : 'http://localhost:80/api');
 
 
 

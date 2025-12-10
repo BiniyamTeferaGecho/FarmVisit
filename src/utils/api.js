@@ -46,16 +46,19 @@ const envURL = import.meta.env && import.meta.env.VITE_API_URL ? String(import.m
 let base = null;
 if (runtimeBase) base = normalizeBase(runtimeBase);
 else if (envURL) base = normalizeBase(envURL);
-// Special-case: when served from farm-visit.vercel.app, prefer using the ngrok tunnel for quick testing.
-// This is temporary and requires a redeploy to take effect on the live build.
+// Special-case: when served from `farm-visit.vercel.app` do NOT hardcode a
+// third-party ngrok domain into the shipped build. Prefer the runtime override
+// (`window.__API_BASE__`), a meta tag (`<meta name="api-base">`), or the
+// build-time `VITE_API_URL`. Falling back to same-origin avoids embedding a
+// stale tunnel URL in production bundles.
 else if (typeof window !== 'undefined' && window.location && window.location.hostname && window.location.hostname === 'farm-visit.vercel.app') {
-  base = 'https://1803afb14fe6.ngrok-free.app';
+  base = `${window.location.origin}`;
 } else if (typeof window !== 'undefined' && window.location && window.location.hostname && !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
   // when served from a host (e.g., Vercel), assume same-origin API path
   base = `${window.location.origin}`;
 } else {
   // Local development default
-  base = 'http://localhost:3000';
+  base = 'http://localhost:80';
 }
 
 // Ensure the returned base points to the API root (append /api if missing)

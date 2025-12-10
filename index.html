@@ -8,9 +8,22 @@
   <!-- legacy svg/favicon removed (was vite.svg) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Farm Visit App</title>
+    <!-- Optional runtime API base: set this meta in your deployed `index.html` to point the app to a different API without rebuilding. -->
+    <meta name="api-base" content="" />
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function(){
+        try {
+          var m = document.querySelector('meta[name="api-base"]');
+          if (m && m.content && m.content.trim()) {
+            // ensure no trailing slash; frontend expects base without trailing '/api'
+            window.__API_BASE__ = m.content.trim().replace(/\/$/, '');
+          }
+        } catch (e) { /* ignore */ }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

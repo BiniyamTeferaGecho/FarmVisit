@@ -163,7 +163,7 @@ const ScheduleModals = ({
             fetchWithAuth({ url: '/farms/active', method: 'GET', params: { pageSize: 1000 } }),
             fetchWithAuth({ url: '/employees', method: 'GET', params: { pageSize: 1000 } }),
             fetchWithAuth({ url: '/advisor/managers', method: 'GET' }),
-            fetchWithAuth({ url: 'http://localhost:3000/api/advisor/active/all', method: 'GET' }),
+            fetchWithAuth({ url: 'http://localhost:80/api/advisor/active/all', method: 'GET' }),
           ]);
           farmsData = extractItems(fRes);
           employeesData = extractItems(eRes);

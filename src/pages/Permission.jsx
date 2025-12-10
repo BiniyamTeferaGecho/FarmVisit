@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider'
 import Modal from '../components/Modal'
 import ConfirmModal from '../components/ConfirmModal'
 
-const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : 'http://localhost:3000/api'
+const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : 'http://localhost:80/api'
 
 const MODULE_OPTIONS = ['System', 'Reports', 'Employee', 'RoleManagement', 'UserManagement']
 
