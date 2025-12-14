@@ -901,13 +901,13 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         <SectionCard title="Vaccination" icon={<Syringe className="text-blue-600" />}>
           <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Vaccinations Given (last 4 weeks)" name="VaccinationsGivenLast4Weeks" checked={data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks} onChange={handleChange} />
-            <div className="flex-grow">
+            <div className="grow">
               <InputField disabled={readOnly} label="Which Type & Date of Vaccine" name="WhichTypeandDataofVaccin" value={data.WhichTypeandDataofVaccin || data.VaccinationNote} onChange={handleChange} />
             </div>
           </div>
           <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Any Medication Given" name="AnyMedicationGiven" checked={data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven} onChange={handleChange} />
-            <div className="flex-grow">
+            <div className="grow">
               <InputField disabled={readOnly} label="Which Type and Why" name="WhichTypeandWhy" value={data.WhichTypeandWhy} onChange={handleChange} />
             </div>
           </div>
@@ -969,7 +969,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
            <SectionCard title="Sampling" icon={<Microscope className="text-teal-600" />}>
            <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Sample Taken" name="SampleTaken" checked={data.SampleTaken} onChange={handleChange} />
-            <div className="flex-grow">
+            <div className="grow">
               <InputField disabled={readOnly} label="Sample Type" name="SampleType" value={data.SampleType} onChange={handleChange} placeholder="e.g., blood, tissue, feed" />
             </div>
           </div>
