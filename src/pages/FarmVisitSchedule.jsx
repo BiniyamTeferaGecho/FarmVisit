@@ -214,6 +214,37 @@ const FarmVisitSchedule = () => {
         dispatch({ type: 'OPEN_COMPLETE_MODAL', payload: data });
         break;
       case 'fillVisit':
+        // Prefill the fill modal with friendly farm name in the layer form's FarmID textbox when possible
+        try {
+          // attempt to find farm in preloaded lookups
+          const farmList = state.farms || [];
+          const findId = (d) => (d && (d.FarmID || d.FarmId || d.farmId || d.id || d.farmId));
+          const targetId = String(findId(data) || '');
+          const local = farmList.find(f => String(f.FarmID || f.FarmId || f.id || '') === targetId);
+          if (local) {
+            setLocalFillData({ layerForm: { ...(data || {}), FarmID: (local.FarmName || local.Name || local.name || '') } });
+          } else {
+            // async fetch the farm record and set the local fill data when available
+            (async () => {
+              try {
+                if (auth && typeof auth.fetchWithAuth === 'function' && targetId) {
+                  const res = await auth.fetchWithAuth({ url: `/farms/${encodeURIComponent(targetId)}`, method: 'GET' });
+                  const body = res?.data?.data || res?.data || res;
+                  const rec = Array.isArray(body) ? body[0] : (body && body.recordset ? body.recordset[0] : body);
+                  const name = rec?.FarmName || rec?.Name || rec?.name || '';
+                  setLocalFillData({ layerForm: { ...(data || {}), FarmID: name } });
+                }
+              } catch (e) {
+                // ignore fetch errors, leave layer form as-is
+              }
+            })();
+            // meanwhile set minimal fill data so modal opens with schedule info
+            setLocalFillData({ layerForm: { ...(data || {}) } });
+          }
+        } catch (e) {
+          // fallback: still open modal without prefill
+          setLocalFillData({ layerForm: { ...(data || {}) } });
+        }
         dispatch({ type: 'OPEN_FILL_MODAL', payload: data });
         break;
       default:
@@ -443,6 +474,67 @@ const FarmVisitSchedule = () => {
       if (scheduleKey && !data.ScheduleID) {
         data.ScheduleID = scheduleKey;
         data.ScheduleId = scheduleKey;
+      }
+
+      // Validate required fields at submit-time: Location is required for creating/updating a visit
+      const hasLocation = data && (data.Location || data.location) || (selectedSchedule && (selectedSchedule.Location || selectedSchedule.location));
+      if (!hasLocation) {
+        showToast('Location is required before saving the visit. Please add a Location to the schedule or visit form.', 'error');
+        return; // keep the fill modal open so user can add Location
+      }
+
+      // If the schedule is still in 'scheduled' status, start it first (server requires start to transition to InProgress)
+      try {
+        const scheduleId = data.ScheduleID || data.ScheduleId || data.scheduleId || (selectedSchedule && (selectedSchedule.ScheduleID || selectedSchedule.ScheduleId || selectedSchedule.id));
+        const statusRaw = (selectedSchedule && (selectedSchedule.VisitStatus || selectedSchedule.Status || selectedSchedule.visitStatus || selectedSchedule.status)) || (data.VisitStatus || data.Status || data.visitStatus || data.status) || '';
+        const lowered = String(statusRaw || '').trim().toLowerCase();
+        const isScheduled = lowered === 'scheduled';
+        if (isScheduled && scheduleId) {
+          // Resolve StartedBy similar to other handlers
+          const u = auth?.user || {};
+          const employees = state.employees || [];
+          const candidates = [u.EmployeeID, u.employeeId, u.UserID, u.userId, u.id, u.sub].filter(Boolean);
+          let startedBy = null;
+          for (const c of candidates) {
+            const found = (employees || []).find(it => {
+              const id = it.id || (it.EmployeeID || it.EmployeeId || (it.raw && (it.raw.EmployeeID || it.raw.employeeId)));
+              if (!id) return false;
+              return String(id).toLowerCase() === String(c).toLowerCase();
+            });
+            if (found) { startedBy = found.EmployeeID || found.EmployeeId || found.id; break; }
+          }
+          // fallback to a basic identifier if employee lookup failed
+          if (!startedBy) startedBy = u.EmployeeID || u.employeeId || u.UserID || u.userId || u.id || null;
+
+          if (!startedBy) {
+            // If we cannot resolve a StartedBy, warn but still attempt to start with minimal payload (server may accept)
+            console.warn('Could not resolve StartedBy; attempting start with minimal payload');
+          }
+
+          try {
+            const started = await api.startFarmVisit(dispatch, scheduleId, startedBy, auth.fetchWithAuth);
+            if (started) {
+              // Update selected schedule locally
+              dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: started });
+            }
+          } catch (err) {
+            const msg = err?.response?.data?.message || err.message || '';
+            // If server enforces Location, surface a friendly message and keep modal open
+            if (/missing required field \"Location\"/i.test(msg) || /missing required field\s+location/i.test(msg)) {
+              showToast(msg || 'Cannot start visit: Location is required. Please add Location.', 'error');
+              return;
+            }
+            // Otherwise rethrow to be handled below
+            throw err;
+          }
+        }
+      } catch (err) {
+        console.error('Failed during startFarmVisit at submit:', err);
+        // Let fill operation proceed only if start was not required or successful; if start failed critically, show a message
+        if (err && err.response && err.response.data && err.response.data.message) {
+          showToast(err.response.data.message, 'error');
+          return;
+        }
       }
 
       await api.fillVisit(dispatch, data, auth.fetchWithAuth);
@@ -776,63 +868,9 @@ const FarmVisitSchedule = () => {
                   return;
                 }
 
-                // Not completed: start visit (if possible) and open editable modal
+                // Not completed: open editable modal (do not auto-start here).
+                // The visit will be started at submit-time inside `onFillVisitSave` so users can add Location first.
                 setIsFillReadOnly(false);
-                const u = auth?.user || {};
-                const employees = state.employees || [];
-                const simpleCandidate = u.EmployeeID || u.employeeId || u.UserID || u.userId || u.id || u.sub;
-                const resolveEmployeeId = () => {
-                  if (!employees || employees.length === 0) return null;
-                  const candidates = [u.EmployeeID, u.employeeId, u.UserID, u.userId, u.id, u.sub].filter(Boolean);
-                  for (const c of candidates) {
-                    const found = employees.find(it => {
-                      const id = it.id || (it.EmployeeID || it.EmployeeId || it.employeeId || (it.raw && (it.raw.EmployeeID || it.raw.employeeId)));
-                      if (!id) return false;
-                      return String(id).toLowerCase() === String(c).toLowerCase();
-                    });
-                    if (found) return found.EmployeeID || found.EmployeeId || found.id || (found.raw && (found.raw.EmployeeID || found.raw.employeeId));
-                  }
-                  const email = (u.email || u.mail || u.upn || u.preferred_username || u.preferredUsername || '').toString().toLowerCase();
-                  if (email) {
-                    const found = employees.find(it => {
-                      const e = (it.raw && (it.raw.Email || it.raw.email)) || (it.Email || it.email);
-                      return e && String(e).toLowerCase() === email;
-                    });
-                    if (found) return found.EmployeeID || found.EmployeeId || found.id || (found.raw && (found.raw.EmployeeID || found.raw.employeeId));
-                  }
-                  return null;
-                };
-                let startedBy = simpleCandidate || resolveEmployeeId();
-                if (startedBy && isScheduled) {
-                  try {
-                    const started = await api.startFarmVisit(dispatch, id, startedBy, auth.fetchWithAuth);
-                    // Optimistically update selected schedule and list when server returns updated row
-                    if (started) {
-                      try {
-                        dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: started });
-                        const updated = (schedules || []).map(s => {
-                          const sid = s.ScheduleID || s.id || null;
-                          const rid = started.ScheduleID || started.id || null;
-                          if (!sid || !rid) return s;
-                          if (String(sid).toLowerCase() === String(rid).toLowerCase()) return { ...s, ...started };
-                          return s;
-                        });
-                        dispatch({ type: 'SET_LIST', payload: updated });
-                      } catch (e) {
-                        // ignore optimistic update failures
-                      }
-                    }
-                  } catch (err) {
-                    const msg = err?.response?.data?.message || err.message || '';
-                    // Gracefully handle the specific stored-proc guard without blocking fill modal
-                    if (/can only be started from scheduled status/i.test(msg)) {
-                      console.warn('Start skipped due to status guard:', msg);
-                    } else {
-                      console.error('Failed to start farm visit before filling:', err);
-                      dispatch({ type: 'SET_MESSAGE', payload: msg || 'Failed to start farm visit' });
-                    }
-                  }
-                }
                 // open editable modal with schedule as starting data
                 dispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: schedule });
                 setLocalFillData(schedule);

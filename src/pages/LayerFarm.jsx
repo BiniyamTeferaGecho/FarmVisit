@@ -171,7 +171,8 @@ export default function LayerFarm() {
           }
         } else {
           await fetchWithAuth({ url: `/layer-farm/${editingId}`, method: 'put', data: { ...payload, UpdatedBy: actor } })
-          setMessage({ type: 'success', text: 'Layer visit updated' })
+          // Show a simple informational message after updating — do not navigate away
+          setMessage({ type: 'info', text: 'Layer visit updated!' })
         }
       } else {
         const createRes = await fetchWithAuth({ url: '/layer-farm', method: 'post', data: payload })
@@ -240,7 +241,7 @@ export default function LayerFarm() {
               } catch (e) { /* ignore */ }
               setMessage({ type: 'success', text: (editingId ? 'Layer visit updated' : 'Layer visit created') + ' — schedule started' })
             } else {
-              setMessage({ type: 'info', text: (editingId ? 'Layer visit updated' : 'Layer visit created') + ' (schedule not started — requires ApprovalStatus=Approved and VisitStatus=Scheduled)' })
+              setMessage({ type: 'info', text: (editingId ? 'Layer visit updated!' : 'Layer visit created')  })
             }
           } catch (getErr) {
             console.warn('failed to fetch schedule before start', getErr)
@@ -263,11 +264,8 @@ export default function LayerFarm() {
       }
       await fetchVisits()
 
-      // Navigate to schedule details when a schedule is present, helps users continue workflow
-      try {
-        const scheduleId = payload.ScheduleID || form.ScheduleID || null
-        if (scheduleId) navigate(`/farm-visit-schedule/${encodeURIComponent(scheduleId)}`)
-      } catch (navErr) { /* ignore navigation errors */ }
+      // Do not navigate away after saving a Layer visit — stay on Layer visits UI
+      // (Previously navigated to schedule details here; removed per UX request)
     } catch (err) {
       console.error('create layer farm error', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to create' })
@@ -753,7 +751,7 @@ export default function LayerFarm() {
               <tr>
                 <th className="px-4 py-3">#</th>
                 <th className="px-4 py-3">Visit Code</th>
-                <th className="px-4 py-3">Farm</th>
+                <th className="px-4 py-3">FarmID</th>
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Breed</th>
                 <th className="px-4 py-3">Flock</th>
@@ -776,7 +774,14 @@ export default function LayerFarm() {
                     return code || v.VisitCode || v.LayerVisitID || v.VisitId || '';
                   })()}</td>
                   
-                  <td className="px-4 py-3">{v.FarmName || v.FarmCode || v.FarmID || ''}</td>
+                  <td className="px-4 py-3">{(() => {
+                    const fid = v.FarmID || v.farmId || v.Farm || null
+                    if (fid) {
+                      const fm = farmMap[String(fid)]
+                      return fm || (v.FarmName || String(fid))
+                    }
+                    return v.FarmName || v.FarmCode || ''
+                  })()}</td>
                   <td className="px-4 py-3">{v.Location || v.FarmLocation || ''}</td>
                   <td className="px-4 py-3">{v.Breed || ''}</td>
                   <td className="px-4 py-3">{v.FlockSize ?? ''}</td>

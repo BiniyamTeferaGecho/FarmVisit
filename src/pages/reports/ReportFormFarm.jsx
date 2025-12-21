@@ -359,6 +359,8 @@ export default function ReportFormFarm() {
 
   // Modern features: charts and trends
   const [viewMode, setViewMode] = useState('table'); // 'table', 'charts', 'trends'
+  // Sub-tab within Views: 'main' shows table, 'charts' shows charts+trends
+  const [viewsSubTab, setViewsSubTab] = useState('main');
   const [chartData, setChartData] = useState({ pieData: [], barData: [], sizeData: [] });
   const [trendData, setTrendData] = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
@@ -566,17 +568,16 @@ export default function ReportFormFarm() {
 
   // Effect to load chart data when items change
   useEffect(() => {
-    if (viewMode === 'charts' && items.length > 0) {
+    // Load chart data whenever we have items (e.g. after running the report)
+    if (items && items.length > 0) {
       loadChartData();
     }
-  }, [viewMode, items, loadChartData]);
+  }, [items, loadChartData]);
 
-  // Effect to load trend data when view mode changes
+  // Effect to load trend data on mount (so trends are ready when Views tab is opened)
   useEffect(() => {
-    if (viewMode === 'trends') {
-      loadTrendData();
-    }
-  }, [viewMode, loadTrendData]);
+    loadTrendData();
+  }, [loadTrendData]);
   const callViewSummary = async () => {
     setAuxLoading(true); setAuxResult(null);
     try { const r = await api.get('/farms/views/summary'); setAuxResult(r?.data); } catch(e){ setAuxResult({ error: e.message || e.toString() }) } finally { setAuxLoading(false) }
@@ -769,31 +770,24 @@ export default function ReportFormFarm() {
         </div>
       )}
 
-      {/* View Mode Toggle (only on Views tab) */}
+      {/* Views sub-tabs: Main (table) and Charts & Trends */}
       {activeTab === 'views' && (
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium">View:</label>
+          <label className="text-sm font-medium">Views:</label>
           <div className="flex gap-1">
             <button
-              onClick={() => { setActiveTab('reports'); setViewMode('table'); }}
-              className={`px-3 py-1 rounded text-sm ${viewMode === 'table' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}
+              onClick={() => { setViewsSubTab('main'); setViewMode('table'); }}
+              className={`px-3 py-1 rounded text-sm ${viewsSubTab === 'main' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}
             >
               <Table className="w-4 h-4 inline mr-1" />
-              Table
+              Main
             </button>
             <button
-              onClick={() => setViewMode('charts')}
-              className={`px-3 py-1 rounded text-sm ${viewMode === 'charts' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}
+              onClick={() => { setViewsSubTab('charts'); setViewMode('charts'); }}
+              className={`px-3 py-1 rounded text-sm ${viewsSubTab === 'charts' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}
             >
               <BarChart3 className="w-4 h-4 inline mr-1" />
-              Charts
-            </button>
-            <button
-              onClick={() => setViewMode('trends')}
-              className={`px-3 py-1 rounded text-sm ${viewMode === 'trends' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700'}`}
-            >
-              <TrendingUp className="w-4 h-4 inline mr-1" />
-              Trends
+              Charts & Trends
             </button>
           </div>
         </div>
@@ -864,9 +858,9 @@ export default function ReportFormFarm() {
         )}
       </AnimatePresence>
 
-      {/* Charts View */}
+      {/* Charts & Trends (visible when Views sub-tab = charts) */}
       <AnimatePresence>
-        {activeTab === 'views' && viewMode === 'charts' && (
+        {activeTab === 'views' && viewsSubTab === 'charts' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -953,9 +947,9 @@ export default function ReportFormFarm() {
         )}
       </AnimatePresence>
 
-      {/* Trends View */}
+      {/* Trends View (part of Charts & Trends sub-tab) */}
       <AnimatePresence>
-        {activeTab === 'views' && viewMode === 'trends' && (
+        {activeTab === 'views' && viewsSubTab === 'charts' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -983,6 +977,71 @@ export default function ReportFormFarm() {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Table View on Views tab (Main sub-tab) */}
+      <AnimatePresence>
+        {activeTab === 'views' && viewsSubTab === 'main' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {loading && !items.length && (
+              <div className="space-y-2">
+                {[...Array(6)].map((_,i) => (
+                  <div key={i} className="h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                ))}
+              </div>
+            )}
+
+            {!loading && Array.isArray(items) && items.length > 0 && (
+              <div className="overflow-auto bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                <table className="min-w-full text-sm">
+                  <thead className="sticky top-0 bg-white dark:bg-gray-800">
+                    <tr className="text-left">
+                      {columns.map(c => (
+                        <th key={c.key} className="px-3 py-2">
+                          <div>{c.label}</div>
+                          {/* show inline filter when in list mode */}
+                          {reportMode === 'list' && (
+                            <input
+                              value={columnFilters[c.key] || ''}
+                              onChange={(e) => setColumnFilters({...columnFilters, [c.key]: e.target.value})}
+                              placeholder="filter"
+                              className="mt-1 w-full px-1 py-0.5 text-xs border rounded"
+                            />
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredItems.map((r, idx) => (
+                      <tr key={r.FarmID ?? r.id ?? idx} className="border-t border-gray-100 dark:border-gray-700">
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'FarmID'), 'id')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'FarmName'), 'name')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'FarmCode'), 'code')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'FarmType'), 'farmtype')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'OwnerName'), 'owner')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'ContactPhone'), 'phone')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'CityTown'), 'city')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'Region'), 'region')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'FarmSize'), 'size')}</td>
+                        <td className="px-3 py-2">{formatValue(getRowValue(r, 'IsActive'), 'active')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {!loading && (!items || (Array.isArray(items) && items.length===0)) && (
+              <div className="text-sm text-gray-500">No results for the selected filters</div>
             )}
           </motion.div>
         )}

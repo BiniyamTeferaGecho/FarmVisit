@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { validateCompleteRequirements } from '../../utils/visitValidation';
 import FillVisitModal from './FillVisitModal'; 
@@ -203,10 +203,123 @@ const ScheduleModals = ({
     return () => { mounted = false };
   }, [fetchWithAuth, farms.length, employees.length, managers.length, advisors.length]);
 
+  // Visit frequency options (loaded from lookup: "Visit Frequency")
+  const [visitFrequencies, setVisitFrequencies] = useState([]);
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const loadVisitFreq = async () => {
+      try {
+        let res = null;
+        if (typeof fetchWithAuth === 'function') {
+          // fetchWithAuth returns parsed JSON (not axios) from AuthProvider.fetchWithAuth
+          res = await fetchWithAuth({ url: '/lookups/by-type-name/Visit Frequency', method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent('Visit Frequency')}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res);
+        if (mounted) setVisitFrequencies(items || []);
+      } catch (err) {
+        // non-fatal: keep default options if lookup fails
+        console.debug('loadVisitFreq error', err);
+      }
+    };
+    loadVisitFreq();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  // Farm type options (loaded from lookup: "Farm Type")
+  const [farmTypesList, setFarmTypesList] = useState([]);
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const loadFarmTypes = async () => {
+      try {
+        let res = null;
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: '/lookups/by-type-name/Farm Type', method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent('Farm Type')}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setFarmTypesList(items);
+      } catch (err) {
+        console.debug('loadFarmTypes error', err);
+      }
+    };
+    loadFarmTypes();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  // Visit type options (for Visit Purpose dropdown) - load from lookup: "Visit Type"
+  const [visitTypes, setVisitTypes] = useState([]);
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const loadVisitTypes = async () => {
+      try {
+        let res = null;
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: '/lookups/by-type-name/Visit Type', method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent('Visit Type')}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setVisitTypes(items);
+      } catch (err) {
+        console.debug('loadVisitTypes error', err);
+      }
+    };
+    loadVisitTypes();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
   // Use shared validation helper for completion requirements
   const { ready: readyToComplete, reasons: completeReasons } = validateCompleteRequirements(selectedSchedule || {}, completeData || {});
 
   const isEditing = Boolean((formData && (formData.id || formData.ScheduleID || formData.ScheduleId)));
+
+  // Debug: log fill modal inputs when opened (development only)
+  useEffect(() => {
+    try {
+      if (isFillVisitModalOpen && console && console.debug) {
+        console.debug('FillVisitModal props', { selectedSchedule, fillVisitFormData, stateLayer: state.layerForm, stateDairy: state.dairyForm, fillReadOnly });
+      }
+    } catch (e) { /* ignore logging errors */ }
+  }, [isFillVisitModalOpen]);
 
   return (
     <>
@@ -256,8 +369,18 @@ const ScheduleModals = ({
             icon={<Building size={16} className="text-gray-400" />}
           >
             <option value="">Select Farm Type</option>
-            <option value="DAIRY">Dairy</option>
-            <option value="LAYER">Layer</option>
+            {farmTypesList && farmTypesList.length > 0 ? (
+              farmTypesList.map((it, i) => {
+                const val = it.LookupValue || it.Value || it.Name || it.name || it.LookupCode || it.code || String(i);
+                const label = it.LookupValue || it.Value || it.Name || it.name || String(val);
+                return <option key={String(val || i)} value={val}>{label}</option>
+              })
+            ) : (
+              <>
+                <option value="DAIRY">Dairy</option>
+                <option value="LAYER">Layer</option>
+              </>
+            )}
           </SelectField>
           <SelectField
             label="Manager"
@@ -289,11 +412,23 @@ const ScheduleModals = ({
             icon={<Clock4 size={16} className="text-gray-400" />}
           >
             <option value="">Select Frequency</option>
-            <option value="Once">Once</option>
-            <option value="Daily">Daily</option>
-            <option value="Weekly">Weekly</option>
-            <option value="Monthly">Monthly</option>
-            <option value="Quarterly">Quarterly</option>
+            {visitFrequencies && visitFrequencies.length > 0 ? (
+              visitFrequencies.map((it, i) => {
+                // Support multiple possible property names returned from lookup endpoint
+                const val = it.LookupValue || it.Value || it.LookupCode || it.code || it.value || (it.Name || it.name);
+                const label = it.LookupValue || it.Value || it.Name || it.name || String(val || '');
+                return <option key={String(val || i)} value={val}>{label}</option>
+              })
+            ) : (
+              // fallback defaults in case lookup not available
+              <>
+                <option value="Once">Once</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Quarterly">Quarterly</option>
+              </>
+            )}
           </SelectField>
           <InputField
             label="Next Follow-up Date"
@@ -311,14 +446,30 @@ const ScheduleModals = ({
             placeholder="Notes for next follow-up"
             icon={<StickyNote size={16} className="text-gray-400" />}
           />
-          <InputField 
+          <SelectField 
             label="Visit Purpose"
-            name="VisitPurpose" 
-            value={formData.VisitPurpose} 
-            onChange={handleFormChange} 
-            placeholder="Purpose of visit" 
+            name="VisitPurpose"
+            value={formData.VisitPurpose}
+            onChange={handleFormChange}
             icon={<Clipboard size={16} className="text-gray-400" />}
-          />
+          >
+            <option value="">Select Purpose</option>
+            {visitTypes && visitTypes.length > 0 ? (
+              visitTypes.map((it, i) => {
+                const val = it.LookupValue || it.Value || it.LookupCode || it.code || it.value || (it.Name || it.name) || String(i);
+                const label = it.LookupValue || it.Value || it.Name || it.name || String(val);
+                return <option key={String(val || i)} value={val}>{label}</option>
+              })
+            ) : (
+              <>
+                <option value="Routine">Routine</option>
+                <option value="Inspection">Inspection</option>
+                <option value="Treatment">Treatment</option>
+                <option value="Vaccination">Vaccination</option>
+                <option value="Other">Other</option>
+              </>
+            )}
+          </SelectField>
           <InputField 
             label="Estimated Duration (hours)"
             name="EstimatedDuration" 
@@ -490,8 +641,7 @@ const ScheduleModals = ({
         />
       )}
 
-      {/* Debug: log fill modal inputs when opened (development only) */}
-      {isFillVisitModalOpen && (console.debug && console.debug('FillVisitModal props', { selectedSchedule, fillVisitFormData, stateLayer: state.layerForm, stateDairy: state.dairyForm, fillReadOnly }))}
+      {/* Debug logging moved to component-level useEffect to avoid repeated logs during render */}
     </>
   );
 };

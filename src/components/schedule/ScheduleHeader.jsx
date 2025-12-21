@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import axios from 'axios';
+import { useAuth } from '../../auth/AuthProvider'
 import {
   FaPlus, FaSync, FaUpload, FaFileAlt, FaThLarge, FaTrash, FaBars, FaTimes,
   FaClipboardList, FaCheckCircle, FaTimesCircle, FaClipboardCheck, FaClock, FaExclamationTriangle
@@ -31,17 +32,30 @@ const StatCard = ({ label, value, icon, color = 'blue' }) => {
 };
 
 function useFetchStats(reloadKey) {
+  const { token, fetchWithAuth } = useAuth() || {};
   const [stats, setStats] = useState(null);
   useEffect(() => {
+    let mounted = true;
     (async () => {
+      // Only attempt to fetch stats when we have authentication available
+      if (!fetchWithAuth || !token) return;
       try {
-        const res = await axios.get(`${API_BASE}/farm-visit-schedule/statistics`);
-        setStats(res.data?.data || {});
+        const res = await fetchWithAuth({ url: '/farm-visit-schedule/statistics', method: 'get' });
+        if (!mounted) return;
+        const payload = res?.data || res || {};
+        setStats(payload.data || payload);
       } catch (err) {
-        console.error('Failed to load stats', err);
+        // Suppress noisy console errors for unauthenticated requests (401)
+        try {
+          const status = err?.response?.status || (err && err.message && err.message.toLowerCase().includes('unauthorized') ? 401 : null)
+          if (status === 401) return
+        } catch (e) { /* ignore */ }
+        // Non-auth errors: debug-level log only
+        console.debug('Failed to load stats', err);
       }
     })();
-  }, [reloadKey]);
+    return () => { mounted = false }
+  }, [reloadKey, token, fetchWithAuth]);
   return { stats };
 }
 

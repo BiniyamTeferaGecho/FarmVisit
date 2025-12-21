@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import ProtectedRoute from './auth/ProtectedRoute'
 import LoginPage from './pages/Login'
 import Dashboard from './pages/dashboard'
+import ResetPassword from './pages/ResetPassword'
 const Farmers = lazy(() => import('./pages/Farmers'))
 const Farms = lazy(() => import('./pages/Farms'))
 const AdminSessions = lazy(() => import('./pages/AdminSessions'))
@@ -18,6 +19,7 @@ function App() {
           <Route path="/dashboard/*" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
+          <Route path="/reset-password" element={<ResetPassword/>} />
           <Route path="/farmers" element={<ProtectedRoute><Suspense fallback={<div>Loading...</div>}><Farmers/></Suspense></ProtectedRoute>} />
           <Route path="/farms" element={<ProtectedRoute><Suspense fallback={<div>Loading...</div>}><Farms/></Suspense></ProtectedRoute>} />
           <Route path="/admin/sessions" element={<ProtectedRoute><Suspense fallback={<div>Loading...</div>}><AdminSessions/></Suspense></ProtectedRoute>} />

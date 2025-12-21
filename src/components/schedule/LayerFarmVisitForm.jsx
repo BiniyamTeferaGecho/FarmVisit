@@ -100,6 +100,21 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     if (errors && errors[name]) {
       setErrors(prev => { const c = { ...(prev || {}) }; delete c[name]; return c; });
     }
+    // If SampleTaken is unchecked, clear SampleType to avoid stale values
+    if (name === 'SampleTaken' && parsedValue === false) {
+      if (typeof onChange === 'function') onChange({ ...data, SampleTaken: false, SampleType: '' });
+      return;
+    }
+    // If Vaccinations checkbox is unchecked, clear vaccine details
+    if (name === 'VaccinationsGivenLast4Weeks' && parsedValue === false) {
+      if (typeof onChange === 'function') onChange({ ...data, VaccinationsGivenLast4Weeks: false, WhichTypeandDataofVaccin: '', VaccinationNote: '' });
+      return;
+    }
+    // If AnyMedicationGiven is unchecked, clear medication details
+    if (name === 'AnyMedicationGiven' && parsedValue === false) {
+      if (typeof onChange === 'function') onChange({ ...data, AnyMedicationGiven: false, WhichTypeandWhy: '' });
+      return;
+    }
     if (typeof onChange === 'function') {
       onChange({ ...data, [name]: parsedValue });
     }
@@ -901,15 +916,19 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         <SectionCard title="Vaccination" icon={<Syringe className="text-blue-600" />}>
           <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Vaccinations Given (last 4 weeks)" name="VaccinationsGivenLast4Weeks" checked={data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks} onChange={handleChange} />
-            <div className="grow">
-              <InputField disabled={readOnly} label="Which Type & Date of Vaccine" name="WhichTypeandDataofVaccin" value={data.WhichTypeandDataofVaccin || data.VaccinationNote} onChange={handleChange} />
-            </div>
+            { (data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks) ? (
+              <div className="grow">
+                <InputField disabled={readOnly} label="Which Type & Date of Vaccine" name="WhichTypeandDataofVaccin" value={data.WhichTypeandDataofVaccin || data.VaccinationNote} onChange={handleChange} />
+              </div>
+            ) : null }
           </div>
           <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Any Medication Given" name="AnyMedicationGiven" checked={data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven} onChange={handleChange} />
-            <div className="grow">
-              <InputField disabled={readOnly} label="Which Type and Why" name="WhichTypeandWhy" value={data.WhichTypeandWhy} onChange={handleChange} />
-            </div>
+            { (data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven) ? (
+              <div className="grow">
+                <InputField disabled={readOnly} label="Which Type and Why" name="WhichTypeandWhy" value={data.WhichTypeandWhy} onChange={handleChange} />
+              </div>
+            ) : null }
           </div>
           <TextAreaField disabled={readOnly} label="Biosecurity Comment" name="BiosecurityComment" value={data.BiosecurityComment} onChange={handleChange} placeholder="Biosecurity measures or observations..." />
           <TextAreaField disabled={readOnly} label="Farm Hygiene Comment" name="FarmHygieneComment" value={data.FarmHygieneComment} onChange={handleChange} placeholder="Comments on farm hygiene..." />
@@ -969,9 +988,11 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
            <SectionCard title="Sampling" icon={<Microscope className="text-teal-600" />}>
            <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Sample Taken" name="SampleTaken" checked={data.SampleTaken} onChange={handleChange} />
-            <div className="grow">
-              <InputField disabled={readOnly} label="Sample Type" name="SampleType" value={data.SampleType} onChange={handleChange} placeholder="e.g., blood, tissue, feed" />
-            </div>
+            {data.SampleTaken ? (
+              <div className="grow">
+                <InputField disabled={readOnly} label="Sample Type" name="SampleType" value={data.SampleType} onChange={handleChange} placeholder="e.g., blood, tissue, feed" />
+              </div>
+            ) : null}
           </div>
           <InputField disabled={readOnly} label="Batch Number/Production Date" name="BatchNumber" value={data.BatchNumber} onChange={handleChange} placeholder="Batch number if applicable" />
           <TextAreaField disabled={readOnly} label="Analysis Request" name="AnalyzeRequested" value={data.AnalyzeRequested || data.AnalysisRequest} onChange={handleChange} placeholder="Specify analysis required..." />

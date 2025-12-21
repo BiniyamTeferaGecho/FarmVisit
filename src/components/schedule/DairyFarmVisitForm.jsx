@@ -262,7 +262,7 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
                 disabled={readOnly || locationReadOnlyInModal}
                 className={`mt-1 block w-full rounded-md ${errors && errors.Location ? 'border-red-500' : 'border-gray-300'} shadow-sm sm:text-base py-2 px-3 h-11 ${(readOnly || locationReadOnlyInModal) ? 'bg-gray-100 cursor-not-allowed' : 'focus:border-indigo-500 focus:ring-indigo-500'}`}
               />
-              {!readOnly && !locationReadOnlyInModal && (
+              {!readOnly && (
                 <button type="button" onClick={handleGetLocation} className="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" disabled={locLoading}>
                 {locLoading ? 'Getting...' : 'Get'}
                 </button>

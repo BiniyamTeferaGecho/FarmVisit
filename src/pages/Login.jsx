@@ -295,6 +295,7 @@ export default function Login() {
 								name="identifier"
 								type="text"
 								required
+								autoComplete="username"
 								value={identifier}
 								onChange={(e) => setIdentifier(e.target.value)}
 								className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none"
@@ -309,6 +310,7 @@ export default function Login() {
 								name="password"
 								type={showPassword ? 'text' : 'password'}
 								required
+								autoComplete="current-password"
 								value={password}
 								onChange={(e) => setPassword(e.target.value)}
 								className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none"
@@ -340,11 +342,26 @@ export default function Login() {
 					{mode === 'forgot' && (
 						<form onSubmit={async (e) => {
 							e.preventDefault(); setLoading(true); setMessage(null);
-							try {
-								const res = await api.post('/api/auth/forgot-password', { email: forgotEmail })
-								const data = res?.data ?? {}
-								setMessage({ type: res.status === 200 ? 'success' : 'error', text: formatMessage(data.message || 'If an account exists, a reset link was sent') });
-							} catch (err) { setMessage({ type: 'error', text: formatMessage(err.response?.data?.message ?? err.message ?? 'Network error') }) } finally { setLoading(false) }
+												try {
+																// Use the axios instance `api` which has a configured baseURL
+																// (ensures the `/api` prefix is applied consistently). Avoid
+																// constructing absolute URLs here which can miss or double
+																// the `/api` segment when runtime overrides are used.
+																const res = await api.post('/auth/forgot-password', { email: forgotEmail });
+																const data = res?.data ?? {};
+																setMessage({ type: res.status === 200 ? 'success' : 'error', text: formatMessage(data.message || 'If an account exists, a reset link was sent') });
+
+																// Dev convenience: when backend returns resetToken (dev only), redirect to reset page
+																try {
+																	const resetToken = data && (data.resetToken || data.ResetToken);
+																	if (resetToken && typeof import.meta !== 'undefined' && !import.meta.env?.PROD) {
+																		const token = String(resetToken).trim();
+																		const emailParam = encodeURIComponent(forgotEmail || '');
+																		// Navigate the SPA to the reset page with token prefilled for quick testing
+																		window.location.href = `/reset-password?token=${token}&email=${emailParam}`;
+																	}
+																} catch (e) { /* ignore redirect errors */ }
+														} catch (err) { setMessage({ type: 'error', text: formatMessage(err.response?.data?.message ?? err.message ?? 'Network error') }) } finally { setLoading(false) }
 						}} className="md:max-w-md w-full mx-auto">
 							<div className="mb-6">
 								<h3 className="text-2xl font-semibold text-slate-900">Reset password</h3>
@@ -403,10 +420,10 @@ export default function Login() {
 								<h3 className="text-2xl font-semibold text-slate-900">Create account</h3>
 							</div>
 							<div className="space-y-4">
-								<input name="regUsername" value={regUsername} onChange={(e)=>setRegUsername(e.target.value)} required placeholder="Username" className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none" />
-								<input name="regEmail" value={regEmail} onChange={(e)=>setRegEmail(e.target.value)} required type="email" placeholder="Email" className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none" />
+								<input name="regUsername" value={regUsername} onChange={(e)=>setRegUsername(e.target.value)} required autoComplete="username" placeholder="Username" className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none" />
+								<input name="regEmail" value={regEmail} onChange={(e)=>setRegEmail(e.target.value)} required type="email" autoComplete="email" placeholder="Email" className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none" />
 								<input name="regPhone" value={regPhone} onChange={(e)=>setRegPhone(e.target.value)} placeholder="Phone (optional)" className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none" />
-								<input name="regPassword" value={regPassword} onChange={(e)=>setRegPassword(e.target.value)} required type="password" placeholder="Password" className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none" />
+								<input name="regPassword" value={regPassword} onChange={(e)=>setRegPassword(e.target.value)} required type="password" autoComplete="new-password" placeholder="Password" className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none" />
 								{/* Employee dropdown (mandatory) */}
 								<select name="regEmployeeId" value={regEmployeeId} onChange={(e) => setRegEmployeeId(e.target.value)} required className="w-full text-sm border-b border-gray-300 focus:border-black pr-8 px-2 py-3 outline-none">
 									<option value="">-- Select Employee (required) --</option>
