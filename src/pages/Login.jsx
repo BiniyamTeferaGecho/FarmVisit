@@ -401,7 +401,7 @@ export default function Login() {
 									employeeId: empId,
 									EmployeeID: empId
 								};
-								const res = await api.post('/api/users', payload)
+								const res = await api.post('/users', payload)
 								const data = res?.data ?? {}
 								if (res.status === 201 || (data && data.success)) {
 									setMessage({ type: 'success', text: formatMessage('Registration successful') });

@@ -22,6 +22,13 @@ function normalizeBase(u) {
   return s.replace(/\/$/, '');
 }
 
+// Ensure a normalized base does not contain a trailing '/api' segment twice.
+function stripApiSegment(u) {
+  if (!u) return u;
+  // Remove any trailing '/api' occurrences so we can append exactly one later
+  return u.replace(/(\/api)+$/i, '').replace(/\/$/, '');
+}
+
 // Runtime override sources (in priority order):
 // 1) window.__API_BASE__ (settable from browser console)
 // 2) localStorage 'API_BASE' (persisted by the dashboard controls)
@@ -61,8 +68,9 @@ else if (typeof window !== 'undefined' && window.location && window.location.hos
   base = 'http://localhost:80';
 }
 
-// Ensure the returned base points to the API root (append /api if missing)
-if (!base.endsWith('/api')) base = `${base}/api`;
+// Canonicalize base so it ends with a single '/api' (avoid '/api/api')
+base = stripApiSegment(base);
+base = `${base}/api`;
 
 const baseURL = base;
 
