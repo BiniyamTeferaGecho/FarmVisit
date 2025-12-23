@@ -916,19 +916,31 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         <SectionCard title="Vaccination" icon={<Syringe className="text-blue-600" />}>
           <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Vaccinations Given (last 4 weeks)" name="VaccinationsGivenLast4Weeks" checked={data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks} onChange={handleChange} />
-            { (data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks) ? (
-              <div className="grow">
-                <InputField disabled={readOnly} label="Which Type & Date of Vaccine" name="WhichTypeandDataofVaccin" value={data.WhichTypeandDataofVaccin || data.VaccinationNote} onChange={handleChange} />
-              </div>
-            ) : null }
+            <div
+              className="grow transition-all duration-200 ease-out overflow-hidden"
+              style={{
+                maxHeight: (data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks) ? '400px' : '0px',
+                opacity: (data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks) ? 1 : 0,
+                paddingTop: (data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks) ? '0.5rem' : '0px'
+              }}
+              aria-hidden={!(data.VaccinationsGivenLast4Weeks == null ? data.VaccinationsGiven : data.VaccinationsGivenLast4Weeks)}
+            >
+              <InputField disabled={readOnly} label="Which Type & Date of Vaccine" name="WhichTypeandDataofVaccin" value={data.WhichTypeandDataofVaccin || data.VaccinationNote} onChange={handleChange} />
+            </div>
           </div>
           <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Any Medication Given" name="AnyMedicationGiven" checked={data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven} onChange={handleChange} />
-            { (data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven) ? (
-              <div className="grow">
-                <InputField disabled={readOnly} label="Which Type and Why" name="WhichTypeandWhy" value={data.WhichTypeandWhy} onChange={handleChange} />
-              </div>
-            ) : null }
+            <div
+              className="grow transition-all duration-200 ease-out overflow-hidden"
+              style={{
+                maxHeight: (data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven) ? '400px' : '0px',
+                opacity: (data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven) ? 1 : 0,
+                paddingTop: (data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven) ? '0.5rem' : '0px'
+              }}
+              aria-hidden={!(data.AnyMedicationGiven == null ? data.AnyMedication || false : data.AnyMedicationGiven)}
+            >
+              <InputField disabled={readOnly} label="Which Type and Why" name="WhichTypeandWhy" value={data.WhichTypeandWhy} onChange={handleChange} />
+            </div>
           </div>
           <TextAreaField disabled={readOnly} label="Biosecurity Comment" name="BiosecurityComment" value={data.BiosecurityComment} onChange={handleChange} placeholder="Biosecurity measures or observations..." />
           <TextAreaField disabled={readOnly} label="Farm Hygiene Comment" name="FarmHygieneComment" value={data.FarmHygieneComment} onChange={handleChange} placeholder="Comments on farm hygiene..." />
@@ -988,11 +1000,17 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
            <SectionCard title="Sampling" icon={<Microscope className="text-teal-600" />}>
            <div className="col-span-1 md:col-span-2 flex items-center space-x-4">
             <CheckboxField disabled={readOnly} label="Sample Taken" name="SampleTaken" checked={data.SampleTaken} onChange={handleChange} />
-            {data.SampleTaken ? (
-              <div className="grow">
-                <InputField disabled={readOnly} label="Sample Type" name="SampleType" value={data.SampleType} onChange={handleChange} placeholder="e.g., blood, tissue, feed" />
-              </div>
-            ) : null}
+            <div
+              className="grow transition-all duration-200 ease-out overflow-hidden"
+              style={{
+                maxHeight: data.SampleTaken ? '200px' : '0px',
+                opacity: data.SampleTaken ? 1 : 0,
+                paddingTop: data.SampleTaken ? '0.5rem' : '0px'
+              }}
+              aria-hidden={!data.SampleTaken}
+            >
+              <InputField disabled={readOnly} label="Sample Type" name="SampleType" value={data.SampleType} onChange={handleChange} placeholder="e.g., blood, tissue, feed" />
+            </div>
           </div>
           <InputField disabled={readOnly} label="Batch Number/Production Date" name="BatchNumber" value={data.BatchNumber} onChange={handleChange} placeholder="Batch number if applicable" />
           <TextAreaField disabled={readOnly} label="Analysis Request" name="AnalyzeRequested" value={data.AnalyzeRequested || data.AnalysisRequest} onChange={handleChange} placeholder="Specify analysis required..." />

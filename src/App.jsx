@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthProvider'
 import ProtectedRoute from './auth/ProtectedRoute'
 import LoginPage from './pages/Login'
@@ -15,7 +15,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard/*" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><Dashboard/></ProtectedRoute>} />
@@ -24,6 +24,8 @@ function App() {
           <Route path="/farms" element={<ProtectedRoute><Suspense fallback={<div>Loading...</div>}><Farms/></Suspense></ProtectedRoute>} />
           <Route path="/admin/sessions" element={<ProtectedRoute><Suspense fallback={<div>Loading...</div>}><AdminSessions/></Suspense></ProtectedRoute>} />
           {/* other routes */}
+          {/* Redirect unknown routes to root so refreshes land at the SPA entry */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

@@ -151,6 +151,35 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When UsesConcentrate is turned off, clear WhichCompany from the form payload
+  useEffect(() => {
+    try {
+      if (readOnly) return;
+      if (form && form.UsesConcentrate === false && form.WhichCompany) {
+        if (typeof onChange === 'function') {
+          onChange({ ...form, WhichCompany: '' });
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    // only watch UsesConcentrate specifically
+  }, [form?.UsesConcentrate]);
+
+  // When IsLocalMix is turned off, clear ListofIngridiant from the form payload
+  useEffect(() => {
+    try {
+      if (readOnly) return;
+      if (form && form.IsLocalMix === false && form.ListofIngridiant) {
+        if (typeof onChange === 'function') {
+          onChange({ ...form, ListofIngridiant: '' });
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [form?.IsLocalMix]);
+
   const validate = () => {
     const errs = {};
     const getNum = (v) => {
@@ -295,9 +324,29 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
         <SectionCard title="Feeding & Forage" icon={<ClipboardList className="text-green-600" />}>
           <CheckboxField label="Uses Concentrate" name="UsesConcentrate" checked={data.UsesConcentrate} onChange={handleChange} disabled={readOnly} />
-          <InputField label="Which Company" name="WhichCompany" value={data.WhichCompany} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <div
+            className="transition-all duration-200 ease-out overflow-hidden"
+            style={{
+              maxHeight: data && data.UsesConcentrate ? '400px' : '0px',
+              opacity: data && data.UsesConcentrate ? 1 : 0,
+              paddingTop: data && data.UsesConcentrate ? '0.5rem' : '0px'
+            }}
+            aria-hidden={!(data && data.UsesConcentrate)}
+          >
+            <InputField label="Which Company" name="WhichCompany" value={data.WhichCompany} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          </div>
           <CheckboxField label="Is Local Mix" name="IsLocalMix" checked={data.IsLocalMix} onChange={handleChange} disabled={readOnly} />
-          <TextAreaField label="List of Ingredients" name="ListofIngridiant" value={data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
+          <div
+            className="col-span-1 md:col-span-2 transition-all duration-200 ease-out overflow-hidden"
+            style={{
+              maxHeight: data && data.IsLocalMix ? '600px' : '0px',
+              opacity: data && data.IsLocalMix ? 1 : 0,
+              paddingTop: data && data.IsLocalMix ? '0.5rem' : '0px'
+            }}
+            aria-hidden={!(data && data.IsLocalMix)}
+          >
+            <TextAreaField label="List of Ingredients" name="ListofIngridiant" value={data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
+          </div>
           <TextAreaField label="Sample Collection" name="SampleCollection" value={data.SampleCollection} onChange={handleChange} placeholder="Sample collection details..." readOnly={readOnly} disabled={readOnly} />
           <CheckboxField label="Has Forage" name="HasForage" checked={data.HasForage} onChange={handleChange} disabled={readOnly} />
           <InputField label="Type of Forage" name="TypeOfForage" value={data.TypeOfForage} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
