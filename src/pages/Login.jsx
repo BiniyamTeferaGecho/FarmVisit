@@ -34,6 +34,9 @@ export default function Login() {
 
 	// forgot / reset
 	const [forgotEmail, setForgotEmail] = useState('')
+	const [forgotToken, setForgotToken] = useState('')
+	const [showTokenInput, setShowTokenInput] = useState(false)
+	const [verifyingToken, setVerifyingToken] = useState(false)
 
 	// register fields
 	const [regUsername, setRegUsername] = useState('')
@@ -342,26 +345,26 @@ export default function Login() {
 					{mode === 'forgot' && (
 						<form onSubmit={async (e) => {
 							e.preventDefault(); setLoading(true); setMessage(null);
-												try {
-																// Use the axios instance `api` which has a configured baseURL
-																// (ensures the `/api` prefix is applied consistently). Avoid
-																// constructing absolute URLs here which can miss or double
-																// the `/api` segment when runtime overrides are used.
-																const res = await api.post('/auth/forgot-password', { email: forgotEmail });
-																const data = res?.data ?? {};
-																setMessage({ type: res.status === 200 ? 'success' : 'error', text: formatMessage(data.message || 'If an account exists, a reset link was sent') });
+							try {
+								const res = await api.post('/auth/forgot-password', { email: forgotEmail });
+								const data = res?.data ?? {};
+								setMessage({ type: res.status === 200 ? 'success' : 'error', text: formatMessage(data.message || 'If an account exists, a reset link was sent') });
 
-																// Dev convenience: when backend returns resetToken (dev only), redirect to reset page
-																try {
-																	const resetToken = data && (data.resetToken || data.ResetToken);
-																	if (resetToken && typeof import.meta !== 'undefined' && !import.meta.env?.PROD) {
-																		const token = String(resetToken).trim();
-																		const emailParam = encodeURIComponent(forgotEmail || '');
-																		// Navigate the SPA to the reset page with token prefilled for quick testing
-																		window.location.href = `/reset-password?token=${token}&email=${emailParam}`;
-																	}
-																} catch (e) { /* ignore redirect errors */ }
-														} catch (err) { setMessage({ type: 'error', text: formatMessage(err.response?.data?.message ?? err.message ?? 'Network error') }) } finally { setLoading(false) }
+								// After a successful send, show the token input so the user can paste and verify
+								if (res.status === 200) setShowTokenInput(true);
+
+								// Dev convenience: when backend returns resetToken (dev only), redirect to reset page
+								try {
+									const resetToken = data && (data.resetToken || data.ResetToken);
+									if (resetToken && typeof import.meta !== 'undefined' && !import.meta.env?.PROD) {
+										const token = String(resetToken).trim();
+										const emailParam = encodeURIComponent(forgotEmail || '');
+										window.location.href = `/reset-password?token=${token}&email=${emailParam}`;
+									}
+								} catch (e) { /* ignore redirect errors */ }
+							} catch (err) {
+								setMessage({ type: 'error', text: formatMessage(err.response?.data?.message ?? err.message ?? 'Network error') })
+							} finally { setLoading(false) }
 						}} className="md:max-w-md w-full mx-auto">
 							<div className="mb-6">
 								<h3 className="text-2xl font-semibold text-slate-900">Reset password</h3>
@@ -373,6 +376,33 @@ export default function Login() {
 							<div className="mt-6">
 								<button disabled={loading} type="submit" className="w-full shadow-xl py-2 px-4 text-[15px] font-medium tracking-wide rounded-md cursor-pointer text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">{loading ? 'Sending...' : 'Send reset link'}</button>
 							</div>
+
+							{showTokenInput && (
+								<div className="mt-4">
+									<label className="block text-sm text-slate-600 mb-1">Enter Reset Token</label>
+									<div className="flex gap-2">
+										<input value={forgotToken} onChange={e=>setForgotToken(e.target.value)} className="w-full p-2 border rounded" placeholder="Paste token from email" />
+										<button type="button" disabled={verifyingToken} onClick={async ()=>{
+											setVerifyingToken(true); setMessage(null);
+											try {
+												const t = (forgotToken || '').trim();
+												if (!t) { setMessage({ type: 'error', text: 'Please enter the reset token.' }); return; }
+												const res = await api.post('/auth/verify-reset-token', { token: t });
+												const d = res?.data ?? {};
+												if (res.status === 200 && d && d.success === true) {
+													// navigate to reset screen with token & email
+													const emailParam = encodeURIComponent(d.email || forgotEmail || '');
+													navigate(`/reset-password?token=${encodeURIComponent(t)}&email=${emailParam}`);
+												} else {
+													setMessage({ type: 'error', text: d.message || 'Invalid or expired token' });
+												}
+											} catch (err) {
+												setMessage({ type: 'error', text: formatMessage(err.response?.data?.message ?? err.message ?? 'Network error') });
+											} finally { setVerifyingToken(false); }
+										}} className="px-4 py-2 bg-green-600 text-white rounded">{verifyingToken ? 'Verifying...' : 'Verify Token'}</button>
+									</div>
+								</div>
+							)}
 							<div className="mt-4 text-center">
 								<button type="button" onClick={() => { setMode('login'); setMessage(null) }} className="text-sm text-slate-600 hover:underline">Back to sign in</button>
 							</div>
