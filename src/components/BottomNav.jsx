@@ -27,11 +27,10 @@ export default function BottomNav() {
   const active = activeKeyFromLocation()
 
   function go(key) {
-    if (key === 'dashboard') navigate('/dashboard')
-      if (key === 'dashboard') {
-        navigate('/dashboard')
-        return
-      }
+    if (key === 'dashboard') {
+      navigate(`/dashboard?tab=${encodeURIComponent('dashboard')}`)
+      return
+    }
 
       // Special mappings for quick actions
       if (key === 'create') {
