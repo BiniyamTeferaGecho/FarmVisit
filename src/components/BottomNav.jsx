@@ -1,13 +1,13 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Calendar, Clock, BarChart2, Settings } from 'lucide-react'
+import { Home, Calendar, Clock, List, Settings } from 'lucide-react'
 
 const items = [
   { key: 'dashboard', label: 'Home', icon: Home },
   // Use dashboard tab ids so mobile nav maps to actual dashboard tabs
   { key: 'farmvisitschedule', label: 'Visits', icon: Calendar },
     { key: 'create', label: 'Create', icon: Clock },
-    { key: 'list', label: 'List', icon: BarChart2 },
+      { key: 'list', label: 'My Visits', icon: List },
   { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
