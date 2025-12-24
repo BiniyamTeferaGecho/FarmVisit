@@ -223,7 +223,8 @@ const FarmVisitSchedule = () => {
           const targetId = String(findId(data) || '');
           const local = farmList.find(f => String(f.FarmID || f.FarmId || f.id || '') === targetId);
           if (local) {
-            setLocalFillData({ layerForm: { ...(data || {}), FarmID: (local.FarmName || local.Name || local.name || '') } });
+            // Keep FarmID as the GUID; set a human-friendly FarmName for the form display instead
+            setLocalFillData({ layerForm: { ...(data || {}), FarmName: (local.FarmName || local.Name || local.name || '') } });
           } else {
             // async fetch the farm record and set the local fill data when available
             (async () => {
@@ -233,7 +234,8 @@ const FarmVisitSchedule = () => {
                   const body = res?.data?.data || res?.data || res;
                   const rec = Array.isArray(body) ? body[0] : (body && body.recordset ? body.recordset[0] : body);
                   const name = rec?.FarmName || rec?.Name || rec?.name || '';
-                  setLocalFillData({ layerForm: { ...(data || {}), FarmID: name } });
+                  // Use FarmName for display; do not overwrite FarmID (must remain GUID)
+                  setLocalFillData({ layerForm: { ...(data || {}), FarmName: name } });
                 }
               } catch (e) {
                 // ignore fetch errors, leave layer form as-is
@@ -490,7 +492,7 @@ const FarmVisitSchedule = () => {
         const statusRaw = (selectedSchedule && (selectedSchedule.VisitStatus || selectedSchedule.Status || selectedSchedule.visitStatus || selectedSchedule.status)) || (data.VisitStatus || data.Status || data.visitStatus || data.status) || '';
         const lowered = String(statusRaw || '').trim().toLowerCase();
         const isScheduled = lowered === 'scheduled';
-        if (isScheduled && scheduleId) {
+          if (isScheduled && scheduleId) {
           // Resolve StartedBy similar to other handlers
           const u = auth?.user || {};
           const employees = state.employees || [];
@@ -513,6 +515,26 @@ const FarmVisitSchedule = () => {
           }
 
           try {
+            // If the schedule record itself is missing a Location but the visit form provides one,
+            // patch the schedule before attempting to start it. The server's start endpoint
+            // may require the schedule row to have a Location set.
+            const scheduleHasLocation = selectedSchedule && (selectedSchedule.Location || selectedSchedule.location);
+            const visitProvidesLocation = data && (data.Location || data.location);
+            if (!scheduleHasLocation && visitProvidesLocation) {
+              try {
+                const patchPayload = { ScheduleID: scheduleId, Location: data.Location || data.location, UpdatedBy: startedBy };
+                const patchedRes = await api.callWithAuthOrApi(auth.fetchWithAuth, { url: `/farm-visit-schedule/${scheduleId}`, method: 'PATCH', data: patchPayload });
+                const patched = patchedRes && patchedRes.data ? (patchedRes.data.data || patchedRes.data) : patchedRes;
+                if (patched) {
+                  // update local selected schedule so subsequent logic sees the Location
+                  dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: patched });
+                }
+              } catch (patchErr) {
+                // Non-fatal: log and continue; start may still fail and be handled below.
+                console.warn('Failed to patch schedule Location before start', patchErr);
+              }
+            }
+
             const started = await api.startFarmVisit(dispatch, scheduleId, startedBy, auth.fetchWithAuth);
             if (started) {
               // Update selected schedule locally

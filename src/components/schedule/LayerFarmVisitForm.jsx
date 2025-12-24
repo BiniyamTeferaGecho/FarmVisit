@@ -131,6 +131,13 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
       // Location required (table: Location NOT NULL)
       if (!data.Location && !data.location) errs.Location = 'Location is required'
 
+      // FarmID must be a GUID when provided (prevent sending human-readable names)
+      const guidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+      if (data.FarmID || data.farmId) {
+        const fid = data.FarmID || data.farmId
+        if (fid && !guidPattern.test(String(fid).trim())) errs.FarmID = 'FarmID must be a valid GUID'
+      }
+
       // FlockSize must be > 0
       const flock = toNum(data.FlockSize)
       if (flock === null) {
