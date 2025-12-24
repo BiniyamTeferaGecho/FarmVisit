@@ -153,13 +153,17 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
             // Prevent default anchor behavior if event present
             if (e && typeof e.preventDefault === 'function') e.preventDefault();
             navigate(target);
-            // If navigating to a dashboard URL, let the Dashboard component
-            // read the URL and handle tab activation (prevents duplicate tabs).
-            // For non-dashboard navigation we still notify parent immediately.
-            if (!target.startsWith('/dashboard')) {
-                onChange && onChange(item.key);
+            // Notify parent of the navigation so Dashboard can update active tab state.
+            // Previously we only notified for non-dashboard targets which caused clicking
+            // the top-level Dashboard item to not activate the dashboard tab. Always
+            // call onChange when provided so the parent can react immediately.
+            onChange && onChange(item.key);
+            if (window.innerWidth < 1024) {
+                // Delay closing the mobile sidebar slightly so navigation can settle
+                try {
+                    setTimeout(() => { if (typeof onClose === 'function') onClose(); }, 200);
+                } catch (e) { if (typeof onClose === 'function') onClose(); }
             }
-            if (window.innerWidth < 1024) onClose();
         }
     };
 

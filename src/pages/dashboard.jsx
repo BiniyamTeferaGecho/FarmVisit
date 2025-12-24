@@ -32,6 +32,8 @@ export default function Dashboard() {
   const [tabs, setTabs] = useState([{ id: 'dashboard', title: 'Dashboard' }]);
   const [loadingModule, setLoadingModule] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [showTabTransition, setShowTabTransition] = useState(false);
+  const transitionTimerRef = React.useRef(null);
 
   useEffect(() => {
     localStorage.setItem('sidebarWidth', String(sidebarWidth));
@@ -63,6 +65,16 @@ export default function Dashboard() {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+
+  // trigger a short visual transition when the active tab changes
+  useEffect(() => {
+    try {
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+      setShowTabTransition(true);
+      transitionTimerRef.current = setTimeout(() => setShowTabTransition(false), 420);
+    } catch (e) { /* ignore */ }
+    return () => { if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current); };
+  }, [activeTabId]);
 
   const titles = useMemo(() => ({
     dashboard: 'Dashboard',
@@ -284,6 +296,22 @@ export default function Dashboard() {
                       </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Small top transition bar when switching tabs */}
+              <div className="w-full h-1 overflow-hidden">
+                <AnimatePresence>
+                  {showTabTransition && (
+                    <motion.div
+                      key={`tab-trans-${activeTabId}-${reloadKey}`}
+                      initial={{ width: '0%' }}
+                      animate={{ width: '100%' }}
+                      exit={{ width: '0%' }}
+                      transition={{ duration: 0.42, ease: 'easeInOut' }}
+                      className="h-1 bg-teal-500"
+                    />
+                  )}
+                </AnimatePresence>
               </div>
 
               <AnimatePresence mode="wait">
