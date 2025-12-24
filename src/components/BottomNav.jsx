@@ -39,8 +39,8 @@ export default function BottomNav() {
         return
       }
       if (key === 'list') {
-        // Open Visit Schedules tab (list view)
-        navigate(`/dashboard?tab=${encodeURIComponent('farmvisitschedule')}`)
+        // Open My Visits (advisor visits) tab
+        navigate(`/dashboard?tab=${encodeURIComponent('advisorvisits')}`)
         return
       }
 
