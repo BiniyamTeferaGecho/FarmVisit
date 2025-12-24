@@ -96,7 +96,7 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors rounded-full p-1"><FaTimes size={22} /></button>
                         </div>
                     </div>
-                <form onSubmit={handleSubmit} noValidate className="flex-grow overflow-y-auto">
+                <form onSubmit={handleSubmit} noValidate className="grow overflow-y-auto">
                     <div className="p-6">
                         <div className="mb-8">
                             <h4 className="text-lg font-semibold text-gray-700 border-b pb-2 mb-6">Personal & Contact Details</h4>
@@ -615,7 +615,7 @@ export default function Farmers() {
                     </button>
                 </div>
             }>
-                <form id="farmer-form" onSubmit={(e) => { e.preventDefault(); handleFormSubmit(form); }} noValidate className="flex-grow overflow-y-auto">
+                <form id="farmer-form" onSubmit={(e) => { e.preventDefault(); handleFormSubmit(form); }} noValidate className="grow overflow-y-auto">
                     <div className="p-6 space-y-8">
                         <div>
                             <h4 className="text-base font-semibold text-gray-600 border-b pb-2 mb-4">Personal & Contact</h4>
