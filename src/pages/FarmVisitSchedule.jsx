@@ -38,6 +38,7 @@ const FarmVisitSchedule = () => {
   const [localFillData, setLocalFillData] = useState({});
   const [isFillReadOnly, setIsFillReadOnly] = useState(false);
   const [externalErrors, setExternalErrors] = useState({});
+  const [recentlyFilled, setRecentlyFilled] = useState({});
 
   // Initial data loading: use the AuthProvider's fetchWithAuth for authenticated calls
   const [reloadKey, setReloadKey] = useState(0);
@@ -155,6 +156,8 @@ const FarmVisitSchedule = () => {
       // ignore
     }
 
+    // Clear transient recently-filled flags when performing a fresh search
+    setRecentlyFilled({});
     api.fetchAllSchedules(dispatch, auth.fetchWithAuth, params);
   };
 
@@ -582,6 +585,15 @@ const FarmVisitSchedule = () => {
       // clear previous external errors for the form
       setExternalErrors({});
       await api.fillVisit(dispatch, data, auth.fetchWithAuth);
+      // mark this schedule as recently filled so UI disables relevant actions immediately
+      try {
+        const sid = data.ScheduleID || data.ScheduleId || data.scheduleId || (selectedSchedule && (selectedSchedule.ScheduleID || selectedSchedule.ScheduleId || selectedSchedule.id));
+        if (sid) {
+          setRecentlyFilled(prev => ({ ...(prev || {}), [sid]: true }));
+          // auto-clear after 12s to allow server refresh to update authoritative state
+          setTimeout(() => setRecentlyFilled(prev => { const copy = { ...(prev || {}) }; delete copy[sid]; return copy; }), 12000);
+        }
+      } catch (e) { /* ignore */ }
       // clear any external errors on success
       setExternalErrors({});
     } catch (err) {
@@ -859,6 +871,7 @@ const FarmVisitSchedule = () => {
           <ScheduleList
             schedules={schedules}
             fetchWithAuth={auth.fetchWithAuth}
+            recentlyFilled={recentlyFilled}
             onEdit={(schedule) => {
               dispatch({ type: 'SET_FORM_DATA', payload: schedule });
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });

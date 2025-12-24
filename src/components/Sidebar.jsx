@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { href, useNavigate } from 'react-router-dom';
 
 const menu = [
-    { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: FaHome },
+    { key: 'dashboard', label: 'Dashboard', href: '/dashboard?tab=dashboard', icon: FaHome },
     {
         key: 'companies', label: 'Companies', href: '/companies', icon: FaBuilding,rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'],
         children: [

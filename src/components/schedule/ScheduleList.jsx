@@ -93,7 +93,7 @@ const ActionButton = ({ onClick, icon: Icon, title, disabled = false, disabledRe
   </div>
 );
 
-const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth }) => {
+const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {} }) => {
   const [advisorMap, setAdvisorMap] = useState({});
   const [latestMap, setLatestMap] = useState({});
   const [completedFlash, setCompletedFlash] = useState({});
@@ -276,11 +276,11 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
             });
 
             // Fill should be active when schedule is approved OR when the visit is scheduled, but disabled if already completed
-            const fillDisabled = isCompleted || isVisitCompletedFlag ? true : !(isApproved || isScheduled);
-            const fillDisabledReason = isCompleted || isVisitCompletedFlag ? 'Visit already completed' : (!(isApproved || isScheduled) ? 'Requires approved schedule or scheduled visit' : '');
+            const fillDisabled = isCompleted || isVisitCompletedFlag || Boolean(recentlyFilled[id]) ? true : !(isApproved || isScheduled);
+            const fillDisabledReason = isCompleted || isVisitCompletedFlag || Boolean(recentlyFilled[id]) ? 'Visit already completed or recently filled' : (!(isApproved || isScheduled) ? 'Requires approved schedule or scheduled visit' : '');
             const isDraft = normalizedVisitStatus === 'draft' || normalizedVisitStatus === 'd';
             const submitDisabledReason = isCompleted ? 'Schedule already completed' : (isSubmitted ? 'Already submitted for approval' : (isScheduled ? 'Visit is scheduled — cannot submit' : ''));
-            const submitDisabled = isDraft ? false : (isCompleted || isSubmitted || isScheduled);
+            const submitDisabled = isDraft ? false : (isCompleted || isSubmitted || isScheduled || Boolean(recentlyFilled[id]));
             const approveDisabledReason = aNorm === 'approved' ? 'Already approved' : '';
             const completeDisabledReason = isCompleted ? 'Schedule already completed' : (!isInProgress ? 'Visit must be InProgress to complete' : (!canComplete ? 'Missing required fields to complete' : ''));
 
