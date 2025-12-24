@@ -236,6 +236,8 @@ export const fillVisit = async (dispatch, visitData, fetchWithAuth) => {
     dispatch({ type: 'SET_SUCCESS', payload: 'Visit details saved successfully.' });
   } catch (error) {
     handleError(dispatch, error);
+    // Re-throw so callers can inspect validation errors and display inline messages
+    throw error;
   }
 };
 

@@ -67,7 +67,7 @@ const TextAreaField = ({ label, name, value, onChange, placeholder, disabled, er
   </div>
 );
 
-const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnly = false, locationReadOnlyInModal = false }) => {
+const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnly = false, locationReadOnlyInModal = false, externalErrors = {} }) => {
   const data = form ?? {};
   const auth = useAuth()
   const { fetchWithAuth, user } = auth || {}
@@ -175,10 +175,12 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
   const handleSave = async () => {
     const errs = validate()
-    if (Object.keys(errs).length) {
-      setErrors(errs)
+    // merge external errors (from parent) with local validation
+    const merged = { ...(externalErrors || {}), ...errs }
+    if (Object.keys(merged).length) {
+      setErrors(merged)
       // focus first errored field if possible
-      const first = Object.keys(errs)[0]
+      const first = Object.keys(merged)[0]
       try { const el = document.getElementsByName(first)[0]; if (el && el.focus) el.focus(); } catch (e) {}
       return
     }

@@ -36,6 +36,7 @@ const FarmVisitSchedule = () => {
   const [localCompleteData, setLocalCompleteData] = useState({});
   const [localFillData, setLocalFillData] = useState({});
   const [isFillReadOnly, setIsFillReadOnly] = useState(false);
+  const [externalErrors, setExternalErrors] = useState({});
 
   // Initial data loading: use the AuthProvider's fetchWithAuth for authenticated calls
   const [reloadKey, setReloadKey] = useState(0);
@@ -537,9 +538,21 @@ const FarmVisitSchedule = () => {
         }
       }
 
+      // clear previous external errors for the form
+      setExternalErrors({});
       await api.fillVisit(dispatch, data, auth.fetchWithAuth);
+      // clear any external errors on success
+      setExternalErrors({});
     } catch (err) {
       console.error('onFillVisitSave error', err);
+      // If server returned validation details, map them to externalErrors so modal forms can display inline messages
+      const payload = payload || localFillData || {};
+      const farmType = (payload.FarmType || payload.FarmTypeCode || '').toString().toUpperCase() || (selectedSchedule && (selectedSchedule.FarmType || selectedSchedule.FarmTypeCode || '')).toString().toUpperCase();
+      const resp = err && err.response && err.response.data ? err.response.data : null;
+      // Common shapes: { success:false, message:'', details: { field: 'msg' } } or { errors: { field: 'msg' } }
+      const fieldErrs = (resp && (resp.details || resp.fieldErrors || resp.errors || resp.validationErrors)) || {};
+      if (farmType === 'LAYER') setExternalErrors(prev => ({ ...(prev || {}), layerForm: fieldErrs }));
+      else setExternalErrors(prev => ({ ...(prev || {}), dairyForm: fieldErrs }));
     }
     closeModal('fillVisit');
     handleSearch();

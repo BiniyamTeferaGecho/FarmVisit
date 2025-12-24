@@ -16,6 +16,7 @@ const FillVisitModal = ({
   loading,
   error,
   readOnly = false,
+  externalErrors = {}
 }) => {
   if (!open || !target) return null;
 
@@ -35,6 +36,7 @@ const FillVisitModal = ({
             loading={loading}
             readOnly={readOnly}
             locationReadOnlyInModal={true}
+            externalErrors={externalErrors?.layerForm || {}}
           />
         )}
         {farmType === 'DAIRY' && (
@@ -46,6 +48,7 @@ const FillVisitModal = ({
             loading={loading}
             readOnly={readOnly}
             locationReadOnlyInModal={true}
+            externalErrors={externalErrors?.dairyForm || {}}
           />
         )}
         {!['LAYER', 'DAIRY'].includes(farmType) && (

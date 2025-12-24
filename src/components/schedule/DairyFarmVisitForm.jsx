@@ -63,7 +63,7 @@ const TextAreaField = ({ label, name, value, onChange, placeholder, readOnly = f
   </div>
 );
 
-const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnly = false, locationReadOnlyInModal = false }) => {
+const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnly = false, locationReadOnlyInModal = false, externalErrors = {} }) => {
   const data = form ?? {};
   const [imagePreviews, setImagePreviews] = useState([]);
   const createdBlobUrlsRef = useRef([]);
@@ -262,9 +262,10 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
   const handleSaveInternal = async () => {
     const errs = validate();
-    if (Object.keys(errs).length) {
-      setErrors(errs);
-      if (errs.Location && locationRef.current) locationRef.current.focus();
+    const merged = { ...(externalErrors || {}), ...errs };
+    if (Object.keys(merged).length) {
+      setErrors(merged);
+      if (merged.Location && locationRef.current) locationRef.current.focus();
       return;
     }
     if (typeof onSave === 'function') {

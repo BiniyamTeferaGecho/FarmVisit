@@ -34,6 +34,7 @@ export default function LayerFarm() {
   const [loadingVisits, setLoadingVisits] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [showDelete, setShowDelete] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [completingId, setCompletingId] = useState(null)
@@ -55,15 +56,27 @@ export default function LayerFarm() {
     const userId = user && (user.EmployeeID || user.employeeId || user.UserID || user.userId || user.UserId || user.id || user.ID)
     // prefer actorId when available (EmployeeID) for CreatedBy/UpdatedBy
     const actor = actorId || userId
+    // clear previous inline field errors and global messages
+    setFieldErrors({})
+    setMessage(null)
+
     if (!userId) { setMessage({ type: 'error', text: 'You must be signed in to create a layer farm visit.' }); return }
-    if (!form.ScheduleID || String(form.ScheduleID).trim() === '') { setMessage({ type: 'error', text: 'ScheduleID is required.' }); return }
-    if (!form.Location || String(form.Location).trim() === '') { setMessage({ type: 'error', text: 'Location is required.' }); return }
+    const errs = {}
+    if (!form.ScheduleID || String(form.ScheduleID).trim() === '') { errs.ScheduleID = 'ScheduleID is required.' }
+    if (!form.Location || String(form.Location).trim() === '') { errs.Location = 'Location is required.' }
+    if (Object.keys(errs).length) {
+      // show modal and surface inline errors on the form
+      setFieldErrors(errs)
+      setShowModal(true)
+      return
+    }
 
     if (form.MortalityTotal !== '' && form.MortalityRecent2Weeks !== '') {
       const mt = Number(form.MortalityTotal)
       const mr = Number(form.MortalityRecent2Weeks)
       if (!Number.isNaN(mt) && !Number.isNaN(mr) && mr > mt) {
-        setMessage({ type: 'error', text: 'Mortality recent 2 weeks cannot exceed total mortality.' })
+        setFieldErrors({ MortalityTotal: 'Total mortality must be >= recent mortality', RecentMortalityPrev1to3Weeks: 'Recent mortality cannot exceed total mortality' })
+        setShowModal(true)
         return
       }
     }
@@ -71,7 +84,8 @@ export default function LayerFarm() {
       const age = Number(form.AgeInWeeks)
       const prod = Number(form.EggProductionPercent)
       if (!Number.isNaN(age) && age < 18 && !Number.isNaN(prod) && prod > 10) {
-        setMessage({ type: 'error', text: 'For age < 18 weeks, egg production must be <= 10%.' })
+        setFieldErrors({ AgeInWeeks: 'Age < 18 weeks requires egg production <= 10%', CurrEggProdinPercent: 'Egg production must be <= 10% for age < 18' })
+        setShowModal(true)
         return
       }
     }
