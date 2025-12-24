@@ -155,7 +155,8 @@ export default function Dashboard() {
   const handleOpenTab = (key) => {
     setLoadingModule(true);
     setTimeout(() => {
-      setTabs(prev => (prev.some(t => t.id === key) ? prev : [...prev, { id: key, title: titles[key] || key }]));
+      const norm = (s) => (String(s || '').trim().toLowerCase());
+      setTabs(prev => (prev.some(t => norm(t.id) === norm(key)) ? prev : [...prev, { id: key, title: titles[key] || key }]));
       // update URL query param when opening tab
       try {
         const next = new URLSearchParams(searchParams);
@@ -175,7 +176,8 @@ export default function Dashboard() {
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && titles[tab]) {
-      setTabs(prev => (prev.some(t => t.id === tab) ? prev : [...prev, { id: tab, title: titles[tab] }]));
+      const norm = (s) => (String(s || '').trim().toLowerCase());
+      setTabs(prev => (prev.some(t => norm(t.id) === norm(tab)) ? prev : [...prev, { id: tab, title: titles[tab] }]));
       setActiveTabId(tab);
     }
     // if query param is invalid we leave the activeTabId alone
