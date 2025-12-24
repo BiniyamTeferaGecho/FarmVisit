@@ -6,8 +6,8 @@ const items = [
   { key: 'dashboard', label: 'Home', icon: Home },
   // Use dashboard tab ids so mobile nav maps to actual dashboard tabs
   { key: 'farmvisitschedule', label: 'Visits', icon: Calendar },
-  { key: 'farmvisitschedule', label: 'Create', icon: Clock },
-  { key: 'farmvisitschedule', label: 'List', icon: BarChart2 },
+    { key: 'create', label: 'Create', icon: Clock },
+    { key: 'list', label: 'List', icon: BarChart2 },
   { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -28,7 +28,25 @@ export default function BottomNav() {
 
   function go(key) {
     if (key === 'dashboard') navigate('/dashboard')
-    else navigate(`/dashboard?tab=${encodeURIComponent(key)}`)
+      if (key === 'dashboard') {
+        navigate('/dashboard')
+        return
+      }
+
+      // Special mappings for quick actions
+      if (key === 'create') {
+        // Open Visit Schedules tab and request the create modal
+        navigate(`/dashboard?tab=${encodeURIComponent('farmvisitschedule')}&open=create`)
+        return
+      }
+      if (key === 'list') {
+        // Open Visit Schedules tab (list view)
+        navigate(`/dashboard?tab=${encodeURIComponent('farmvisitschedule')}`)
+        return
+      }
+
+      // default: treat key as dashboard tab id
+      navigate(`/dashboard?tab=${encodeURIComponent(key)}`)
   }
 
   return (

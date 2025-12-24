@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { showToast } from '../utils/toast';
 import { scheduleReducer, initialState } from '../reducers/scheduleReducer';
@@ -40,6 +41,7 @@ const FarmVisitSchedule = () => {
 
   // Initial data loading: use the AuthProvider's fetchWithAuth for authenticated calls
   const [reloadKey, setReloadKey] = useState(0);
+  const location = useLocation();
 
   useEffect(() => {
     const refresh = async () => {
@@ -255,6 +257,23 @@ const FarmVisitSchedule = () => {
         dispatch({ type: `OPEN_${modalName.toUpperCase()}_MODAL`, payload: data });
     }
   };
+
+  // Auto-open modal when dashboard navigation includes `?open=create`.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(location.search || window.location.search);
+      if (p.get('open') === 'create') {
+        openModal('schedule');
+        // remove the flag from URL so repeated navigation doesn't re-open modal
+        p.delete('open');
+        const next = p.toString();
+        const newUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [location.search]);
 
   const closeModal = (modalName) => {
     switch (modalName) {
