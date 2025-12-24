@@ -4,10 +4,10 @@ import { Home, Calendar, Clock, BarChart2, Settings } from 'lucide-react'
 
 const items = [
   { key: 'dashboard', label: 'Home', icon: Home },
-  // Wire mobile "Visits" button to the Visit Schedules tab
+  // Use dashboard tab ids so mobile nav maps to actual dashboard tabs
   { key: 'farmvisitschedule', label: 'Visits', icon: Calendar },
-  { key: 'createschedule', label: 'Create', icon: Clock },
-  { key: 'schedules', label: 'List', icon: BarChart2 },
+  { key: 'farmvisitschedule', label: 'Create', icon: Clock },
+  { key: 'farmvisitschedule', label: 'List', icon: BarChart2 },
   { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
