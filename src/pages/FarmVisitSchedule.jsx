@@ -39,6 +39,7 @@ const FarmVisitSchedule = () => {
   const [isFillReadOnly, setIsFillReadOnly] = useState(false);
   const [externalErrors, setExternalErrors] = useState({});
   const [recentlyFilled, setRecentlyFilled] = useState({});
+  const [confirmedFilled, setConfirmedFilled] = useState({});
 
   // Initial data loading: use the AuthProvider's fetchWithAuth for authenticated calls
   const [reloadKey, setReloadKey] = useState(0);
@@ -590,8 +591,59 @@ const FarmVisitSchedule = () => {
         const sid = data.ScheduleID || data.ScheduleId || data.scheduleId || (selectedSchedule && (selectedSchedule.ScheduleID || selectedSchedule.ScheduleId || selectedSchedule.id));
         if (sid) {
           setRecentlyFilled(prev => ({ ...(prev || {}), [sid]: true }));
-          // auto-clear after 12s to allow server refresh to update authoritative state
-          setTimeout(() => setRecentlyFilled(prev => { const copy = { ...(prev || {}) }; delete copy[sid]; return copy; }), 12000);
+          // Poll server for confirmation that the visit/form is present. If confirmed,
+          // move id into `confirmedFilled` so the disabled state persists until
+          // the authoritative server state is observed. Fall back to clearing
+          // optimistic flag after 30s if server never confirms.
+          (async () => {
+            const maxAttempts = 6;
+            const delayMs = 2000;
+            let confirmed = false;
+            for (let i = 0; i < maxAttempts; i++) {
+              try {
+                const payload = await api.getFilledFormByScheduleId(dispatch, sid, auth.fetchWithAuth).catch(() => null);
+                if (payload && (payload.form || payload.schedule)) {
+                  // Consider confirmed if server returned a filled form or schedule row
+                  confirmed = true;
+                  setConfirmedFilled(prev => ({ ...(prev || {}), [sid]: true }));
+                  // remove optimistic flag
+                  setRecentlyFilled(prev => { const copy = { ...(prev || {}) }; delete copy[sid]; return copy; });
+                  // Refresh the authoritative schedule row and update local list/state
+                  try {
+                    const schedRes = await api.callWithAuthOrApi(auth.fetchWithAuth, { url: `/farm-visit-schedule/${sid}`, method: 'GET' });
+                    const returned = schedRes && schedRes.data ? (schedRes.data.data || schedRes.data) : schedRes;
+                    if (returned) {
+                      // update selected schedule and list optimistically from server response
+                      dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: returned });
+                      try {
+                        const updated = (schedules || []).map(s => {
+                          const sidLocal = s.ScheduleID || s.id || null;
+                          const rid = returned.ScheduleID || returned.id || null;
+                          if (!sidLocal || !rid) return s;
+                          if (String(sidLocal).toLowerCase() === String(rid).toLowerCase()) return { ...s, ...returned };
+                          return s;
+                        });
+                        dispatch({ type: 'SET_LIST', payload: updated });
+                      } catch (e) {
+                        // fallback: refresh full list if local merge fails
+                        await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 });
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Failed to refresh schedule row after confirmation', e);
+                  }
+                  break;
+                }
+              } catch (e) {
+                // ignore and retry
+              }
+              await new Promise(r => setTimeout(r, delayMs));
+            }
+            if (!confirmed) {
+              // fallback: clear optimistic flag after 30s to avoid permanently disabling UI
+              setTimeout(() => setRecentlyFilled(prev => { const copy = { ...(prev || {}) }; delete copy[sid]; return copy; }), 30000);
+            }
+          })();
         }
       } catch (e) { /* ignore */ }
       // clear any external errors on success
@@ -872,6 +924,7 @@ const FarmVisitSchedule = () => {
             schedules={schedules}
             fetchWithAuth={auth.fetchWithAuth}
             recentlyFilled={recentlyFilled}
+            confirmedFilled={confirmedFilled}
             onEdit={(schedule) => {
               dispatch({ type: 'SET_FORM_DATA', payload: schedule });
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
