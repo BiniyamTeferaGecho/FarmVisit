@@ -10,6 +10,7 @@ import { Plus, RefreshCw, Edit, Trash2, Check } from 'lucide-react'
 const initialForm = {
   ScheduleID: '',
   Location: '',
+  LocationCoordinate: '',
   LactationCows: '',
   DryCows: '',
   Heifers: '',
@@ -78,7 +79,9 @@ export default function DairyFarm() {
   const [list, setList] = useState([])
   // scheduleMap: cache schedule rows (by ScheduleID) so we can show VisitCode, Farm and Advisor names
   const [scheduleMap, setScheduleMap] = useState({});
-  const [savedLocationMap, setSavedLocationMap] = useState({});
+  const [savedLocationMap, setSavedLocationMap] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('dairy.savedLocationMap') || '{}') } catch (e) { return {} }
+  });
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
 
@@ -119,6 +122,7 @@ export default function DairyFarm() {
           setForm({
             ScheduleID: d.ScheduleID || d.ScheduleID || ScheduleID || '',
             Location: d.Location || d.FarmLocation || '',
+            LocationCoordinate: d.LocationCoordinate || d.Location || '',
             LactationCows: d.LactationCows ?? d.LactationCows ?? '',
             DryCows: d.DryCows ?? '',
             Heifers: d.Heifers ?? '',
@@ -306,6 +310,7 @@ export default function DairyFarm() {
         RecommendationorAdvice: form.RecommendationorAdvice || form.RecommendationAdvice || null,
 
         IsVisitCompleted: form.IsVisitCompleted ? 1 : 0,
+        LocationCoordinate: form.LocationCoordinate || form.Location || null,
         // prefer actorId (EmployeeID) when available for CreatedBy/UpdatedBy; backend accepts NULL
         CreatedBy: actorId || user?.UserID || user?.id || null,
         UpdatedBy: actorId || user?.UserID || user?.id || null,
@@ -315,6 +320,15 @@ export default function DairyFarm() {
       if (editingId) {
         saveRes = await fetchWithAuth({ url: `/dairy-farm/${editingId}`, method: 'put', data: payload })
         setMessage({ type: 'success', text: 'Dairy visit updated' })
+        // persist any coordinate the user provided locally
+        try {
+          const coord = form.LocationCoordinate || form.Location || ''
+          setSavedLocationMap(m => {
+            const nm = { ...(m || {}), [String(editingId)]: coord }
+            try { localStorage.setItem('dairy.savedLocationMap', JSON.stringify(nm)) } catch (e) { }
+            return nm
+          })
+        } catch (e) { /* ignore */ }
       } else {
         saveRes = await fetchWithAuth({ url: '/dairy-farm', method: 'post', data: payload })
         // Backend returns 201 and the newly created visit row; surface DB validation messages for 400
@@ -323,9 +337,14 @@ export default function DairyFarm() {
           const newId = created.DairyFarmVisitId || created.DairyFarmVisitID || created.id || null
           if (newId) setEditingId(newId)
           // remember the coordinate the user entered so UI can prefer it over region name
-          if (newId && form && form.Location) {
-            setSavedLocationMap(m => ({ ...(m||{}), [String(newId)]: form.Location }))
-          }
+            if (newId && form) {
+              const coord = form.LocationCoordinate || form.Location || ''
+              setSavedLocationMap(m => {
+                const nm = { ...(m || {}), [String(newId)]: coord }
+                try { localStorage.setItem('dairy.savedLocationMap', JSON.stringify(nm)) } catch (e) { /* ignore */ }
+                return nm
+              })
+            }
         }
         setMessage({ type: 'success', text: 'Dairy visit created' })
       }
@@ -531,6 +550,7 @@ export default function DairyFarm() {
         setForm({
           ScheduleID: d.ScheduleID || d.scheduleId || d.ScheduleId || '',
           Location: d.Location || d.FarmLocation || '',
+          LocationCoordinate: d.LocationCoordinate || d.Location || '',
           LactationCows: d.LactationCows ?? '',
           DryCows: d.DryCows ?? '',
           Heifers: d.Heifers ?? '',
@@ -593,7 +613,10 @@ export default function DairyFarm() {
           AnyRelatedEvidenceImage: d.AnyRelatedEvidenceImage || '',
           IsVisitCompleted: !!d.IsVisitCompleted,
         })
-        setEditingId(id); setShowForm(true)
+        setEditingId(id);
+        // prefer locally saved coordinate if server didn't provide one
+        setForm(f => ({ ...f, LocationCoordinate: f.LocationCoordinate || savedLocationMap[String(id)] || f.Location || '' }))
+        setShowForm(true)
       }
     } catch (err) { console.error('openEdit error', err); setMessage({ type: 'error', text: 'Failed to load dairy visit' }) } finally { setLoading(false) }
   }

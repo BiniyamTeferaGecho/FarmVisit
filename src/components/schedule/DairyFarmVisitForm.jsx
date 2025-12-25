@@ -114,7 +114,7 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           const lng = pos.coords.longitude.toFixed(6);
           const coord = `${lat}, ${lng}`;
           try {
-            if (typeof onChange === 'function') onChange({ ...data, Location: coord });
+            if (typeof onChange === 'function') onChange({ ...data, Location: coord, LocationCoordinate: coord });
           } catch (e) { }
           setLocationReadOnly(true);
           setLocLoading(false);

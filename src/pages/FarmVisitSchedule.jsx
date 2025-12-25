@@ -45,6 +45,28 @@ const FarmVisitSchedule = () => {
   const [reloadKey, setReloadKey] = useState(0);
   const location = useLocation();
 
+  // Helper: normalize various possible shapes returned by getFilledFormByScheduleId
+  const extractFillForm = (payload) => {
+    if (!payload) return { schedule: null, form: {} };
+    // Common shapes: { schedule, form } or { data: { schedule, form } } or { dairyForm, layerForm }
+    const maybe = payload.data || payload;
+    const schedule = maybe.schedule || maybe.serverSchedule || maybe.sched || maybe.scheduleRow || null;
+    // Try multiple possible locations for the actual form contents
+    let form = maybe.form || maybe.dairyForm || maybe.layerForm || maybe.FilledForm || maybe.filledForm || maybe.data?.form || maybe.data?.dairyForm || null;
+    // If the returned `form` is wrapped in recordset or array, extract first
+    if (Array.isArray(form) && form.length === 1) form = form[0];
+    if (form && form.recordset && Array.isArray(form.recordset) && form.recordset.length > 0) form = form.recordset[0];
+    // Some APIs return the district or nested object as { DairyFarmVisit: { ... } }
+    if (form && form.DairyFarmVisit) form = form.DairyFarmVisit;
+    if (!form && maybe && typeof maybe === 'object') {
+      // Fallback: return payload keys that look like dairy visit fields
+      const candidateKeys = ['Location','LactationCows','AvgMilkProductionPerDayPerCow','DairyFarmVisitId','DairyFarmVisitID'];
+      const hasAny = candidateKeys.some(k => Object.prototype.hasOwnProperty.call(maybe, k));
+      if (hasAny) form = maybe;
+    }
+    return { schedule, form: form || {} };
+  };
+
   useEffect(() => {
     const refresh = async () => {
       try {
@@ -636,7 +658,8 @@ const FarmVisitSchedule = () => {
             for (let i = 0; i < maxAttempts; i++) {
               try {
                 const payload = await api.getFilledFormByScheduleId(dispatch, sid, auth.fetchWithAuth).catch(() => null);
-                if (payload && (payload.form || payload.schedule)) {
+                const normalized = extractFillForm(payload);
+                if (payload && (normalized.form && Object.keys(normalized.form).length > 0 || normalized.schedule)) {
                   // Consider confirmed if server returned a filled form or schedule row
                   confirmed = true;
                   setConfirmedFilled(prev => ({ ...(prev || {}), [sid]: true }));
@@ -1038,9 +1061,10 @@ const FarmVisitSchedule = () => {
                 try {
                   const payload = await api.getFilledFormByScheduleId(dispatch, id, auth.fetchWithAuth);
                   console.debug('onView: fetched filled form payload', { id, payload });
-                  const serverSchedule = payload?.schedule || schedule;
-                  const form = payload?.form || {};
-                  const farmType = (serverSchedule.FarmType || serverSchedule.FarmTypeCode || '').toString().toUpperCase();
+                  const normalized = extractFillForm(payload);
+                  const serverSchedule = normalized.schedule || payload?.schedule || schedule;
+                  const form = normalized.form || {};
+                  const farmType = (serverSchedule?.FarmType || serverSchedule?.FarmTypeCode || '').toString().toUpperCase();
                   const fillData = farmType === 'LAYER' ? { layerForm: form, dairyForm: {} } : { layerForm: {}, dairyForm: form };
                   // Update local state first so parent prop is ready when modal mounts
                   setLocalFillData(fillData);
