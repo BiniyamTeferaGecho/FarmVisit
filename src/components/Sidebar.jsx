@@ -105,7 +105,7 @@ const SidebarLink = ({ item, active, onClick, isCollapsed, isOpen, onToggle }) =
 
 export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, active, onChange, width = 1256, minWidth = 80 }) {
     const [query, setQuery] = useState('');
-    const { user, logout } = useAuth();
+    const { user, logout, hasFormPermission } = useAuth();
     const navigate = useNavigate();
     const [openKeys, setOpenKeys] = useState({});
 
@@ -132,6 +132,11 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
         if (item.rolesAllowed && Array.isArray(item.rolesAllowed) && item.rolesAllowed.length > 0) {
             const allowed = item.rolesAllowed.map(r => r.toString().trim().toLowerCase());
             if (hasAny(userRoles, allowed)) return true;
+            // try form-level permission fallback: allow if user's formPermissions grant access
+            try {
+                const fk = (item.formKey || item.key || '').toString().toLowerCase();
+                if (fk && typeof hasFormPermission === 'function' && hasFormPermission(fk)) return true;
+            } catch (e) { /* ignore */ }
             // if roles explicitly required and none match, deny
             return false;
         }

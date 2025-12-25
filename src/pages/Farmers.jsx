@@ -231,7 +231,7 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
 
 // --- Columns Definition ---
 
-const getColumns = (openEdit, confirmDelete) => [
+const getColumns = (openEdit, confirmDelete, canEdit = true, canDelete = true) => [
     {
         id: 'select',
         header: ({ table }) => (
@@ -286,10 +286,10 @@ const getColumns = (openEdit, confirmDelete) => [
         id: 'actions',
         header: 'Actions',
         cell: ({ row }) => (
-            <div className="flex space-x-2">
-                <button onClick={() => openEdit(row.original.FarmerID)} className="text-blue-500 hover:text-blue-700 transition-colors"><FaEdit /></button>
-                <button onClick={() => confirmDelete(row.original)} className="text-red-500 hover:text-red-700 transition-colors"><FaTrash /></button>
-            </div>
+                    <div className="flex space-x-2">
+                        {canEdit && <button onClick={() => openEdit(row.original.FarmerID)} className="text-blue-500 hover:text-blue-700 transition-colors"><FaEdit /></button>}
+                        {canDelete && <button onClick={() => confirmDelete(row.original)} className="text-red-500 hover:text-red-700 transition-colors"><FaTrash /></button>}
+                    </div>
         ),
     },
 ];
@@ -308,6 +308,9 @@ const DataTable = ({
     onDownloadTemplate,
     onRefresh,
     onBulkDelete,
+    canCreate = true,
+    canEdit = true,
+    canDelete = true,
 }) => {
     const [sorting, setSorting] = useState([]);
     const [globalFilter, setGlobalFilter] = useState('');
@@ -380,10 +383,12 @@ const DataTable = ({
                         </button>
                     ) : (
                         <>
-                            <button onClick={onAdd} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md flex items-center space-x-2">
-                                <FaPlus />
-                                <span>New Farmer</span>
-                            </button>
+                            {canCreate && (
+                                <button onClick={onAdd} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md flex items-center space-x-2">
+                                    <FaPlus />
+                                    <span>New Farmer</span>
+                                </button>
+                            )}
                             <button onClick={onRefresh} className="p-2 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50" title="Refresh Data"><FaSync /></button>
                         </>
                     )}
@@ -473,7 +478,7 @@ const DataTable = ({
 // --- Main Farmers Page Component ---
 
 export default function Farmers() {
-    const { user, fetchWithAuth } = useAuth();
+    const { user, fetchWithAuth, hasFormPermission } = useAuth();
     const navigate = useNavigate();
 
     const [data, setData] = useState([]);
@@ -554,16 +559,57 @@ export default function Farmers() {
     // Accept optional payload (from FarmerModal) else use local `form` state
     const handleFormSubmit = async (payloadFromModal) => {
         setFormSubmitting(true);
+        setFieldErrors({});
+        setError(null);
+        const mapServerErrors = (resp) => {
+            const errs = {};
+            if (!resp) return errs;
+            // common shapes: { errors: { Field: 'msg' } } or { validationErrors: [{ field, message }] }
+            if (resp.errors && typeof resp.errors === 'object') Object.assign(errs, resp.errors);
+            if (Array.isArray(resp.validationErrors)) {
+                resp.validationErrors.forEach(v => { if (v && v.field) errs[v.field] = v.message || v.msg || String(v); });
+            }
+            // Some controllers return { data: { ... } } with success:false at top-level
+            if (resp.data && typeof resp.data === 'object' && resp.data.errors) Object.assign(errs, resp.data.errors);
+            return errs;
+        }
+
         try {
             const payload = payloadFromModal ? { ...payloadFromModal } : { ...form };
             if (editingFarmer && editingFarmer.FarmerID) {
                 // update
-                await fetchWithAuth({ url: `/farmers/${editingFarmer.FarmerID}`, method: 'put', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
+                const res = await fetchWithAuth({ url: `/farmers/${editingFarmer.FarmerID}`, method: 'put', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
+                if (res && (res.success === false || res.success === 'false')) {
+                    const errs = mapServerErrors(res);
+                    if (Object.keys(errs).length) {
+                        setFieldErrors(errs);
+                        const first = Object.keys(errs)[0];
+                        const el = document.querySelector(`[name="${first}"]`);
+                        if (el && typeof el.focus === 'function') el.focus();
+                        return;
+                    }
+                    setError(res.message || 'Save failed');
+                    return;
+                }
             } else {
                 // create
                 payload.CreatedBy = user?.UserID || user?.id;
                 const res = await fetchWithAuth({ url: `/farmers`, method: 'post', data: payload });
-                const newId = res?.data?.data?.FarmerID || res?.data?.FarmerID || null;
+                // If server indicates failure shape
+                if (res && (res.success === false || res.success === 'false')) {
+                    const errs = mapServerErrors(res);
+                    if (Object.keys(errs).length) {
+                        setFieldErrors(errs);
+                        const first = Object.keys(errs)[0];
+                        const el = document.querySelector(`[name="${first}"]`);
+                        if (el && typeof el.focus === 'function') el.focus();
+                        return;
+                    }
+                    setError(res.message || 'Save failed');
+                    return;
+                }
+
+                const newId = res?.data?.data?.FarmerID || res?.data?.FarmerID || res?.FarmerID || null;
                 if (newId) {
                     try {
                         const r2 = await fetchWithAuth({ url: `/farmers/${newId}`, method: 'get' });
@@ -579,13 +625,31 @@ export default function Farmers() {
             fetchData({ pageIndex: 0, pageSize: 10 });
         } catch (err) {
             console.error('Save error', err);
-            setError(err.message || 'Save failed');
+            const resp = err?.response?.data || err?.data || null;
+            if (resp) {
+                const errs = mapServerErrors(resp);
+                if (Object.keys(errs).length) {
+                    setFieldErrors(errs);
+                    const first = Object.keys(errs)[0];
+                    const el = document.querySelector(`[name="${first}"]`);
+                    if (el && typeof el.focus === 'function') el.focus();
+                    return;
+                }
+                setError(resp.message || resp.error || JSON.stringify(resp));
+            } else {
+                setError(err.message || 'Save failed');
+            }
         } finally {
             setFormSubmitting(false);
         }
     }
 
-    const columns = useMemo(() => getColumns(handleEdit, handleDelete), [data]);
+    // Compute form-level permission flags. Try common form key 'farmers'.
+    const canCreate = (hasFormPermission && hasFormPermission('farmers', 'CanCreate')) || (user && (user.roles || []).includes('ROLE_ADMIN')) || (user && (user.roles || []).includes('ROLE_SUPER_ADMIN'));
+    const canEdit = (hasFormPermission && hasFormPermission('farmers', 'CanEdit')) || (user && (user.roles || []).includes('ROLE_ADMIN')) || (user && (user.roles || []).includes('ROLE_SUPER_ADMIN'));
+    const canDelete = (hasFormPermission && hasFormPermission('farmers', 'CanDelete')) || (user && (user.roles || []).includes('ROLE_ADMIN')) || (user && (user.roles || []).includes('ROLE_SUPER_ADMIN'));
+
+    const columns = useMemo(() => getColumns(handleEdit, handleDelete, canEdit, canDelete), [data, canEdit, canDelete]);
 
     return (
         <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
@@ -602,6 +666,9 @@ export default function Farmers() {
                 fetchData={fetchData}
                 loading={loading}
                 onAdd={handleAdd}
+                canCreate={canCreate}
+                canEdit={canEdit}
+                canDelete={canDelete}
                 onBulkDelete={handleBulkDelete}
                 onRefresh={() => fetchData({ pageIndex: 0, pageSize: 10 })}
             />

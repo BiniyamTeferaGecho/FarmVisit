@@ -52,6 +52,34 @@ export function AuthProvider({ children }) {
     // roles & permissions
     out.roles = out.roles || out.Roles || out.role || [];
     out.permissions = out.permissions || out.Permissions || out.permission || [];
+    // formPermissions: accept various shapes and normalize to a lower-cased-key map
+    const fpSrc = out.formPermissions || out.FormPermissions || out.formPermission || null;
+    if (fpSrc && typeof fpSrc === 'object') {
+      try {
+        // If it's an array of { FormID/path, ... } convert to map
+        if (Array.isArray(fpSrc)) {
+          const m = {};
+          for (const it of fpSrc) {
+            const key = (it.path || it.FormID || it.formId || it.FormKey || it.formKey || '').toString().toLowerCase();
+            if (!key) continue;
+            m[key] = { ...(m[key] || {}), ...it };
+          }
+          out.formPermissions = m;
+        } else {
+          // assume object map already — normalize keys to lower-case
+          const m = {};
+          for (const k of Object.keys(fpSrc)) {
+            const nk = String(k).toLowerCase();
+            m[nk] = fpSrc[k];
+          }
+          out.formPermissions = m;
+        }
+      } catch (e) {
+        out.formPermissions = {};
+      }
+    } else {
+      out.formPermissions = {};
+    }
     // employee normalization
     const empSrc = out.employee || out.Employee || out.EmployeeInfo || out.employeeInfo || null;
     if (empSrc && typeof empSrc === 'object') {
@@ -89,24 +117,51 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   // On mount, try to obtain an access token via the HttpOnly refresh cookie
-  // This allows server-set cookies (cross-site) to bootstrap a client session
-  // without requiring the login response to contain tokens. We set `loading`
-  // while the check is in progress so ProtectedRoute can show a spinner.
+  // and request a richer user object (including `formPermissions`) from
+  // the server. This ensures the client receives the session-cached
+  // access model persisted by the backend.
   useEffect(() => {
     let mounted = true;
     const trySession = async () => {
-      if (token) return; // already have a token
       setLoading(true);
       try {
-        const res = await api.get('/auth/session', { withCredentials: true });
-        if (!mounted) return;
-        const access = res?.data?.accessToken || null;
-        if (access) {
-          // set token which will decode user via existing effect
+        // If we already have a token from localStorage, attempt to fetch /auth/me
+        let access = token || null;
+
+        if (!access) {
+          try {
+            const sess = await api.get('/auth/session', { withCredentials: true });
+            access = sess?.data?.accessToken || null;
+          } catch (e) {
+            access = null;
+          }
+        }
+
+        if (!access) return;
+
+        // Prefer the server-provided user via /auth/me (includes formPermissions)
+        try {
+          // Ensure axios uses the token for the call
+          setAuthToken(access);
+          const me = await api.get('/auth/me', { withCredentials: true });
+          if (!mounted) return;
+          const userObj = me?.data?.user || me?.data || null;
+          if (userObj) {
+            skipDecodeRef.current = true;
+            setToken(access);
+            setUser(normalizeUser(userObj));
+            try { localStorage.setItem('accessToken', access); } catch (e) { /* ignore */ }
+            try { setAuthToken(access); } catch (e) { /* ignore */ }
+          } else {
+            // Fallback: set token and let the decode effect populate a minimal user
+            skipDecodeRef.current = true;
+            setToken(access);
+          }
+        } catch (e) {
+          // If /auth/me fails, fallback to token-only bootstrap
+          skipDecodeRef.current = true;
           setToken(access);
         }
-      } catch (e) {
-        // ignore: user not authenticated or network error
       } finally {
         if (mounted) setLoading(false);
       }
@@ -183,5 +238,24 @@ export function AuthProvider({ children }) {
     throw e;
   };
 
-  return <AuthContext.Provider value={{ user, token, accessToken: token, login, logout, setAuth, fetchWithAuth, loading, isAuthenticated: !!token && !!user }}>{children}</AuthContext.Provider>;
+  // Helper: check for a form-level permission.
+  // `formKey` can be a path or form id; `flag` is optional (e.g. 'CanCreate', 'CanEdit').
+  const hasFormPermission = (formKey, flag) => {
+    if (!formKey) return false;
+    const key = String(formKey).toLowerCase();
+    const fp = (user && user.formPermissions) ? user.formPermissions[key] : null;
+    if (!fp) return false;
+    if (!flag) return true;
+    // accept flexible flag casing
+    const f = String(flag);
+    if (Object.prototype.hasOwnProperty.call(fp, f)) return !!fp[f];
+    // try camel/pascal variants
+    const camel = f.charAt(0).toLowerCase() + f.slice(1);
+    if (Object.prototype.hasOwnProperty.call(fp, camel)) return !!fp[camel];
+    const pascal = f.charAt(0).toUpperCase() + f.slice(1);
+    if (Object.prototype.hasOwnProperty.call(fp, pascal)) return !!fp[pascal];
+    return !!fp[f.toLowerCase()];
+  };
+
+  return <AuthContext.Provider value={{ user, token, accessToken: token, login, logout, setAuth, fetchWithAuth, loading, isAuthenticated: !!token && !!user, hasFormPermission }}>{children}</AuthContext.Provider>;
 }
