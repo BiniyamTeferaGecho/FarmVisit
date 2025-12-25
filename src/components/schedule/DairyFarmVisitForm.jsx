@@ -198,10 +198,14 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
       if (!Number.isFinite(n) || n < 0) errs[k] = `${k} must be a number >= 0`
     })
 
-    // BodyCondition between 1 and 5
-    const body = getNum(data.BodyCondition)
-    if (body !== null && !Number.isNaN(body)) {
-      if (body < 1 || body > 5) errs.BodyCondition = 'Body condition must be between 1.0 and 5.0'
+    // BodyCondition fields between 1 and 5
+    const bodyL = getNum(data.BodyConditionLactetingCow)
+    if (bodyL !== null && !Number.isNaN(bodyL)) {
+      if (bodyL < 1 || bodyL > 5) errs.BodyConditionLactetingCow = 'Body condition (lactating) must be between 1.0 and 5.0'
+    }
+    const bodyD = getNum(data.BodyConditionDryCow)
+    if (bodyD !== null && !Number.isNaN(bodyD)) {
+      if (bodyD < 1 || bodyD > 5) errs.BodyConditionDryCow = 'Body condition (dry) must be between 1.0 and 5.0'
     }
 
     // AgeAtFirstCalving 18-40
@@ -235,17 +239,17 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
       if (mp < 0) errs.MilkPricePerLitter = 'Milk price must be >= 0'
     }
 
-    // Avg and Max milk checks
-    const avg = getNum(data.AvgMilkProductionPerDay)
-    const max = getNum(data.MaxMilkProductionPerCow)
+    // Avg and Max milk checks (per cow)
+    const avg = getNum(data.AvgMilkProductionPerDayPerCow)
+    const max = getNum(data.MaxMilkProductionPerDayPerCow)
     if (avg !== null && !Number.isNaN(avg)) {
-      if (avg < 0 || avg > 100) errs.AvgMilkProductionPerDay = 'Avg milk per day must be between 0 and 100 L'
+      if (avg < 0 || avg > 100) errs.AvgMilkProductionPerDayPerCow = 'Avg milk per day must be between 0 and 100 L'
     }
     if (max !== null && !Number.isNaN(max)) {
-      if (max < 0) errs.MaxMilkProductionPerCow = 'Max milk production must be >= 0'
+      if (max < 0) errs.MaxMilkProductionPerDayPerCow = 'Max milk production must be >= 0'
     }
     if (avg !== null && max !== null && !Number.isNaN(avg) && !Number.isNaN(max)) {
-      if (avg > max) errs.AvgMilkProductionPerDay = 'Average production cannot exceed max production per cow'
+      if (avg > max) errs.AvgMilkProductionPerDayPerCow = 'Average production cannot exceed max production per cow'
     }
 
     // Total milk reasonable check: <= lactation * avg * 1.5
@@ -316,7 +320,8 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField label="Heifers" name="Heifers" type="number" value={data.Heifers} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.Heifers} />
           <InputField label="Calves" name="Calves" type="number" value={data.Calves} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.Calves} />
           <InputField label="Bulls" name="Buls" type="number" value={data.Buls} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.Buls} />
-          <InputField label="Body Condition" name="BodyCondition" type="number" step="0.1" value={data.BodyCondition} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.BodyCondition} />
+          <InputField label="Body Condition (Lactating cows)" name="BodyConditionLactetingCow" type="number" step="0.1" value={data.BodyConditionLactetingCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.BodyConditionLactetingCow} />
+          <InputField label="Body Condition (Dry cows)" name="BodyConditionDryCow" type="number" step="0.1" value={data.BodyConditionDryCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.BodyConditionDryCow} />
           <InputField label="Feeding Per Cow" name="FeedingPerCow" value={data.FeedingPerCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <InputField label="How They Give For Cows" name="HowTheyGiveForCows" value={data.HowTheyGiveForCows || data.HowTheyGiveForCos} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
 
@@ -335,6 +340,11 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
             aria-hidden={!(data && data.UsesConcentrate)}
           >
             <InputField label="Which Company" name="WhichCompany" value={data.WhichCompany} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+            <InputField label="Feeding System" name="FeedingSystem" value={data.FeedingSystem} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+            <InputField label="Compound Feed Source" name="CompoundFeedSource" value={data.CompoundFeedSource} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+            <InputField label="Quantity of Commercial Feed" name="QuantityOfCommercialFeed" type="number" value={data.QuantityOfCommercialFeed} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+            <InputField label="Quantity of Home Mix" name="QuantityOfHomeMix" type="number" value={data.QuantityOfHomeMix} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+            <InputField label="Feeding Mechanism" name="FeedingMechanism" value={data.FeedingMechanism} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           </div>
           <CheckboxField label="Is Local Mix" name="IsLocalMix" checked={data.IsLocalMix} onChange={handleChange} disabled={readOnly} />
           <div
@@ -348,7 +358,9 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           >
             <TextAreaField label="List of Ingredients" name="ListofIngridiant" value={data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
           </div>
-          <TextAreaField label="Sample Collection" name="SampleCollection" value={data.SampleCollection} onChange={handleChange} placeholder="Sample collection details..." readOnly={readOnly} disabled={readOnly} />
+          <div className="col-span-1 md:col-span-2">
+            <CheckboxField label="Sample Collected" name="SampleCollection" checked={data.SampleCollection} onChange={handleChange} disabled={readOnly} />
+          </div>
           <CheckboxField label="Has Forage" name="HasForage" checked={data.HasForage} onChange={handleChange} disabled={readOnly} />
           <InputField label="Type of Forage" name="TypeOfForage" value={data.TypeOfForage} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <InputField label="Forage Amount" name="ForageAmount" type="number" value={data.ForageAmount} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.ForageAmount} />
@@ -359,8 +371,10 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
         <SectionCard title="Production & Water" icon={<Thermometer className="text-red-600" />}>
           <InputField label="Amount of Water Provided" name="AmountofWaterProvided" value={data.AmountofWaterProvided} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Avg Milk Production/Day" name="AvgMilkProductionPerDay" type="number" step="0.01" value={data.AvgMilkProductionPerDay} onChange={handleChange} unit="L/day" readOnly={readOnly} disabled={readOnly} error={errors && errors.AvgMilkProductionPerDay} />
-          <InputField label="Max Milk Production/Cow" name="MaxMilkProductionPerCow" type="number" step="0.01" value={data.MaxMilkProductionPerCow} onChange={handleChange} unit="L" readOnly={readOnly} disabled={readOnly} error={errors && errors.MaxMilkProductionPerCow} />
+          <InputField label="Watering System" name="WateringSystem" value={data.WateringSystem} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="If limited, how much" name="IfLimitedHowMuch" value={data.IfLimitedHowMuch} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Avg Milk Production/Day (per cow)" name="AvgMilkProductionPerDayPerCow" type="number" step="0.01" value={data.AvgMilkProductionPerDayPerCow} onChange={handleChange} unit="L/day" readOnly={readOnly} disabled={readOnly} error={errors && errors.AvgMilkProductionPerDayPerCow} />
+          <InputField label="Max Milk Production/Day (per cow)" name="MaxMilkProductionPerDayPerCow" type="number" step="0.01" value={data.MaxMilkProductionPerDayPerCow} onChange={handleChange} unit="L" readOnly={readOnly} disabled={readOnly} error={errors && errors.MaxMilkProductionPerDayPerCow} />
           <InputField label="Total Milk/Day" name="TotalMilkPerDay" type="number" step="0.01" value={data.TotalMilkPerDay} onChange={handleChange} unit="L" readOnly={readOnly} disabled={readOnly} error={errors && errors.TotalMilkPerDay} />
           <InputField label="Milk Supply To" name="MilkSupplyTo" value={data.MilkSupplyTo} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <InputField label="Milk Price/Liter" name="MilkPricePerLitter" type="number" step="0.01" value={data.MilkPricePerLitter} onChange={handleChange} unit="ETB/L" readOnly={readOnly} disabled={readOnly} error={errors && errors.MilkPricePerLitter} />
@@ -385,11 +399,17 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         <SectionCard title="Health, Medication & Advice" icon={<Pill className="text-purple-600" />}>
           <CheckboxField label="Medication" name="Medication" checked={data.Medication} onChange={handleChange} disabled={readOnly} />
           <TextAreaField label="Vaccination History" name="VaccinationHistory" value={data.VaccinationHistory} onChange={handleChange} placeholder="Vaccination history..." readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Vaccination Type" name="VaccinationType" value={data.VaccinationType} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Vaccination Time" name="VaccinationTime" value={data.VaccinationTime} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <TextAreaField label="What Type of Medication" name="WhatTypeofMedication" value={data.WhatTypeofMedication} onChange={handleChange} placeholder="Describe medications..." readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Recent Medication Type" name="RecentMedicationType" value={data.RecentMedicationType} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Recent Medication Time" name="RecentMedicationTime" value={data.RecentMedicationTime} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <TextAreaField label="Issues / Complaints" name="IssuesComplaints" value={data.IssuesComplaints} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <TextAreaField label="Analysis Requested" name="AnalyzeRequested" value={data.AnalyzeRequested} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <TextAreaField label="Recommendation / Advice" name="RecommendationAdvice" value={data.RecommendationAdvice} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <TextAreaField label="Feedback on AKF" name="FeedBackOnAKF" value={data.FeedBackOnAKF} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <TextAreaField label="Farm Advisor Conclusion" name="FarmAdvisorConclusion" value={data.FarmAdvisorConclusion} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <TextAreaField label="Feedback on AKF / Customer Feedback" name="FeedBackOnAKF" value={data.FeedBackOnAKF} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <TextAreaField label="Customer Feedback or Complaints" name="CustomerFeedbackorCompliants" value={data.CustomerFeedbackorCompliants} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
         </SectionCard>
 
         <SectionCard title="Housing & Environment" icon={<AlertTriangle className="text-yellow-600" />}>

@@ -15,19 +15,25 @@ const initialForm = {
   Heifers: '',
   Calves: '',
   Buls: '',
-  BodyCondition: '',
+  BodyConditionLactetingCow: '',
+  BodyConditionDryCow: '',
   FeedingPerCow: '',
   HowTheyGiveForCows: '',
   UsesConcentrate: false,
   WhichCompany: '',
   IsLocalMix: false,
   ListofIngridiant: '',
-  SampleCollection: '',
+  SampleCollection: false,
   HasForage: false,
   TypeOfForage: '',
   ForageAmount: '',
   ConcentrateFeedSample: false,
   HowManyTimes: '',
+  FeedingSystem: '',
+  CompoundFeedSource: '',
+  QuantityOfCommercialFeed: '',
+  QuantityOfHomeMix: '',
+  FeedingMechanism: '',
   AmountofWaterProvided: '',
   ManureScore1: '',
   ManureScore2: '',
@@ -38,14 +44,16 @@ const initialForm = {
   BeddingType: '',
   SpaceAvailability: '',
   VaccinationHistory: '',
+  VaccinationType: '',
+  VaccinationTime: '',
   BreedingHistory: '',
   BreedingMethod: '',
   AreTheyUsingNaturalorAI: '',
   InseminationFrequency: '',
   CalvingInterval: '',
   AgeAtFirstCalving: '',
-  AvgMilkProductionPerDay: '',
-  MaxMilkProductionPerCow: '',
+  AvgMilkProductionPerDayPerCow: '',
+  MaxMilkProductionPerDayPerCow: '',
   TotalMilkPerDay: '',
   MilkSupplyTo: '',
   MilkPricePerLitter: '',
@@ -54,7 +62,10 @@ const initialForm = {
   IssuesComplaints: '',
   AnalyzeRequested: '',
   RecommendationAdvice: '',
-  FeedBackOnAKF: '',
+  FarmAdvisorConclusion: '',
+  CustomerFeedbackorCompliants: '',
+  ComplainSampleTaken: false,
+  BatchNumberorProductionDate: '',
   AnyRelatedEvidenceImage: '',
   IsVisitCompleted: false,
 }
@@ -112,19 +123,25 @@ export default function DairyFarm() {
             Heifers: d.Heifers ?? '',
             Calves: d.Calves ?? '',
             Buls: d.Buls ?? '',
-            BodyCondition: d.BodyCondition ?? '',
+            BodyConditionLactetingCow: d.BodyConditionLactetingCow ?? d.BodyCondition ?? '',
+            BodyConditionDryCow: d.BodyConditionDryCow ?? '',
             FeedingPerCow: d.FeedingPerCow || '',
             HowTheyGiveForCows: d.HowTheyGiveForCows || d.HowTheyGiveForCos || '',
             UsesConcentrate: !!d.UsesConcentrate,
             WhichCompany: d.WhichCompany || '',
             IsLocalMix: !!d.IsLocalMix,
             ListofIngridiant: d.ListofIngridiant || '',
-            SampleCollection: d.SampleCollection || '',
+            SampleCollection: !!d.SampleCollection,
             HasForage: !!d.HasForage,
             TypeOfForage: d.TypeOfForage || '',
             ForageAmount: d.ForageAmount ?? '',
             ConcentrateFeedSample: !!d.ConcentrateFeedSample,
             AmountofWaterProvided: d.AmountofWaterProvided || '',
+            FeedingSystem: d.FeedingSystem || '',
+            CompoundFeedSource: d.CompoundFeedSource || '',
+            QuantityOfCommercialFeed: d.QuantityOfCommercialFeed ?? '',
+            QuantityOfHomeMix: d.QuantityOfHomeMix ?? '',
+            FeedingMechanism: d.FeedingMechanism || '',
             ManureScore1: d.ManureScore1 ?? '',
             ManureScore2: d.ManureScore2 ?? '',
             ManureScore3: d.ManureScore3 ?? '',
@@ -134,6 +151,8 @@ export default function DairyFarm() {
             BeddingType: d.BeddingType || '',
             SpaceAvailability: d.SpaceAvailability || '',
             VaccinationHistory: d.VaccinationHistory || '',
+            VaccinationType: d.VaccinationType || '',
+            VaccinationTime: d.VaccinationTime || '',
             BreedingHistory: d.BreedingHistory || '',
             BreedingMethod: d.BreedingMethod || '',
             AreTheyUsingNaturalorAI: d.AreTheyUsingNaturalorAI || '',
@@ -144,8 +163,8 @@ export default function DairyFarm() {
             TypeofFeedwithComplain: d.TypeofFeedwithComplain || '',
             SampleTaken: !!d.SampleTaken,
             BatchNumber: d.BatchNumber || '',
-            AvgMilkProductionPerDay: d.AvgMilkProductionPerDay ?? '',
-            MaxMilkProductionPerCow: d.MaxMilkProductionPerCow ?? '',
+            AvgMilkProductionPerDayPerCow: d.AvgMilkProductionPerDayPerCow ?? d.AvgMilkProductionPerDay ?? '',
+            MaxMilkProductionPerDayPerCow: d.MaxMilkProductionPerDayPerCow ?? d.MaxMilkProductionPerCow ?? '',
             TotalMilkPerDay: d.TotalMilkPerDay ?? '',
             MilkSupplyTo: d.MilkSupplyTo || '',
             MilkPricePerLitter: d.MilkPricePerLitter ?? '',
@@ -154,7 +173,10 @@ export default function DairyFarm() {
             IssuesComplaints: d.IssuesComplaints || '',
             AnalyzeRequested: d.AnalyzeRequested || '',
             RecommendationAdvice: d.RecommendationAdvice || '',
-            FeedBackOnAKF: d.FeedBackOnAKF || '',
+            FarmAdvisorConclusion: d.FarmAdvisorConclusion || '',
+            CustomerFeedbackorCompliants: d.CustomerFeedbackorCompliants || d.FeedBackOnAKF || '',
+            ComplainSampleTaken: !!d.ComplainSampleTaken || !!d.SampleTaken,
+            BatchNumberorProductionDate: d.BatchNumberorProductionDate || d.BatchNumber || '',
             AnyRelatedEvidenceImage: d.AnyRelatedEvidenceImage || '',
             IsVisitCompleted: !!d.IsVisitCompleted,
           })
@@ -178,104 +200,6 @@ export default function DairyFarm() {
     return () => { mounted = false }
   }, [location.search, location.state])
 
-  const fetchList = async () => {
-    setLoading(true); setMessage(null)
-    try {
-      const res = await fetchWithAuth({ url: '/dairy-farm', method: 'get' })
-      const items = res.data?.data || res.data || res
-      const arr = Array.isArray(items) ? items : []
-      setList(arr)
-      // populate scheduleMap to provide VisitCode, Farm and Advisor display info
-      try {
-        const ids = arr.map(d => d.ScheduleID || d.scheduleId || null).filter(Boolean)
-        const uniq = Array.from(new Set(ids.map(String)))
-        if (uniq.length > 0) {
-          const map = {}
-          await Promise.all(uniq.map(async (id) => {
-            try {
-              const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(id)}`, method: 'get' })
-              const sd = r?.data?.data || r?.data || null
-              if (sd) {
-                map[String(id)] = sd
-              }
-            } catch (e) { /* ignore per-row failures */ }
-          }))
-          setScheduleMap(prev => ({ ...prev, ...map }))
-        }
-      } catch (e) { /* ignore schedule-map populate errors */ }
-    } catch (err) {
-      console.error('fetchList dairy error', err)
-      setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Failed to load dairy visits' })
-    } finally { setLoading(false) }
-  }
-
-  const openCreate = () => { setEditingId(null); setForm(initialForm); setShowForm(true); setMessage(null) }
-
-  const openEdit = async (id) => {
-    setLoading(true); setMessage(null)
-    try {
-      const res = await fetchWithAuth({ url: `/dairy-farm/${id}`, method: 'get' })
-      const d = res.data?.data || res.data
-      if (d) {
-        setForm({
-          ScheduleID: d.ScheduleID || d.ScheduleID || '',
-          Location: d.Location || d.FarmLocation || '',
-          LactationCows: d.LactationCows ?? '',
-          DryCows: d.DryCows ?? '',
-          Heifers: d.Heifers ?? '',
-          Calves: d.Calves ?? '',
-          Buls: d.Buls ?? '',
-          BodyCondition: d.BodyCondition ?? '',
-          FeedingPerCow: d.FeedingPerCow || '',
-          HowTheyGiveForCows: d.HowTheyGiveForCows || d.HowTheyGiveForCos || '',
-          UsesConcentrate: !!d.UsesConcentrate,
-          WhichCompany: d.WhichCompany || '',
-          IsLocalMix: !!d.IsLocalMix,
-          ListofIngridiant: d.ListofIngridiant || '',
-          SampleCollection: d.SampleCollection || '',
-          HasForage: !!d.HasForage,
-          TypeOfForage: d.TypeOfForage || '',
-          ForageAmount: d.ForageAmount ?? '',
-          ConcentrateFeedSample: !!d.ConcentrateFeedSample,
-          AmountofWaterProvided: d.AmountofWaterProvided || '',
-          ManureScore1: d.ManureScore1 ?? '',
-          ManureScore2: d.ManureScore2 ?? '',
-          ManureScore3: d.ManureScore3 ?? '',
-          ManureScore4: d.ManureScore4 ?? '',
-          Ventilation: d.Ventilation || '',
-          LightIntensity: d.LightIntensity || '',
-          BeddingType: d.BeddingType || '',
-          SpaceAvailability: d.SpaceAvailability || '',
-          VaccinationHistory: d.VaccinationHistory || '',
-          BreedingHistory: d.BreedingHistory || '',
-          BreedingMethod: d.BreedingMethod || '',
-          AreTheyUsingNaturalorAI: d.AreTheyUsingNaturalorAI || '',
-          InseminationFrequency: d.InseminationFrequency || '',
-          CalvingInterval: d.CalvingInterval ?? '',
-          AgeAtFirstCalving: d.AgeAtFirstCalving ?? '',
-          HowManyTimes: d.HowManyTimes || '',
-          TypeofFeedwithComplain: d.TypeofFeedwithComplain || '',
-          SampleTaken: !!d.SampleTaken,
-          BatchNumber: d.BatchNumber || '',
-          AvgMilkProductionPerDay: d.AvgMilkProductionPerDay ?? '',
-          MaxMilkProductionPerCow: d.MaxMilkProductionPerCow ?? '',
-          TotalMilkPerDay: d.TotalMilkPerDay ?? '',
-          MilkSupplyTo: d.MilkSupplyTo || '',
-          MilkPricePerLitter: d.MilkPricePerLitter ?? '',
-          Medication: !!d.Medication,
-          WhatTypeofMedication: d.WhatTypeofMedication || '',
-          IssuesComplaints: d.IssuesComplaints || '',
-          AnalyzeRequested: d.AnalyzeRequested || '',
-          RecommendationAdvice: d.RecommendationAdvice || '',
-          FeedBackOnAKF: d.FeedBackOnAKF || '',
-          AnyRelatedEvidenceImage: d.AnyRelatedEvidenceImage || '',
-          IsVisitCompleted: !!d.IsVisitCompleted,
-        })
-        setEditingId(id); setShowForm(true)
-      }
-    } catch (err) { console.error('openEdit error', err); setMessage({ type: 'error', text: 'Failed to load dairy visit' }) } finally { setLoading(false) }
-  }
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
     setForm(f => ({ ...f, [name]: type === 'checkbox' ? checked : value }))
@@ -286,12 +210,13 @@ export default function DairyFarm() {
     try {
       const messages = []
       const lact = form.LactationCows ? Number(form.LactationCows) : 0
-      const avg = form.AvgMilkProductionPerDay ? Number(form.AvgMilkProductionPerDay) : 0
+      const avg = form.AvgMilkProductionPerDayPerCow ? Number(form.AvgMilkProductionPerDayPerCow) : (form.AvgMilkProductionPerDay ? Number(form.AvgMilkProductionPerDay) : 0)
       const total = form.TotalMilkPerDay ? Number(form.TotalMilkPerDay) : 0
-      const bodyCond = form.BodyCondition ? Number(form.BodyCondition) : null
+      // prefer lactating body condition, then fallback to legacy BodyCondition
+      const bodyCond = form.BodyConditionLactetingCow != null && form.BodyConditionLactetingCow !== '' ? Number(form.BodyConditionLactetingCow) : (form.BodyCondition ? Number(form.BodyCondition) : null)
 
       if (!lact) messages.push('LactationCows should be provided and > 0')
-      if (bodyCond == null) messages.push('BodyCondition is recommended')
+      if (bodyCond == null) messages.push('Body condition (lactating) is recommended')
       // Business rule from DB: TotalMilkPerDay should not exceed lactation * avg * 1.5
       if (lact > 0 && avg > 0 && total > 0 && total > (lact * avg * 1.5)) {
         messages.push('Total milk exceeds reasonable maximum based on lactation cows and average production')
@@ -320,50 +245,65 @@ export default function DairyFarm() {
         Heifers: form.Heifers ? Number(form.Heifers) : null,
         Calves: form.Calves ? Number(form.Calves) : null,
         Buls: form.Buls ? Number(form.Buls) : null,
-        BodyCondition: form.BodyCondition ? Number(form.BodyCondition) : null,
-        FeedingPerCow: form.FeedingPerCow || null,
-        HowTheyGiveForCows: form.HowTheyGiveForCows || form.HowTheyGiveForCos || null,
-        UsesConcentrate: form.UsesConcentrate ? 1 : 0,
+
+        BodyConditionLactetingCow: form.BodyConditionLactetingCow ? Number(form.BodyConditionLactetingCow) : null,
+        BodyConditionDryCow: form.BodyConditionDryCow ? Number(form.BodyConditionDryCow) : null,
+
+        FeedingSystem: form.FeedingSystem || null,
+        CompoundFeedSource: form.CompoundFeedSource || null,
         WhichCompany: form.WhichCompany || null,
-        IsLocalMix: form.IsLocalMix ? 1 : 0,
-        ListofIngridiant: form.ListofIngridiant || null,
-        SampleCollection: form.SampleCollection || null,
+        ListOfHomeMixingIngridient: form.ListofIngridiant || null,
+        QuantityOfCommercialFeed: form.QuantityOfCommercialFeed ? Number(form.QuantityOfCommercialFeed) : null,
+        QuantityOfHomeMix: form.QuantityOfHomeMix ? Number(form.QuantityOfHomeMix) : null,
+        HowManyTimes: form.HowManyTimes || null,
+        FeedingMechanism: form.FeedingMechanism || null,
+        SampleCollection: form.SampleCollection ? 1 : 0,
         HasForage: form.HasForage ? 1 : 0,
         TypeOfForage: form.TypeOfForage || null,
         ForageAmount: form.ForageAmount ? Number(form.ForageAmount) : null,
-        ConcentrateFeedSample: form.ConcentrateFeedSample ? 1 : 0,
-        HowManyTimes: form.HowManyTimes || null,
+
+        WateringSystem: form.WateringSystem || null,
         AmountofWaterProvided: form.AmountofWaterProvided || null,
+        IfLimitedHowMuch: form.IfLimitedHowMuch || null,
+
         ManureScore1: form.ManureScore1 ? Number(form.ManureScore1) : null,
         ManureScore2: form.ManureScore2 ? Number(form.ManureScore2) : null,
         ManureScore3: form.ManureScore3 ? Number(form.ManureScore3) : null,
         ManureScore4: form.ManureScore4 ? Number(form.ManureScore4) : null,
+
         Ventilation: form.Ventilation || null,
         LightIntensity: form.LightIntensity || null,
         BeddingType: form.BeddingType || null,
         SpaceAvailability: form.SpaceAvailability || null,
-        VaccinationHistory: form.VaccinationHistory || null,
+
         BreedingHistory: form.BreedingHistory || null,
         BreedingMethod: form.BreedingMethod || null,
-        AreTheyUsingNaturalorAI: form.AreTheyUsingNaturalorAI || null,
         InseminationFrequency: form.InseminationFrequency || null,
         CalvingInterval: form.CalvingInterval ? Number(form.CalvingInterval) : null,
         AgeAtFirstCalving: form.AgeAtFirstCalving ? Number(form.AgeAtFirstCalving) : null,
-        TypeofFeedwithComplain: form.TypeofFeedwithComplain || null,
-        SampleTaken: form.SampleTaken ? 1 : 0,
-        BatchNumber: form.BatchNumber || null,
-        AvgMilkProductionPerDay: form.AvgMilkProductionPerDay ? Number(form.AvgMilkProductionPerDay) : null,
-        MaxMilkProductionPerCow: form.MaxMilkProductionPerCow ? Number(form.MaxMilkProductionPerCow) : null,
+
+        AvgMilkProductionPerDayPerCow: form.AvgMilkProductionPerDayPerCow ? Number(form.AvgMilkProductionPerDayPerCow) : null,
+        MaxMilkProductionPerDayPerCow: form.MaxMilkProductionPerDayPerCow ? Number(form.MaxMilkProductionPerDayPerCow) : null,
         TotalMilkPerDay: form.TotalMilkPerDay ? Number(form.TotalMilkPerDay) : null,
         MilkSupplyTo: form.MilkSupplyTo || null,
         MilkPricePerLitter: form.MilkPricePerLitter ? Number(form.MilkPricePerLitter) : null,
-        Medication: form.Medication ? 1 : 0,
-        WhatTypeofMedication: form.WhatTypeofMedication || null,
-        IssuesComplaints: form.IssuesComplaints || null,
+
+        VaccinationType: form.VaccinationType || null,
+        VaccinationTime: form.VaccinationTime || null,
+        RecentMedicationType: form.RecentMedicationType || null,
+        RecentMedicationTime: form.RecentMedicationTime || null,
+
+        CustomerFeedbackorCompliants: form.CustomerFeedbackorCompliants || form.FeedBackOnAKF || null,
+        ComplainSampleTaken: form.ComplainSampleTaken ? 1 : 0,
+        BatchNumberorProductionDate: form.BatchNumberorProductionDate || form.BatchNumber || null,
+
         AnalyzeRequested: form.AnalyzeRequested || null,
-        RecommendationAdvice: form.RecommendationAdvice || null,
-        FeedBackOnAKF: form.FeedBackOnAKF || null,
+        IssuesComplaints: form.IssuesComplaints || null,
         AnyRelatedEvidenceImage: form.AnyRelatedEvidenceImage || null,
+
+        FarmAdvisorConclusion: form.FarmAdvisorConclusion || null,
+        RecommendationorAdvice: form.RecommendationorAdvice || form.RecommendationAdvice || null,
+
         IsVisitCompleted: form.IsVisitCompleted ? 1 : 0,
         // prefer actorId (EmployeeID) when available for CreatedBy/UpdatedBy; backend accepts NULL
         CreatedBy: actorId || user?.UserID || user?.id || null,
@@ -547,6 +487,112 @@ export default function DairyFarm() {
     }
   }
 
+  // Fetch list of dairy visits and build a small schedule map for display fallbacks
+  async function fetchList() {
+    setLoading(true); setMessage(null)
+    try {
+      const res = await fetchWithAuth({ url: '/dairy-farm', method: 'get' })
+      const data = res.data?.data || res.data || []
+      const rows = Array.isArray(data) ? data : (data.rows || [])
+      setList(rows)
+      // build scheduleMap minimal: map by ScheduleID to name/code if present
+      const map = {}
+      rows.forEach(r => {
+        const sid = r.ScheduleID || r.scheduleId || null
+        if (sid && !map[String(sid)]) {
+          map[String(sid)] = { VisitCode: r.VisitCode || r.VisitCodeName || null, FarmName: r.FarmName || r.FarmCode || null, AdvisorName: r.AdvisorName || null }
+        }
+      })
+      setScheduleMap(map)
+    } catch (err) {
+      console.error('fetchList dairy error', err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to load visits' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function openCreate() {
+    setForm(initialForm); setEditingId(null); setShowForm(true)
+  }
+
+  async function openEdit(id) {
+    if (!id) return
+    setLoading(true); setMessage(null)
+    try {
+      const res = await fetchWithAuth({ url: `/dairy-farm/${encodeURIComponent(id)}`, method: 'get' })
+      const d = res.data?.data || res.data || null
+      if (d) {
+        setForm({
+          ScheduleID: d.ScheduleID || d.scheduleId || d.ScheduleId || '',
+          Location: d.Location || d.FarmLocation || '',
+          LactationCows: d.LactationCows ?? '',
+          DryCows: d.DryCows ?? '',
+          Heifers: d.Heifers ?? '',
+          Calves: d.Calves ?? '',
+          Buls: d.Buls ?? '',
+          BodyConditionLactetingCow: d.BodyConditionLactetingCow ?? d.BodyCondition ?? '',
+          BodyConditionDryCow: d.BodyConditionDryCow ?? '',
+          FeedingPerCow: d.FeedingPerCow || '',
+          HowTheyGiveForCows: d.HowTheyGiveForCows || '',
+          UsesConcentrate: !!d.UsesConcentrate,
+          WhichCompany: d.WhichCompany || '',
+          IsLocalMix: !!d.IsLocalMix,
+          ListofIngridiant: d.ListofIngridiant || '',
+          SampleCollection: !!d.SampleCollection,
+          HasForage: !!d.HasForage,
+          TypeOfForage: d.TypeOfForage || '',
+          ForageAmount: d.ForageAmount ?? '',
+          ConcentrateFeedSample: !!d.ConcentrateFeedSample,
+          AmountofWaterProvided: d.AmountofWaterProvided || '',
+          FeedingSystem: d.FeedingSystem || '',
+          CompoundFeedSource: d.CompoundFeedSource || '',
+          QuantityOfCommercialFeed: d.QuantityOfCommercialFeed ?? '',
+          QuantityOfHomeMix: d.QuantityOfHomeMix ?? '',
+          FeedingMechanism: d.FeedingMechanism || '',
+          ManureScore1: d.ManureScore1 ?? '',
+          ManureScore2: d.ManureScore2 ?? '',
+          ManureScore3: d.ManureScore3 ?? '',
+          ManureScore4: d.ManureScore4 ?? '',
+          Ventilation: d.Ventilation || '',
+          LightIntensity: d.LightIntensity || '',
+          BeddingType: d.BeddingType || '',
+          SpaceAvailability: d.SpaceAvailability || '',
+          VaccinationHistory: d.VaccinationHistory || '',
+          VaccinationType: d.VaccinationType || '',
+          VaccinationTime: d.VaccinationTime || '',
+          BreedingHistory: d.BreedingHistory || '',
+          BreedingMethod: d.BreedingMethod || '',
+          AreTheyUsingNaturalorAI: d.AreTheyUsingNaturalorAI || '',
+          InseminationFrequency: d.InseminationFrequency || '',
+          CalvingInterval: d.CalvingInterval ?? '',
+          AgeAtFirstCalving: d.AgeAtFirstCalving ?? '',
+          HowManyTimes: d.HowManyTimes || '',
+          TypeofFeedwithComplain: d.TypeofFeedwithComplain || '',
+          SampleTaken: !!d.SampleTaken,
+          BatchNumber: d.BatchNumber || '',
+          AvgMilkProductionPerDayPerCow: d.AvgMilkProductionPerDayPerCow ?? d.AvgMilkProductionPerDay ?? '',
+          MaxMilkProductionPerDayPerCow: d.MaxMilkProductionPerDayPerCow ?? d.MaxMilkProductionPerCow ?? '',
+          TotalMilkPerDay: d.TotalMilkPerDay ?? '',
+          MilkSupplyTo: d.MilkSupplyTo || '',
+          MilkPricePerLitter: d.MilkPricePerLitter ?? '',
+          Medication: !!d.Medication,
+          WhatTypeofMedication: d.WhatTypeofMedication || '',
+          IssuesComplaints: d.IssuesComplaints || '',
+          AnalyzeRequested: d.AnalyzeRequested || '',
+          RecommendationAdvice: d.RecommendationAdvice || '',
+          FarmAdvisorConclusion: d.FarmAdvisorConclusion || '',
+          CustomerFeedbackorCompliants: d.CustomerFeedbackorCompliants || d.FeedBackOnAKF || '',
+          ComplainSampleTaken: !!d.ComplainSampleTaken || !!d.SampleTaken,
+          BatchNumberorProductionDate: d.BatchNumberorProductionDate || d.BatchNumber || '',
+          AnyRelatedEvidenceImage: d.AnyRelatedEvidenceImage || '',
+          IsVisitCompleted: !!d.IsVisitCompleted,
+        })
+        setEditingId(id); setShowForm(true)
+      }
+    } catch (err) { console.error('openEdit error', err); setMessage({ type: 'error', text: 'Failed to load dairy visit' }) } finally { setLoading(false) }
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between mb-6">
@@ -611,7 +657,7 @@ export default function DairyFarm() {
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   return sched?.AdvisorName || it.AdvisorName || (sched && sched.Advisor && (sched.Advisor.Name || sched.AdvisorName)) || (it.Advisor && (it.Advisor.Name || it.AdvisorName)) || it.AdvisorID || it.AdvisorId || it.AssignTo || it.AssignedTo || it.DoctorName || it.Doctor || ''
                 })()}</td>
-                <td className="px-4 py-3">{it.AvgMilkProductionPerDay ?? ''}</td>
+                <td className="px-4 py-3">{it.AvgMilkProductionPerDayPerCow ?? it.AvgMilkProductionPerDay ?? ''}</td>
                 <td className="px-4 py-3">{it.TotalMilkPerDay ?? ''}</td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex items-center justify-center gap-1">
