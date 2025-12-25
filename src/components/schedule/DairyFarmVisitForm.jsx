@@ -395,7 +395,12 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField label="Age at First Calving" name="AgeAtFirstCalving" type="number" value={data.AgeAtFirstCalving} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.AgeAtFirstCalving} />
           {/* LitterCondition removed — field not used by current backend stored-proc */}
         </SectionCard>
-
+        <SectionCard title="Housing & Environment" icon={<AlertTriangle className="text-yellow-600" />}>
+          <InputField label="Ventilation" name="Ventilation" value={data.Ventilation} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Light Intensity" name="LightIntensity" value={data.LightIntensity} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Bedding Type" name="BeddingType" value={data.BeddingType} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Space Availability" name="SpaceAvailability" value={data.SpaceAvailability} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+        </SectionCard>
         <SectionCard title="Health, Medication & Advice" icon={<Pill className="text-purple-600" />}>
           <CheckboxField label="Medication" name="Medication" checked={data.Medication} onChange={handleChange} disabled={readOnly} />
           <TextAreaField label="Vaccination History" name="VaccinationHistory" value={data.VaccinationHistory} onChange={handleChange} placeholder="Vaccination history..." readOnly={readOnly} disabled={readOnly} />
@@ -412,12 +417,7 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <TextAreaField label="Customer Feedback or Complaints" name="CustomerFeedbackorCompliants" value={data.CustomerFeedbackorCompliants} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
         </SectionCard>
 
-        <SectionCard title="Housing & Environment" icon={<AlertTriangle className="text-yellow-600" />}>
-          <InputField label="Ventilation" name="Ventilation" value={data.Ventilation} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Light Intensity" name="LightIntensity" value={data.LightIntensity} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Bedding Type" name="BeddingType" value={data.BeddingType} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Space Availability" name="SpaceAvailability" value={data.SpaceAvailability} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-        </SectionCard>
+
 
         <SectionCard title="Sampling & Evidence" icon={<Microscope className="text-teal-600" />}>
           <div className="col-span-1 md:col-span-2">
