@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import ScheduleList from '../components/schedule/ScheduleList'
 
 export default function AdvisorVisits() {
   const { user, fetchWithAuth } = useAuth()
@@ -82,7 +83,20 @@ export default function AdvisorVisits() {
 
       <div className="overflow-x-auto bg-white rounded shadow">
         {/* Use the shared ScheduleList component so My Visits matches the main Visit Schedule columns and actions */}
-        <ScheduleList schedules={items} fetchWithAuth={fetchWithAuth} onView={() => {}} onEdit={() => {}} onDelete={() => {}} onSubmit={() => {}} onFill={() => {}} onProcess={() => {}} onComplete={() => {}} recentlyFilled={{}} confirmedFilled={{}} />
+        <ScheduleList
+          schedules={items}
+          fetchWithAuth={fetchWithAuth}
+          pageStartOffset={(page - 1) * pageSize}
+          onView={(row) => { console.log('view', row) }}
+          onEdit={(row) => { console.log('edit', row) }}
+          onDelete={(row) => { console.log('delete', row) }}
+          onSubmit={(row) => { console.log('submit', row) }}
+          onFill={(row) => { console.log('fill', row) }}
+          onProcess={(row) => { console.log('process', row) }}
+          onComplete={(row) => { console.log('complete', row) }}
+          recentlyFilled={{}}
+          confirmedFilled={{}}
+        />
       </div>
 
       <div className="mt-3 flex items-center justify-between text-sm">
