@@ -711,11 +711,42 @@ const FarmVisitSchedule = () => {
       const payload = payload || localFillData || {};
       const farmType = (payload.FarmType || payload.FarmTypeCode || '').toString().toUpperCase() || (selectedSchedule && (selectedSchedule.FarmType || selectedSchedule.FarmTypeCode || '')).toString().toUpperCase();
       const resp = err && err.response && err.response.data ? err.response.data : null;
-      // Common shapes: { success:false, message:'', details: { field: 'msg' } } or { errors: { field: 'msg' } }
-      const fieldErrs = (resp && (resp.details || resp.fieldErrors || resp.errors || resp.validationErrors)) || {};
-      if (farmType === 'LAYER') setExternalErrors(prev => ({ ...(prev || {}), layerForm: fieldErrs }));
-      else setExternalErrors(prev => ({ ...(prev || {}), dairyForm: fieldErrs }));
+      // Common shapes: { success:false, message:'', details: { field: 'msg' } } or { errors: { field: 'msg' } } or errors: [{field,msg}]
+      let fieldErrs = (resp && (resp.details || resp.fieldErrors || resp.errors || resp.validationErrors)) || {};
+      // Normalize array-shaped errors to object map
+      if (Array.isArray(fieldErrs)) {
+        const obj = {};
+        fieldErrs.forEach(it => {
+          if (!it) return;
+          const key = it.field || it.key || it.name || null;
+          const msg = it.message || it.msg || it.error || (typeof it === 'string' ? it : JSON.stringify(it));
+          if (key) obj[key] = msg;
+        });
+        fieldErrs = obj;
+      }
+      // If errors is an object with arrays, flatten to first message
+      if (fieldErrs && typeof fieldErrs === 'object' && !Array.isArray(fieldErrs)) {
+        const flat = {};
+        Object.keys(fieldErrs).forEach(k => {
+          const v = fieldErrs[k];
+          if (Array.isArray(v) && v.length > 0) flat[k] = v[0];
+          else if (typeof v === 'object' && v !== null && (v.message || v.msg)) flat[k] = v.message || v.msg;
+          else flat[k] = typeof v === 'string' ? v : String(v);
+        });
+        fieldErrs = flat;
+      }
+
+      if (fieldErrs && Object.keys(fieldErrs).length > 0) {
+        if (farmType === 'LAYER') setExternalErrors(prev => ({ ...(prev || {}), layerForm: fieldErrs }));
+        else setExternalErrors(prev => ({ ...(prev || {}), dairyForm: fieldErrs }));
+        // Don't close the modal; let user fix inline errors
+        return;
+      }
+      // otherwise show a toast or generic message
+      showToast(err?.response?.data?.message || err.message || 'Failed to save visit', 'error');
+      return;
     }
+    // on success: close modal and refresh
     closeModal('fillVisit');
     handleSearch();
   };

@@ -74,6 +74,32 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
   const locationRef = useRef(null);
   const [errors, setErrors] = useState({});
 
+  // When parent supplies externalErrors (server-side validation), merge into local errors
+  useEffect(() => {
+    try {
+      if (externalErrors && typeof externalErrors === 'object' && Object.keys(externalErrors).length > 0) {
+        setErrors(prev => ({ ...(prev || {}), ...externalErrors }));
+      }
+    } catch (e) {}
+  }, [externalErrors]);
+
+  // Helper to focus an input by name (supports dotted keys like 'dairyForm.Location')
+  const focusFieldByName = (fieldName) => {
+    try {
+      if (!fieldName) return;
+      const short = String(fieldName).split('.').pop();
+      // Try exact match then short name
+      const selector = `[name="${fieldName}"] , [name=\"${short}\"]`;
+      const el = document.querySelector(selector);
+      if (el && typeof el.focus === 'function') {
+        el.focus();
+        if (el.select) {
+          try { el.select(); } catch (e) {}
+        }
+      }
+    } catch (e) {}
+  };
+
   const handleChange = (e) => {
     if (!e) return;
     const { name, value, type, checked } = e.target;
@@ -269,7 +295,13 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     const merged = { ...(externalErrors || {}), ...errs };
     if (Object.keys(merged).length) {
       setErrors(merged);
-      if (merged.Location && locationRef.current) locationRef.current.focus();
+      // Focus first invalid field (prefer Location when present)
+      const keys = Object.keys(merged || {});
+      if (keys && keys.length) {
+        const first = keys.includes('Location') ? 'Location' : keys[0];
+        // small delay to ensure DOM is ready
+        setTimeout(() => focusFieldByName(first), 50);
+      }
       return;
     }
     if (typeof onSave === 'function') {
