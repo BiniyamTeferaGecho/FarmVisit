@@ -14,7 +14,7 @@ export default function ReportFormAdvisor() {
     const fetchLists = async () => {
       try {
         const [aRes, fRes] = await Promise.all([
-          api.get('/advisors').catch(() => ({ data: [] })),
+          api.get('/advisor/active').catch(() => ({ data: [] })),
           api.get('/farms').catch(() => ({ data: [] })),
         ]);
         const normalize = (d) => Array.isArray(d) ? d : (d && Array.isArray(d.rows) ? d.rows : []);

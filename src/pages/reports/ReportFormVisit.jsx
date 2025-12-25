@@ -16,7 +16,7 @@ export default function ReportFormVisit() {
       try {
         const [fRes, aRes, sRes] = await Promise.all([
           api.get('/farms').catch(() => ({ data: [] })),
-          api.get('/advisors').catch(() => ({ data: [] })),
+          api.get('/advisor/active').catch(() => ({ data: [] })),
           api.get('/visit-statuses').catch(() => ({ data: [] })),
         ]);
         const normalize = (d) => Array.isArray(d) ? d : (d && Array.isArray(d.rows) ? d.rows : []);
