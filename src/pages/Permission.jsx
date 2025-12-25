@@ -7,7 +7,7 @@ import ConfirmModal from '../components/ConfirmModal'
 
 const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, '') : 'http://localhost:80/api'
 
-const MODULE_OPTIONS = ['System', 'Reports', 'Employee', 'RoleManagement', 'UserManagement']
+const MODULE_OPTIONS = ['System', 'Reports', 'Employee', 'RoleManagement', 'UserManagement','Companies','Farms','FarmVisits','Dashboard','Notifications']
 
 function getUserId(user) {
   return user && (user.UserID || user.userId || user.UserId || user.id || user.ID)
