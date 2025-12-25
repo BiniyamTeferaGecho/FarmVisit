@@ -24,30 +24,28 @@ export default function AdvisorVisits() {
       if (!advisorId) return
       setLoading(true)
       try {
+        // Use the new paginated per-user endpoint for advisors. The backend will derive UserID
+        // from the token if not explicitly provided. We still include page and pageSize.
         const params = new URLSearchParams()
-        params.set('AdvisorID', advisorId)
-        params.set('page', String(page))
-        params.set('pageSize', String(pageSize))
-        if (q) params.set('q', q)
-        if (status) params.set('status', status)
-        if (startDate) params.set('StartDate', startDate)
-        if (endDate) params.set('EndDate', endDate)
-        if (sortBy) params.set('sortBy', sortBy)
-        if (sortDir) params.set('sortDir', sortDir)
-        const url = `/farm-visit/advisor?${params.toString()}`
+        params.set('PageNumber', String(page))
+        params.set('PageSize', String(pageSize))
+        // Include completed and drafts by default; adjust if filters request exclusion
+        params.set('IncludeCompleted', String(1))
+        params.set('IncludeDraft', String(1))
+        const url = `/farm-visit-schedule/list/user?${params.toString()}`
         const res = await fetchWithAuth({ url, method: 'get' })
-        const data = res?.data
+        const body = res?.data || res
         if (!mounted) return
-        if (data && data.success && data.data) {
-          setItems(data.data.items || [])
-          setTotal(data.data.total || 0)
-          // extract status options from returned items for quick filter options
-          const uniq = Array.from(new Set((data.data.items || []).map(i => i.VisitStatusName).filter(Boolean)))
+        // New endpoint returns { success: true, data: rows, totalCount }
+        if (body && body.success && Array.isArray(body.data)) {
+          setItems(body.data)
+          setTotal(body.totalCount || (body.data && body.data.length) || 0)
+          const uniq = Array.from(new Set((body.data || []).map(i => i.VisitStatus || i.VisitStatusName).filter(Boolean)))
           setStatuses(uniq)
-        } else if (res && res.data && Array.isArray(res.data)) {
-          // fallback if older API shape
-          setItems(res.data)
-          setTotal(res.data.length)
+        } else if (Array.isArray(body)) {
+          // fallback older shapes
+          setItems(body)
+          setTotal(body.length)
         }
       } catch (err) {
         console.error('Failed to fetch advisor visits', err)

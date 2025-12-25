@@ -57,33 +57,6 @@ export const fetchAllSchedules = async (dispatch, fetchWithAuth, options = {}) =
   }
 };
 
-export const fetchSchedulesByUser = async (dispatch, fetchWithAuth, options = {}) => {
-  dispatch({ type: 'SET_LOADING', payload: true });
-  try {
-    const params = {};
-    if (options.IncludeDeleted !== undefined) params.IncludeDeleted = options.IncludeDeleted ? 1 : 0;
-    if (options.PageNumber) params.PageNumber = options.PageNumber;
-    if (options.PageSize) params.PageSize = options.PageSize;
-    // include any other filter props directly
-    Object.keys(options).forEach(k => {
-      if (!['IncludeDeleted','PageNumber','PageSize'].includes(k) && options[k] !== undefined) params[k] = options[k];
-    });
-
-    const res = await callWithAuthOrApi(fetchWithAuth, { url: '/farm-visit-schedule/list/user', method: 'GET', params });
-    const wrapper = res.data && res.data.data ? res.data.data : (res.data || {});
-    const items = Array.isArray(wrapper.items) ? wrapper.items : (Array.isArray(wrapper) ? wrapper : []);
-    const pagination = wrapper.pagination || { totalCount: items.length, currentPage: options.PageNumber || 1, pageSize: options.PageSize || items.length, totalPages: 1 };
-    dispatch({ type: 'SET_LIST', payload: items });
-    dispatch({ type: 'SET_PAGINATION', payload: { currentPage: pagination.currentPage || pagination.current || options.PageNumber || 1, pageSize: pagination.pageSize || pagination.pageSize || options.PageSize || items.length, totalCount: pagination.totalCount || pagination.total || items.length, totalPages: pagination.totalPages || 1 } });
-    return { items, pagination };
-  } catch (error) {
-    handleError(dispatch, error);
-    return { items: [], pagination: { totalCount: 0, currentPage: 1, pageSize: options.PageSize || 0, totalPages: 0 } };
-  } finally {
-    dispatch({ type: 'SET_LOADING', payload: false });
-  }
-};
-
 export const fetchDrafts = async (dispatch, fetchWithAuth, params = {}) => {
   dispatch({ type: 'SET_LOADING', payload: true });
   try {
