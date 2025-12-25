@@ -81,32 +81,8 @@ export default function AdvisorVisits() {
       </div>
 
       <div className="overflow-x-auto bg-white rounded shadow">
-        <table className="w-full text-sm">
-          <thead className="text-left bg-gray-50">
-            <tr>
-              <th className="px-3 py-2">Farm</th>
-              <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2">Purpose</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Priority</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={5} className="p-4 text-center">Loading…</td></tr>
-            ) : items.length === 0 ? (
-              <tr><td colSpan={5} className="p-4 text-center text-sm text-gray-500">No visits found.</td></tr>
-            ) : items.map(it => (
-              <tr key={it.VisitID} className="border-t">
-                <td className="px-3 py-2">{it.FarmName || it.FarmID}</td>
-                <td className="px-3 py-2">{it.VisitDate ? new Date(it.VisitDate).toLocaleString() : '-'}</td>
-                <td className="px-3 py-2">{it.VisitPurpose || '-'}</td>
-                <td className="px-3 py-2">{it.VisitStatusName || '-'}</td>
-                <td className="px-3 py-2">{it.VisitPriority || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* Use the shared ScheduleList component so My Visits matches the main Visit Schedule columns and actions */}
+        <ScheduleList schedules={items} fetchWithAuth={fetchWithAuth} onView={() => {}} onEdit={() => {}} onDelete={() => {}} onSubmit={() => {}} onFill={() => {}} onProcess={() => {}} onComplete={() => {}} recentlyFilled={{}} confirmedFilled={{}} />
       </div>
 
       <div className="mt-3 flex items-center justify-between text-sm">

@@ -93,7 +93,7 @@ const ActionButton = ({ onClick, icon: Icon, title, disabled = false, disabledRe
   </div>
 );
 
-const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {}, confirmedFilled = {} }) => {
+const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {}, confirmedFilled = {}, pageStartOffset = 0 }) => {
   const [advisorMap, setAdvisorMap] = useState({});
   const [latestMap, setLatestMap] = useState({});
   const [completedFlash, setCompletedFlash] = useState({});
@@ -244,6 +244,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-700">
           <tr>
+            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">#</th>
             {['Farm Name', 'Advisor', 'Scheduled Date', 'Farm Type', 'Visit Type', 'Visit Status', 'Approval Status', 'Actions'].map(header => (
               <th key={header} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 {header}
@@ -252,7 +253,8 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-          {(schedules || []).map(schedule => {
+          {(schedules || []).map((schedule, _idx) => {
+            const idx = (pageStartOffset || 0) + _idx + 1;
             const id = schedule.id ?? schedule.ScheduleID;
             const latest = latestMap[id] || {};
             const visitStatus = latest.VisitStatus ?? schedule.VisitStatus;
@@ -286,6 +288,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
 
             return (
               <tr key={id} className={`transition-colors duration-500 ${completedFlash[id] ? 'bg-green-50 dark:bg-green-900/20' : ''}`}>
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{idx}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{schedule.FarmName}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{advisorMap[schedule.AdvisorID] || 'Loading...'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
