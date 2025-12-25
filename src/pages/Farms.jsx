@@ -402,6 +402,14 @@ export default function Farms() {
         try {
             // Send FarmTypeID to backend (expecting ID not free-text type)
             const payload = { ...form, FarmTypeID: form.FarmTypeID || null, CreatedBy: user?.UserID || user?.id };
+            // Coerce FarmStatus (e.g., 'Active'/'Inactive') to boolean IsActive when present.
+            if (payload.FarmStatus !== undefined && payload.FarmStatus !== null) {
+                try {
+                    const s = String(payload.FarmStatus).trim().toLowerCase();
+                    if (s === 'inactive' || s === '0' || s === 'false') payload.IsActive = false;
+                    else if (s === 'active' || s === '1' || s === 'true') payload.IsActive = true;
+                } catch (e) { /* ignore */ }
+            }
             if (editingId) {
                 await fetchWithAuth({ url: `/farms/${editingId}`, method: 'put', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
             } else {

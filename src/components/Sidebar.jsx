@@ -158,11 +158,17 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
             // Prevent default anchor behavior if event present
             if (e && typeof e.preventDefault === 'function') e.preventDefault();
             navigate(target);
+            // Determine the tab key to notify the parent with. Prefer an explicit
+            // `tab` query parameter from the href (this avoids mismatches where
+            // menu item keys use dashes but the dashboard query uses underscores).
+            let tabKey = item.key;
+            try {
+                const url = new URL(target, window.location.origin);
+                const t = url.searchParams.get('tab');
+                if (t) tabKey = t;
+            } catch (e) { /* ignore invalid URL parsing */ }
             // Notify parent of the navigation so Dashboard can update active tab state.
-            // Previously we only notified for non-dashboard targets which caused clicking
-            // the top-level Dashboard item to not activate the dashboard tab. Always
-            // call onChange when provided so the parent can react immediately.
-            onChange && onChange(item.key);
+            onChange && onChange(tabKey);
             if (window.innerWidth < 1024) {
                 // Delay closing the mobile sidebar slightly so navigation can settle
                 try {

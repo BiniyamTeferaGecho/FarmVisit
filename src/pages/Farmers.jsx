@@ -645,9 +645,13 @@ export default function Farmers() {
     }
 
     // Compute form-level permission flags. Try common form key 'farmers'.
-    const canCreate = (hasFormPermission && hasFormPermission('farmers', 'CanCreate')) || (user && (user.roles || []).includes('ROLE_ADMIN')) || (user && (user.roles || []).includes('ROLE_SUPER_ADMIN'));
-    const canEdit = (hasFormPermission && hasFormPermission('farmers', 'CanEdit')) || (user && (user.roles || []).includes('ROLE_ADMIN')) || (user && (user.roles || []).includes('ROLE_SUPER_ADMIN'));
-    const canDelete = (hasFormPermission && hasFormPermission('farmers', 'CanDelete')) || (user && (user.roles || []).includes('ROLE_ADMIN')) || (user && (user.roles || []).includes('ROLE_SUPER_ADMIN'));
+    const isAdmin = user && (user.roles || []).includes('ROLE_ADMIN');
+    const isSuperAdmin = user && (user.roles || []).includes('ROLE_SUPER_ADMIN');
+    const isAdvisor = user && (user.roles || []).includes('ROLE_ADVISOR');
+
+    const canCreate = (hasFormPermission && hasFormPermission('farmers', 'CanCreate')) || isAdmin || isSuperAdmin || isAdvisor;
+    const canEdit = (hasFormPermission && hasFormPermission('farmers', 'CanEdit')) || isAdmin || isSuperAdmin || isAdvisor;
+    const canDelete = (hasFormPermission && hasFormPermission('farmers', 'CanDelete')) || isAdmin || isSuperAdmin || isAdvisor;
 
     const columns = useMemo(() => getColumns(handleEdit, handleDelete, canEdit, canDelete), [data, canEdit, canDelete]);
 
