@@ -318,17 +318,48 @@ export default function DairyFarm() {
 
       let saveRes
       if (editingId) {
-        saveRes = await fetchWithAuth({ url: `/dairy-farm/${editingId}`, method: 'put', data: payload })
-        setMessage({ type: 'success', text: 'Dairy visit updated' })
-        // persist any coordinate the user provided locally
-        try {
-          const coord = form.LocationCoordinate || form.Location || ''
-          setSavedLocationMap(m => {
-            const nm = { ...(m || {}), [String(editingId)]: coord }
-            try { localStorage.setItem('dairy.savedLocationMap', JSON.stringify(nm)) } catch (e) { }
-            return nm
-          })
-        } catch (e) { /* ignore */ }
+        // update or mark complete
+        if (payload.IsVisitCompleted) {
+          // Use the complete endpoint to ensure DB workflow runs server-side
+          await fetchWithAuth({ url: `/dairy-farm/${editingId}/complete`, method: 'put', data: { IsVisitCompleted: true, UpdatedBy: actorId } })
+          setMessage({ type: 'success', text: 'Dairy visit marked as completed' })
+          // Try to complete the parent schedule if it's in-progress
+          try {
+            const scheduleId = payload.ScheduleID || form.ScheduleID || null
+            if (scheduleId) {
+              const sdRes = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}`, method: 'get' })
+              const sd = sdRes.data?.data || sdRes.data || null
+              const visitRaw = sd?.VisitStatus ?? sd?.Status ?? sd?.visitStatus ?? sd?.VisitStatusName ?? sd?.status ?? null
+              const visitStatus = visitRaw ? String(visitRaw).trim().toUpperCase() : ''
+              if (visitStatus === 'INPROGRESS' || visitStatus === 'IN_PROGRESS' || visitStatus === 'IN PROGRESS') {
+                try {
+                  await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}/complete`, method: 'post', data: { CompletedBy: actorId, VisitSummary: 'Completed from Dairy Visits UI' } })
+                  try { window.dispatchEvent(new CustomEvent('farmvisit:updated', { detail: { action: 'update', id: scheduleId, data: { VisitStatus: 'Completed' } } })); } catch (e) { /* ignore */ }
+                  // Update local scheduleMap so UI reflects Completed status immediately
+                  try { setScheduleMap(prev => ({ ...(prev || {}), [String(scheduleId)]: { ...(prev && prev[String(scheduleId)] ? prev[String(scheduleId)] : {}), VisitStatus: 'Completed' } })); } catch (e) { /* ignore */ }
+                  setMessage({ type: 'success', text: 'Dairy visit and schedule marked as completed' })
+                } catch (schErr) {
+                  const msg = schErr?.response?.data?.message || schErr?.message || 'Schedule complete failed'
+                  setMessage({ type: 'info', text: `Visit marked completed but could not complete schedule: ${msg}` })
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('could not fetch schedule after visit complete', e)
+          }
+        } else {
+          saveRes = await fetchWithAuth({ url: `/dairy-farm/${editingId}`, method: 'put', data: payload })
+          setMessage({ type: 'success', text: 'Dairy visit updated' })
+          // persist any coordinate the user provided locally
+          try {
+            const coord = form.LocationCoordinate || form.Location || ''
+            setSavedLocationMap(m => {
+              const nm = { ...(m || {}), [String(editingId)]: coord }
+              try { localStorage.setItem('dairy.savedLocationMap', JSON.stringify(nm)) } catch (e) { }
+              return nm
+            })
+          } catch (e) { /* ignore */ }
+        }
       } else {
         saveRes = await fetchWithAuth({ url: '/dairy-farm', method: 'post', data: payload })
         // Backend returns 201 and the newly created visit row; surface DB validation messages for 400
@@ -345,6 +376,36 @@ export default function DairyFarm() {
                 return nm
               })
             }
+            // If the created visit was already marked completed in the form, call the complete endpoint
+            try {
+              const createdId = created.DairyFarmVisitId || created.DairyFarmVisitID || created.id || null
+              if (createdId && (form.IsVisitCompleted || payload.IsVisitCompleted)) {
+                await fetchWithAuth({ url: `/dairy-farm/${createdId}/complete`, method: 'put', data: { IsVisitCompleted: true, UpdatedBy: actorId } })
+                // attempt to complete schedule as LayerFarm does
+                try {
+                  const scheduleId = payload.ScheduleID || created.ScheduleID || created.ScheduleId || null
+                  if (scheduleId) {
+                    const sdRes = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}`, method: 'get' })
+                    const sd = sdRes.data?.data || sdRes.data || null
+                    const visitRaw = sd?.VisitStatus ?? sd?.Status ?? sd?.visitStatus ?? sd?.VisitStatusName ?? sd?.status ?? null
+                    const visitStatus = visitRaw ? String(visitRaw).trim().toUpperCase() : ''
+                    if (visitStatus === 'INPROGRESS' || visitStatus === 'IN_PROGRESS' || visitStatus === 'IN PROGRESS') {
+                      try {
+                        await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}/complete`, method: 'post', data: { CompletedBy: actorId, VisitSummary: 'Completed from Dairy Visits UI' } })
+                        try { window.dispatchEvent(new CustomEvent('farmvisit:updated', { detail: { action: 'update', id: scheduleId, data: { VisitStatus: 'Completed' } } })); } catch (e) { /* ignore */ }
+                        try { setScheduleMap(prev => ({ ...(prev || {}), [String(scheduleId)]: { ...(prev && prev[String(scheduleId)] ? prev[String(scheduleId)] : {}), VisitStatus: 'Completed' } })); } catch (e) { /* ignore */ }
+                      } catch (schErr) {
+                        const msg = schErr?.response?.data?.message || schErr?.message || 'Schedule complete failed'
+                        setMessage({ type: 'info', text: `Visit created but could not complete schedule: ${msg}` })
+                      }
+                    }
+                  }
+                } catch (e) { console.warn('post-create schedule complete attempt failed', e) }
+              }
+            } catch (completeErr) {
+              console.warn('post-create complete failed', completeErr)
+              setMessage({ type: 'info', text: 'Visit created but marking complete failed' })
+            }
         }
         setMessage({ type: 'success', text: 'Dairy visit created' })
       }
@@ -354,7 +415,6 @@ export default function DairyFarm() {
       try {
         const scheduleId = payload.ScheduleID || form.ScheduleID || null
         if (scheduleId) {
-          // Fetch the authoritative schedule to check ApprovalStatus and VisitStatus
           try {
             const res = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}`, method: 'get' })
             const sd = res.data?.data || res.data || null
@@ -363,8 +423,18 @@ export default function DairyFarm() {
             const approval = approvalRaw ? String(approvalRaw).trim().toUpperCase() : ''
             const visitStatus = visitRaw ? String(visitRaw).trim().toUpperCase() : ''
 
-            // schedule auto-start removed; UI will not attempt to change schedule state
-            setMessage({ type: 'success', text: (editingId ? 'Dairy visit updated' : 'Dairy visit created') })
+            if (approval === 'APPROVED' && visitStatus === 'SCHEDULED') {
+              try {
+                await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}/start`, method: 'post', data: {} })
+                try { const now = new Date().toISOString(); window.dispatchEvent(new CustomEvent('farmvisit:updated', { detail: { action: 'update', id: scheduleId, data: { VisitStatus: 'InProgress', ActualVisitDate: now } } })); } catch (e) { /* ignore */ }
+                setMessage({ type: 'success', text: (editingId ? 'Dairy visit updated' : 'Dairy visit created') + ' — schedule started' })
+              } catch (startErr) {
+                const msg = startErr?.response?.data?.message || startErr?.message || 'Schedule start failed'
+                setMessage({ type: 'info', text: `Saved visit but could not start schedule: ${msg}` })
+              }
+            } else {
+              setMessage({ type: 'info', text: (editingId ? 'Dairy visit updated' : 'Dairy visit created') })
+            }
           } catch (getErr) {
             console.warn('failed to fetch schedule before start', getErr)
             const errMsg = getErr?.response?.data?.message || getErr?.message || 'Failed to fetch schedule';
@@ -409,8 +479,9 @@ export default function DairyFarm() {
     try {
       setCompletingId(id)
       setMessage(null)
-      // Call backend PATCH /dairy-farm/:id/complete (no body expected)
-      await fetchWithAuth({ url: `/dairy-farm/${encodeURIComponent(id)}/complete`, method: 'put' })
+      let completedScheduleId = null
+      // Call backend PUT /dairy-farm/:id/complete with actor info
+      await fetchWithAuth({ url: `/dairy-farm/${encodeURIComponent(id)}/complete`, method: 'put', data: { IsVisitCompleted: true, UpdatedBy: actorId } })
       // optimistic update in list
       setList(prev => prev.map(it => {
         const rowId = it.DairyFarmVisitId || it.DairyFarmVisitID || it.id
@@ -420,19 +491,44 @@ export default function DairyFarm() {
       }))
       try { window.dispatchEvent(new CustomEvent('dairyvisit:updated', { detail: { action: 'complete', id } })) } catch (e) { /* ignore */ }
       setMessage({ type: 'success', text: 'Visit marked completed' })
-      // attempt to complete parent schedule if present (best-effort)
+      // attempt to complete parent schedule if present (best-effort, but check status first)
       try {
         const row = list.find(it => String((it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)) === String(id))
         const scheduleId = row && (row.ScheduleID || row.scheduleId || null)
+        completedScheduleId = scheduleId
         if (scheduleId) {
-          await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}/complete`, method: 'post', data: {} })
-          try { window.dispatchEvent(new CustomEvent('farmvisit:updated', { detail: { action: 'update', id: scheduleId, data: { VisitStatus: 'Completed' } } })) } catch (e) { /* ignore */ }
+          const sdRes = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}`, method: 'get' })
+          const sd = sdRes.data?.data || sdRes.data || null
+          const visitRaw = sd?.VisitStatus ?? sd?.Status ?? sd?.visitStatus ?? sd?.VisitStatusName ?? sd?.status ?? null
+          const visitStatus = visitRaw ? String(visitRaw).trim().toUpperCase() : ''
+          if (visitStatus === 'INPROGRESS' || visitStatus === 'IN_PROGRESS' || visitStatus === 'IN PROGRESS') {
+            try {
+              await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}/complete`, method: 'post', data: { CompletedBy: actorId, VisitSummary: 'Completed from Dairy Visits UI' } })
+              try { window.dispatchEvent(new CustomEvent('farmvisit:updated', { detail: { action: 'update', id: scheduleId, data: { VisitStatus: 'Completed' } } })) } catch (e) { /* ignore */ }
+              try { setScheduleMap(prev => ({ ...(prev || {}), [String(scheduleId)]: { ...(prev && prev[String(scheduleId)] ? prev[String(scheduleId)] : {}), VisitStatus: 'Completed' } })); } catch (e) { /* ignore */ }
+              setMessage({ type: 'success', text: 'Visit and schedule marked as completed' })
+            } catch (schErr) {
+              const msg = schErr?.response?.data?.message || schErr?.message || 'Schedule complete failed'
+              setMessage({ type: 'info', text: `Visit marked completed but could not complete schedule: ${msg}` })
+            }
+          }
         }
       } catch (e) {
         // non-fatal
       }
-      // refresh list to load authoritative state
-      fetchList()
+      // refresh list to load authoritative state and then fetch the schedule detail
+      // so the UI can show the updated VisitStatus
+      // (await so we update scheduleMap after the list refresh)
+      await fetchList()
+      try {
+        if (completedScheduleId) {
+          try {
+            const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(completedScheduleId)}`, method: 'get' })
+            const sd = r?.data?.data || r?.data || null
+            if (sd) setScheduleMap(prev => ({ ...(prev || {}), [String(completedScheduleId)]: sd }))
+          } catch (e) { /* ignore */ }
+        }
+      } catch (e) { /* ignore */ }
     } catch (err) {
       console.error('complete dairy error', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || err?.message || 'Failed to complete visit' })
@@ -657,14 +753,15 @@ export default function DairyFarm() {
               <th className="px-4 py-3">Advisor</th>
               <th className="px-4 py-3">Avg Milk (L/day)</th>
               <th className="px-4 py-3">Total Milk (L/day)</th>
+              <th className="px-4 py-3">Visit Status</th>
               <th className="px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8} className="p-6 text-center"><LoadingSpinner /></td></tr>
+              <tr><td colSpan={9} className="p-6 text-center"><LoadingSpinner /></td></tr>
             ) : list.length === 0 ? (
-              <tr><td colSpan={8} className="p-6 text-center text-gray-500">No dairy visits found.</td></tr>
+              <tr><td colSpan={9} className="p-6 text-center text-gray-500">No dairy visits found.</td></tr>
             ) : list.map((it, idx) => (
               <tr key={it.DairyFarmVisitId || idx} className="border-t hover:bg-gray-50">
                 <td className="px-4 py-3">{idx+1}</td>
@@ -687,6 +784,30 @@ export default function DairyFarm() {
                 })()}</td>
                 <td className="px-4 py-3">{it.AvgMilkProductionPerDayPerCow ?? it.AvgMilkProductionPerDay ?? ''}</td>
                 <td className="px-4 py-3">{it.TotalMilkPerDay ?? ''}</td>
+                <td className="px-4 py-3">{(() => {
+                  const scheduleId = it.ScheduleID || it.scheduleId || null
+                  const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
+                  const raw = sched?.VisitStatus || sched?.VisitStatusName || it.VisitStatus || it.VisitStatusName || (it.IsVisitCompleted ? 'COMPLETED' : null)
+                  if (!raw) return ''
+                  const v = String(raw).trim().toUpperCase()
+                  let label = ''
+                  let cls = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium '
+                  if (v === 'INPROGRESS' || v === 'IN_PROGRESS' || v === 'IN PROGRESS') {
+                    label = 'In Progress'
+                    cls += 'bg-amber-100 text-amber-800'
+                  } else if (v === 'SCHEDULED') {
+                    label = 'Scheduled'
+                    cls += 'bg-blue-100 text-blue-800'
+                  } else if (v === 'COMPLETED' || v === 'COMPLETE') {
+                    label = 'Completed'
+                    cls += 'bg-green-100 text-green-800'
+                  } else {
+                    // fallback: title-case the raw string
+                    label = raw.toString().split(/_|\s+/).map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()).join(' ')
+                    cls += 'bg-gray-100 text-gray-700'
+                  }
+                  return <span className={cls}>{label}</span>
+                })()}</td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex items-center justify-center gap-1">
                     {(() => {
