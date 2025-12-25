@@ -7,23 +7,23 @@ import { href, useNavigate } from 'react-router-dom';
 const menu = [
     { key: 'dashboard', label: 'Dashboard', href: '/dashboard?tab=dashboard', icon: FaHome },
     {
-        key: 'companies', label: 'Companies', href: '/companies', icon: FaBuilding,rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'],
+        key: 'companies', label: 'Companies', href: '/companies', icon: FaBuilding,rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'], formKey: 'companies',
         children: [
-            { key: 'lookups', label: 'Lookups', icon: FaChartBar, href: '/dashboard?tab=lookups', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
-            { key: 'lookuptypes', label: 'Lookup Type', icon: FaTags, href: '/dashboard?tab=lookuptypes', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
-            { key: 'farmtypes', label: 'Farm Types', icon: FaTags, href: '/dashboard?tab=farmtypes', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
-            { key: 'farmers', label: 'Farmers', icon: FaUserPlus, href: '/dashboard?tab=farmers', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
-            { key: 'employees', label: 'Employees', icon: FaUsers, href: '/dashboard?tab=employees', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'] },
-            { key: 'farms', label: 'Farm', icon: FaIndustry, href: '/dashboard?tab=farms', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'] },
+            { key: 'lookups', label: 'Lookups', icon: FaChartBar, href: '/dashboard?tab=lookups', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], formKey: 'lookups' },
+            { key: 'lookuptypes', label: 'Lookup Type', icon: FaTags, href: '/dashboard?tab=lookuptypes', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], formKey: 'lookuptypes' },
+            { key: 'farmtypes', label: 'Farm Types', icon: FaTags, href: '/dashboard?tab=farmtypes', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], formKey: 'farmtypes' },
+            { key: 'farmers', label: 'Farmers', icon: FaUserPlus, href: '/dashboard?tab=farmers', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADVISOR'], formKey: 'farmers' },
+            { key: 'employees', label: 'Employees', icon: FaUsers, href: '/dashboard?tab=employees', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], formKey: 'employees' },
+            { key: 'farms', label: 'Farm', icon: FaIndustry, href: '/dashboard?tab=farms', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'], formKey: 'farms' },
         ]
     },
     {
-        key: 'farmsvisit', label: 'Farms Visit', href: '/dashboard?tab=farmvisit', icon: FaBriefcase,rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR','ROLE_VIEWER'],
+        key: 'farmsvisit', label: 'Farms Visit', href: '/dashboard?tab=farmvisit', icon: FaBriefcase,rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR','ROLE_VIEWER'], formKey: 'farm-visit',
         children: [
-            { key: 'layerfarm', label: 'Layer Farm', icon: FaLayerGroup, href: '/dashboard?tab=layerfarm', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'] },
-            { key: 'dairyfarm', label: 'Dairy Farm', icon: FaBookOpen, href: '/dashboard?tab=dairyfarm', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'] },
-            { key: 'farmvisitschedule', label: 'Visit Schedules', icon: FaCalendarAlt, href: '/dashboard?tab=farmvisitschedule', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR','ROLE_VIEWER'] },
-            { key: 'advisorvisits', label: 'My Visits', icon: FaCalendarAlt, href: '/dashboard?tab=advisorvisits', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'] },
+            { key: 'layerfarm', label: 'Layer Farm', icon: FaLayerGroup, href: '/dashboard?tab=layerfarm', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'], formKey: 'layer-farm' },
+            { key: 'dairyfarm', label: 'Dairy Farm', icon: FaBookOpen, href: '/dashboard?tab=dairyfarm', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'], formKey: 'dairy-farm' },
+            { key: 'farmvisitschedule', label: 'Visit Schedules', icon: FaCalendarAlt, href: '/dashboard?tab=farmvisitschedule', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR','ROLE_VIEWER'], formKey: 'farm-visit-schedule' },
+            { key: 'advisorvisits', label: 'My Visits', icon: FaCalendarAlt, href: '/dashboard?tab=advisorvisits', rolesAllowed: ['ROLE_ADMIN', 'ROLE_SUPER_ADMIN','ROLE_ADVISOR'], formKey: 'advisor-visits' },
         ]
     },
     {

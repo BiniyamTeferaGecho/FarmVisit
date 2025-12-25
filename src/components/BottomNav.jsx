@@ -1,4 +1,5 @@
 import React from 'react'
+import { useAuth } from '../auth/AuthProvider'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Home, Calendar, Clock, List, Settings } from 'lucide-react'
 
@@ -24,6 +25,7 @@ export default function BottomNav() {
     }
   }
 
+  const auth = useAuth()
   const active = activeKeyFromLocation()
 
   function go(key) {
@@ -53,6 +55,16 @@ export default function BottomNav() {
       <div className="max-w-5xl mx-auto px-2">
         <div className="flex justify-between items-center h-14">
           {items.map((it) => {
+            // check form-level permission if available (map keys where necessary)
+            try {
+              const fk = (it.formKey || it.key || '').toString().toLowerCase();
+              if (fk && auth && typeof auth.hasFormPermission === 'function') {
+                if (!auth.hasFormPermission(fk) && !(auth.user && (auth.user.roles || []).includes('ROLE_ADMIN'))) {
+                  // skip rendering this nav item if the user lacks permission
+                  return null
+                }
+              }
+            } catch (e) { /* ignore permission checks on error */ }
             const Icon = it.icon
             const isActive = active === it.key
             return (
