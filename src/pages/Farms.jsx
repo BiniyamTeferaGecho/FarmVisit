@@ -402,7 +402,8 @@ export default function Farms() {
         try {
             // Send FarmTypeID to backend (expecting ID not free-text type)
             const payload = { ...form, FarmTypeID: form.FarmTypeID || null, CreatedBy: user?.UserID || user?.id };
-            // Coerce FarmStatus (e.g., 'Active'/'Inactive') to boolean IsActive when present.
+            // Always send an explicit IsActive boolean to the backend to avoid NULL (no-change) parameters.
+            // Accept either the explicit `IsActive` checkbox from the form or legacy `FarmStatus` values.
             if (payload.FarmStatus !== undefined && payload.FarmStatus !== null) {
                 try {
                     const s = String(payload.FarmStatus).trim().toLowerCase();
@@ -410,6 +411,8 @@ export default function Farms() {
                     else if (s === 'active' || s === '1' || s === 'true') payload.IsActive = true;
                 } catch (e) { /* ignore */ }
             }
+            // Ensure IsActive is always present as boolean (fallback to form checkbox state)
+            payload.IsActive = payload.IsActive === undefined || payload.IsActive === null ? !!form.IsActive : !!payload.IsActive;
             if (editingId) {
                 await fetchWithAuth({ url: `/farms/${editingId}`, method: 'put', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
             } else {
