@@ -419,7 +419,8 @@ export default function Farms() {
         if (!deleteTarget) return;
         setLoading(true); setError(null);
         try {
-            await fetchWithAuth({ url: `/farms/${deleteTarget.FarmID}/delete`, method: 'post', data: { DeletedBy: user?.UserID || user?.id } });
+            // Backend expects a DELETE to /api/farms/:id for soft delete
+            await fetchWithAuth({ url: `/farms/${deleteTarget.FarmID}`, method: 'delete', data: { DeletedBy: user?.UserID || user?.id } });
             setShowDelete(false); setDeleteTarget(null); fetchList();
         } catch (err) { setError(getErrorMessage(err) || 'Delete failed') } finally { setLoading(false) }
     };
@@ -436,7 +437,8 @@ export default function Farms() {
         if (window.confirm('Are you sure you want to permanently delete this farm? This action cannot be undone.')) {
             setLoading(true); setError(null);
             try {
-                await fetchWithAuth({ url: `/farms/${farm.FarmID}/permanent-delete`, method: 'delete', data: { DeletedBy: user?.UserID || user?.id } });
+                // Backend route for permanent delete is DELETE /api/farms/permanent/:id
+                await fetchWithAuth({ url: `/farms/permanent/${farm.FarmID}`, method: 'delete', data: { DeletedBy: user?.UserID || user?.id } });
                 fetchList();
             } catch (err) { setError(getErrorMessage(err) || 'Permanent delete failed') } finally { setLoading(false) }
         }
@@ -665,7 +667,7 @@ export default function Farms() {
                                 />
                             </div>
                         </div>
-                        <div className="flex-shrink-0">
+                        <div className="shrink-0">
                             <button type="button" onClick={getCurrentLocation} className="px-3 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300" disabled={gpsLoading}>
                                 {gpsLoading ? 'Getting...' : 'Get'}
                             </button>
