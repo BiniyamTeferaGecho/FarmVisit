@@ -75,9 +75,14 @@ const FarmVisitSchedule = () => {
           console.warn('refresh: failed to load lookups directly', e);
         }
 
+        // Use user-specific schedules for advisors; admins get the full list
+        const scheduleFetch = (auth?.user && Array.isArray(auth.user.roles) && auth.user.roles.includes('ROLE_ADVISOR'))
+          ? api.fetchSchedulesByUser(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 })
+          : api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 });
+
         await Promise.all([
           api.fetchStats(dispatch, auth.fetchWithAuth),
-          api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 }),
+          scheduleFetch,
         ]);
       } catch (err) {
         console.error('refresh error', err);
@@ -159,7 +164,12 @@ const FarmVisitSchedule = () => {
 
     // Clear transient recently-filled flags when performing a fresh search
     setRecentlyFilled({});
-    api.fetchAllSchedules(dispatch, auth.fetchWithAuth, params);
+    // Choose user-specific list for advisors
+    if (auth?.user && Array.isArray(auth.user.roles) && auth.user.roles.includes('ROLE_ADVISOR')) {
+      api.fetchSchedulesByUser(dispatch, auth.fetchWithAuth, params);
+    } else {
+      api.fetchAllSchedules(dispatch, auth.fetchWithAuth, params);
+    }
   };
 
   const handleReset = () => {
