@@ -381,7 +381,7 @@ export default function Farms() {
         return errs;
     };
 
-    const handleChange = (e) => {
+    const handleChange = async (e) => {
         const { name, value, type, checked } = e.target;
         if (name === 'FarmTypeID') {
             // when a FarmType is selected, also store a friendly name for backward compatibility
@@ -391,7 +391,26 @@ export default function Farms() {
             setForm(s => ({ ...s, FarmTypeID: id, FarmType: friendly }));
             return;
         }
+
+        // Update local form state first
         setForm(s => ({ ...s, [name]: type === 'checkbox' ? checked : value }));
+
+        // If toggling IsActive while editing an existing farm, call the dedicated toggle endpoint
+        if (name === 'IsActive' && editingId) {
+            setLoading(true); setError(null);
+            try {
+                const setActive = type === 'checkbox' ? checked : (value === 'true' || value === '1');
+                await fetchWithAuth({ url: `/farms/${editingId}/active`, method: 'post', data: { UserID: user?.UserID || user?.id, SetActive: setActive } });
+                // refresh list and current form with authoritative data
+                await fetchList();
+                // attempt to re-open the edited farm into form to show updated state
+                try { await openEdit(editingId); } catch (e) { /* ignore */ }
+            } catch (err) {
+                setError(getErrorMessage(err) || 'Failed to update active status');
+            } finally {
+                setLoading(false);
+            }
+        }
     };
 
     const handleSubmit = async (e) => {
