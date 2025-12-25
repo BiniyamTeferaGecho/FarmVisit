@@ -87,11 +87,48 @@ export default function AdvisorVisits() {
           schedules={items}
           fetchWithAuth={fetchWithAuth}
           pageStartOffset={(page - 1) * pageSize}
-          onView={(row) => { console.log('view', row) }}
-          onEdit={(row) => { console.log('edit', row) }}
+          onView={(row) => {
+            try {
+              const id = row?.ScheduleID || row?.id || row?.ScheduleId;
+              if (!id) return;
+              const p = new URLSearchParams(window.location.search || '');
+              p.set('tab', 'farmvisitschedule');
+              p.set('open', 'view');
+              p.set('scheduleId', String(id));
+              const newUrl = `${window.location.pathname}?${p.toString()}`;
+              window.history.pushState({}, '', newUrl);
+              // notify Dashboard's useSearchParams to pick up the change
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            } catch (e) { console.debug('navigate to schedule view failed', e) }
+          }}
+          onEdit={(row) => {
+            try {
+              const id = row?.ScheduleID || row?.id || row?.ScheduleId;
+              if (!id) return;
+              const p = new URLSearchParams(window.location.search || '');
+              p.set('tab', 'farmvisitschedule');
+              p.set('open', 'edit');
+              p.set('scheduleId', String(id));
+              const newUrl = `${window.location.pathname}?${p.toString()}`;
+              window.history.pushState({}, '', newUrl);
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            } catch (e) { console.debug('navigate to schedule edit failed', e) }
+          }}
           onDelete={(row) => { console.log('delete', row) }}
           onSubmit={(row) => { console.log('submit', row) }}
-          onFill={(row) => { console.log('fill', row) }}
+          onFill={(row) => {
+            try {
+              const id = row?.ScheduleID || row?.id || row?.ScheduleId;
+              if (!id) return;
+              const p = new URLSearchParams(window.location.search || '');
+              p.set('tab', 'farmvisitschedule');
+              p.set('open', 'fill');
+              p.set('scheduleId', String(id));
+              const newUrl = `${window.location.pathname}?${p.toString()}`;
+              window.history.pushState({}, '', newUrl);
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            } catch (e) { console.debug('navigate to schedule fill failed', e) }
+          }}
           onProcess={(row) => { console.log('process', row) }}
           onComplete={(row) => { console.log('complete', row) }}
           recentlyFilled={{}}

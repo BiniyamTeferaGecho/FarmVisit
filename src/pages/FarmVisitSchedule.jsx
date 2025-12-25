@@ -279,6 +279,40 @@ const FarmVisitSchedule = () => {
     }
   }, [location.search]);
 
+  // Auto-open schedule modal when dashboard navigation includes
+  // `?open=edit|view|fill&scheduleId=<id>` so other pages can request the Schedule tab
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(location.search || window.location.search);
+      const op = p.get('open');
+      const sid = p.get('scheduleId') || p.get('ScheduleID') || p.get('id');
+      if ((op === 'edit' || op === 'view' || op === 'fill') && sid) {
+        (async () => {
+          try {
+            const res = await auth.fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(sid)}`, method: 'get' });
+            const body = res?.data?.data || res?.data || res;
+            const rec = Array.isArray(body) ? body[0] : (body && body.recordset ? body.recordset[0] : body);
+            if (op === 'fill') openModal('fillVisit', rec);
+            else openModal('schedule', rec);
+          } catch (e) {
+            console.warn('Failed to load schedule for open param', e);
+          }
+        })();
+
+        // remove the flags so repeated navigation doesn't re-open
+        p.delete('open');
+        p.delete('scheduleId');
+        p.delete('ScheduleID');
+        p.delete('id');
+        const next = p.toString();
+        const newUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [location.search]);
+
   const closeModal = (modalName) => {
     switch (modalName) {
       case 'schedule':
