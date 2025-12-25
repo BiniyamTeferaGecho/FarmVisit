@@ -78,6 +78,7 @@ export default function DairyFarm() {
   const [list, setList] = useState([])
   // scheduleMap: cache schedule rows (by ScheduleID) so we can show VisitCode, Farm and Advisor names
   const [scheduleMap, setScheduleMap] = useState({});
+  const [savedLocationMap, setSavedLocationMap] = useState({});
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
 
@@ -321,6 +322,10 @@ export default function DairyFarm() {
         if (created) {
           const newId = created.DairyFarmVisitId || created.DairyFarmVisitID || created.id || null
           if (newId) setEditingId(newId)
+          // remember the coordinate the user entered so UI can prefer it over region name
+          if (newId && form && form.Location) {
+            setSavedLocationMap(m => ({ ...(m||{}), [String(newId)]: form.Location }))
+          }
         }
         setMessage({ type: 'success', text: 'Dairy visit created' })
       }
@@ -651,7 +656,7 @@ export default function DairyFarm() {
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   return sched?.FarmName || sched?.FarmCode || it.FarmName || it.FarmCode || (it.Farm && (it.Farm.FarmCode || it.Farm.FarmName || it.Farm.Name)) || ''
                 })()}</td>
-                <td className="px-4 py-3">{it.Location || it.FarmLocation || ''}</td>
+                <td className="px-4 py-3">{savedLocationMap[String(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)] || it.Location || it.FarmLocation || ''}</td>
                 <td className="px-4 py-3">{(() => {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
