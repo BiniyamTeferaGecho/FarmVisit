@@ -13,6 +13,7 @@ import {
   CalendarClock,
   Check
 } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { validateCompleteRequirements } from '../../utils/visitValidation';
 
 const renderStatus = (visitStatus, approvalStatus) => {
@@ -223,7 +224,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
                     <ActionButton onClick={() => onSubmit(schedule)} icon={ArrowUpCircle} title="Submit" disabled={submitDisabled} disabledReason={submitDisabledReason} />
                     <ActionButton onClick={() => onProcess && onProcess(schedule)} icon={Check} title="Approve" disabled={!isScheduled || String(approvalStatus || '').toLowerCase().includes('approved')} disabledReason={approveDisabledReason} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" />
                     <ActionButton onClick={() => onFill(schedule)} icon={FilePenLine} title="Fill Visit" disabled={fillDisabled} disabledReason={fillDisabledReason} />
-                    <ActionButton onClick={() => onView && onView(schedule)} icon={File} title="View" className="text-sky-600" />
+                    <ActionButton onClick={() => onView && onView(schedule)} icon={Eye} title="View Visit" className="text-sky-600" />
                     
                     <ActionButton onClick={() => onDelete(schedule)} icon={Trash2} title="Delete" className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" />
                   </div>
