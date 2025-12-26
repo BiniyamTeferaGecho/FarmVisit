@@ -6,6 +6,7 @@ export const initialState = {
   loading: true,
   message: null,
   showForm: false,
+  scheduleReadOnly: false,
   editingId: null,
   form: {
     AdvisorID: '',
@@ -99,9 +100,13 @@ export const scheduleReducer = (state, action) => {
         showForm: true,
         editingId: action.payload ? action.payload.ScheduleID : null,
         form: action.payload ? { ...initialState.form, ...action.payload, ProposedDate: action.payload.ProposedDate ? format(new Date(action.payload.ProposedDate), "yyyy-MM-dd'T'HH:mm") : '' } : initialState.form,
+        // respect explicit read-only flag if set by caller
+        scheduleReadOnly: action.payload && action.payload.__readOnly === true ? true : state.scheduleReadOnly,
       };
     case 'CLOSE_FORM':
-      return { ...state, showForm: false, editingId: null, form: initialState.form };
+      return { ...state, showForm: false, editingId: null, form: initialState.form, scheduleReadOnly: false };
+    case 'SET_SCHEDULE_READ_ONLY':
+      return { ...state, scheduleReadOnly: action.payload === true };
     case 'SET_FORM_DATA':
       return { ...state, form: action.payload };
     case 'UPDATE_FORM':

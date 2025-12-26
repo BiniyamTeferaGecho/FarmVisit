@@ -5,7 +5,7 @@ import FillVisitModal from './FillVisitModal';
 import Modal from '../Modal';
 import { FilePlus, Trash2, Send, CheckCircle, XCircle, Clock, Upload, Calendar, User, Building, Clipboard, Clock4, StickyNote, AlertTriangle } from 'lucide-react';
 
-const InputField = ({ label, name, value, onChange, placeholder, type = 'text', icon }) => (
+const InputField = ({ label, name, value, onChange, placeholder, type = 'text', icon, readOnly = false, disabled = false }) => (
   <div>
     <label className="text-left block text-sm font-medium text-gray-700 mb-1">{label}</label>
     <div className="relative">
@@ -15,14 +15,16 @@ const InputField = ({ label, name, value, onChange, placeholder, type = 'text', 
         name={name}
         value={value || ''}
         onChange={onChange}
+        readOnly={readOnly}
+        disabled={disabled || readOnly}
         placeholder={placeholder}
-        className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 ${icon ? 'pl-10' : ''}`}
+        className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 ${icon ? 'pl-10' : ''} ${(disabled || readOnly) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       />
     </div>
   </div>
 );
 
-const SelectField = ({ label, name, value, onChange, children, icon, disabled = false }) => (
+const SelectField = ({ label, name, value, onChange, children, icon, disabled = false, readOnly = false }) => (
   <div>
     <label className="text-left block text-sm font-medium text-gray-700 mb-1">{label}</label>
     <div className="relative">
@@ -31,8 +33,8 @@ const SelectField = ({ label, name, value, onChange, children, icon, disabled = 
         name={name}
         value={value || ''}
         onChange={onChange}
-        disabled={disabled}
-        className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 ${icon ? 'pl-10' : ''}`}
+        disabled={disabled || readOnly}
+        className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 ${icon ? 'pl-10' : ''} ${(disabled || readOnly) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
       >
         {children}
       </select>
@@ -40,7 +42,7 @@ const SelectField = ({ label, name, value, onChange, children, icon, disabled = 
   </div>
 );
 
-const TextAreaField = ({ label, name, value, onChange, placeholder, icon }) => (
+const TextAreaField = ({ label, name, value, onChange, placeholder, icon, readOnly = false, disabled = false }) => (
     <div className="md:col-span-2">
         <label className="text-left block text-sm font-medium text-gray-700 mb-1">{label}</label>
         <div className="relative">
@@ -48,22 +50,25 @@ const TextAreaField = ({ label, name, value, onChange, placeholder, icon }) => (
             <textarea
                 name={name}
                 value={value || ''}
-                onChange={onChange}
-                placeholder={placeholder}
-                className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 ${icon ? 'pl-10' : ''}`}
+        onChange={onChange}
+        readOnly={readOnly}
+        disabled={disabled || readOnly}
+        placeholder={placeholder}
+        className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 ${icon ? 'pl-10' : ''} ${(disabled || readOnly) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 rows="3"
             ></textarea>
         </div>
     </div>
 );
 
-const CheckboxField = ({ name, checked, onChange, label }) => (
+const CheckboxField = ({ name, checked, onChange, label, readOnly = false, disabled = false }) => (
   <label className="flex items-center gap-2 text-sm text-gray-700">
     <input
       type="checkbox"
       name={name}
       checked={Boolean(checked)}
       onChange={onChange}
+      disabled={disabled || readOnly}
       className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
     />
     {label}
@@ -128,7 +133,10 @@ const ScheduleModals = ({
     approvalTarget,
     completeTarget,
     fillTarget,
+    scheduleReadOnly,
   } = state;
+
+  const isScheduleReadOnly = Boolean(scheduleReadOnly);
 
   // prefer externalFillVisitFormData (from parent local state) over reducer fill data
   const fillVisitFormData = externalFillVisitFormData ?? reducerFillVisitFormData;
@@ -402,6 +410,7 @@ const ScheduleModals = ({
             value={formData.AdvisorID}
             onChange={handleFormChange}
             disabled={isAdvisor && !isEditing}
+            readOnly={isScheduleReadOnly}
             icon={<User size={16} className="text-gray-400" />}
           >
                 {isAdvisor && !isEditing ? (
@@ -426,6 +435,7 @@ const ScheduleModals = ({
             value={formData.FarmID}
             onChange={handleFormChange}
             icon={<Building size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           >
             <option value="">Select Farm</option>
             {farms.map(f => {
@@ -441,6 +451,7 @@ const ScheduleModals = ({
             value={formData.ProposedDate}
             onChange={handleFormChange}
             icon={<Calendar size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           />
           <SelectField 
             label="Farm Type"
@@ -448,6 +459,7 @@ const ScheduleModals = ({
             value={formData.FarmType} 
             onChange={handleFormChange}
             icon={<Building size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           >
             <option value="">Select Farm Type</option>
             {farmTypesList && farmTypesList.length > 0 ? (
@@ -469,6 +481,7 @@ const ScheduleModals = ({
             value={formData.ManagerID}
             onChange={handleFormChange}
             icon={<User size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           >
             <option value="">Select Manager</option>
             {(managers && managers.length ? managers : employees).map(m => {
@@ -484,6 +497,7 @@ const ScheduleModals = ({
             onChange={handleFormChange}
             placeholder="Optional reference id"
             icon={<Building size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           />
           <SelectField
             label="Visit Frequency"
@@ -491,6 +505,7 @@ const ScheduleModals = ({
             value={formData.VisitFrequency}
             onChange={handleFormChange}
             icon={<Clock4 size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           >
             <option value="">Select Frequency</option>
             {visitFrequencies && visitFrequencies.length > 0 ? (
@@ -518,6 +533,7 @@ const ScheduleModals = ({
             value={formData.NextFollowUpDate}
             onChange={handleFormChange}
             icon={<Calendar size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           />
           <TextAreaField
             label="Follow-up Note"
@@ -526,6 +542,7 @@ const ScheduleModals = ({
             onChange={handleFormChange}
             placeholder="Notes for next follow-up"
             icon={<StickyNote size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           />
           <SelectField 
             label="Visit Purpose"
@@ -533,6 +550,7 @@ const ScheduleModals = ({
             value={formData.VisitPurpose}
             onChange={handleFormChange}
             icon={<Clipboard size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           >
             <option value="">Select Purpose</option>
             {visitTypes && visitTypes.length > 0 ? (
@@ -559,6 +577,7 @@ const ScheduleModals = ({
             placeholder="e.g., 2" 
             type="number"
             icon={<Clock4 size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           />
           <SelectField 
             label="Assign To"
@@ -566,6 +585,7 @@ const ScheduleModals = ({
             value={formData.AssignTo} 
             onChange={handleFormChange}
             icon={<User size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           >
             <option value="">Assign To</option>
             {advisors.map(e => {
@@ -581,6 +601,7 @@ const ScheduleModals = ({
             onChange={handleFormChange} 
             placeholder="Additional notes..." 
             icon={<StickyNote size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           />
           <div className="md:col-span-2 flex items-center">
             <CheckboxField 
@@ -588,6 +609,7 @@ const ScheduleModals = ({
                 checked={formData.IsUrgent} 
                 onChange={handleFormChange} 
                 label="This is an urgent visit" 
+                readOnly={isScheduleReadOnly}
             />
             <AlertTriangle size={16} className="text-yellow-500 ml-2" />
           </div>
@@ -596,8 +618,8 @@ const ScheduleModals = ({
           <ActionButton onClick={() => closeModal('schedule')} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Cancel</ActionButton>
           <ActionButton
             onClick={isEditing ? (typeof onUpdate === 'function' ? onUpdate : onSave) : onSave}
-            className={`${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-            disabled={!isEditing && createLocked}
+            className={`${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} ${isScheduleReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={isScheduleReadOnly || (!isEditing && createLocked)}
           >
             {isEditing ? 'Update Schedule' : (createLocked ? 'Creating...' : 'Save Schedule')}
           </ActionButton>

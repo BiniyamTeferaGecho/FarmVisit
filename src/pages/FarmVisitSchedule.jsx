@@ -1122,74 +1122,15 @@ const FarmVisitSchedule = () => {
               })();
             }}
             onView={(schedule) => {
-              (async () => {
-                const id = schedule.id ?? schedule.ScheduleID ?? schedule.ScheduleID;
-                try {
-                  const payload = await api.getFilledFormByScheduleId(dispatch, id, auth.fetchWithAuth);
-                  console.debug('onView: fetched filled form payload', { id, payload });
-                  let normalized = extractFillForm(payload);
-                  let serverSchedule = normalized.schedule || payload?.schedule || schedule;
-                  let form = normalized.form || {};
-                  // Fallback: if filled-form endpoint returned no form, try dairy-specific route
-                  if ((!form || Object.keys(form).length === 0) && serverSchedule && (serverSchedule.FarmType || serverSchedule.FarmTypeCode || '').toString().toUpperCase() === 'DAIRY') {
-                    try {
-                      const alt = await auth.fetchWithAuth({ url: `/dairy-farm/by-schedule/${encodeURIComponent(id)}`, method: 'GET' });
-                      const altBody = alt?.data?.data || alt?.data || alt;
-                      // altBody may be an array or object; pick first record if array
-                      const altForm = Array.isArray(altBody) ? (altBody[0] || null) : (altBody || null);
-                      if (altForm) {
-                        form = altForm;
-                        // some dairy route returns joined schedule fields; ensure schedule is set
-                        serverSchedule = serverSchedule || (altForm.ScheduleID ? { ScheduleID: altForm.ScheduleID } : schedule);
-                        console.debug('onView: dairy fallback populated form from /dairy-farm/by-schedule', { id, altForm });
-                      }
-                    } catch (altErr) {
-                      console.debug('onView: dairy fallback failed', altErr);
-                    }
-                    // update normalized shape after fallback
-                    normalized = { schedule: serverSchedule, form };
-                  }
-                  // If still no form and schedule indicates Layer, try layer-specific unified filled-form endpoint
-                  if ((!form || Object.keys(form).length === 0) && serverSchedule && (serverSchedule.FarmType || serverSchedule.FarmTypeCode || '').toString().toUpperCase() === 'LAYER') {
-                    try {
-                      const altPayload = await api.getLayerFilledFormByScheduleId(dispatch, id, auth.fetchWithAuth).catch(() => null);
-                      let altBody = altPayload || null;
-                      if (altBody && altBody.data) altBody = altBody.data;
-                      // altBody may be array, an object with { schedule, form, layerForm }, or a raw row
-                      let altForm = null;
-                      if (Array.isArray(altBody)) altForm = altBody[0] || null;
-                      else if (altBody && (altBody.layerForm || altBody.form)) altForm = altBody.layerForm || altBody.form;
-                      else altForm = altBody || null;
-
-                      if (altForm) {
-                        form = altForm;
-                        serverSchedule = serverSchedule || (altBody && altBody.schedule ? altBody.schedule : (altForm.ScheduleID ? { ScheduleID: altForm.ScheduleID } : schedule));
-                        console.debug('onView: layer fallback populated form from /layer-farm/filled-form', { id, altForm });
-                      }
-                    } catch (altErr) {
-                      console.debug('onView: layer fallback failed', altErr);
-                    }
-                    normalized = { schedule: serverSchedule, form };
-                  }
-                  const farmType = (serverSchedule?.FarmType || serverSchedule?.FarmTypeCode || '').toString().toUpperCase();
-                  const fillData = farmType === 'LAYER' ? { layerForm: form, dairyForm: {} } : { layerForm: {}, dairyForm: form };
-                  // Update local state first so parent prop is ready when modal mounts
-                  setLocalFillData(fillData);
-                  dispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: fillData });
-                  dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: serverSchedule });
-                  setIsFillReadOnly(true);
-                  openModal('fillVisit', serverSchedule);
-                } catch (err) {
-                  // If fetching filled form fails, still open modal in read-only with schedule data
-                  console.warn('View: failed to fetch filled form, opening readonly modal with schedule data', err);
-                  const fillData = { layerForm: {}, dairyForm: {} };
-                  setLocalFillData(fillData);
-                  dispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: fillData });
-                  dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
-                  setIsFillReadOnly(true);
-                  openModal('fillVisit', schedule);
-                }
-              })();
+              // Open the Visit Schedule modal in read-only mode with the selected schedule's data
+              try {
+                dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
+                // mark schedule modal as read-only before opening
+                dispatch({ type: 'SET_SCHEDULE_READ_ONLY', payload: true });
+                openModal('schedule', schedule);
+              } catch (err) {
+                console.warn('onView: failed to open schedule modal', err);
+              }
             }}
             onComplete={(schedule) => {
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
