@@ -757,7 +757,7 @@ export default function DairyFarm() {
               <th className="px-4 py-3">#</th>
               <th className="px-4 py-3">Visit Code</th>
               <th className="px-4 py-3">Farm</th>
-              <th className="px-4 py-3">City / Zone</th>
+              <th className="px-4 py-3">Location</th>
               <th className="px-4 py-3">Advisor</th>
               <th className="px-4 py-3">Avg Milk (L/day)</th>
               <th className="px-4 py-3">Total Milk (L/day)</th>
