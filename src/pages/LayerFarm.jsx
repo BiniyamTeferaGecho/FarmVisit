@@ -5,7 +5,7 @@ import Modal from '../components/Modal'
 import LayerFarmVisitForm from '../components/schedule/LayerFarmVisitForm'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Plus, RefreshCw, Edit, Trash2, Check } from 'lucide-react'
+import { Plus, RefreshCw, Edit, Trash2, Check, Eye } from 'lucide-react'
 
 
 export default function LayerFarm() {
@@ -34,6 +34,7 @@ export default function LayerFarm() {
   const [loadingVisits, setLoadingVisits] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [viewMode, setViewMode] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [showDelete, setShowDelete] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -542,12 +543,32 @@ export default function LayerFarm() {
       if (d) {
         setForm(d)
         setEditingId(layerVisitId)
+        setViewMode(false)
         setShowModal(true)
       } else {
         setMessage({ type: 'error', text: 'Could not load visit for editing' })
       }
     } catch (err) {
       console.error('load visit error', err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to load visit' })
+    } finally { setLoadingVisits(false) }
+  }
+
+  const handleView = async (layerVisitId) => {
+    setLoadingVisits(true); setMessage(null)
+    try {
+      const res = await fetchWithAuth({ url: `/layer-farm/${layerVisitId}`, method: 'get' })
+      const d = res.data?.data || res.data || null
+      if (d) {
+        setForm(d)
+        setEditingId(layerVisitId)
+        setViewMode(true)
+        setShowModal(true)
+      } else {
+        setMessage({ type: 'error', text: 'Could not load visit for viewing' })
+      }
+    } catch (err) {
+      console.error('load visit for view error', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to load visit' })
     } finally { setLoadingVisits(false) }
   }
@@ -819,6 +840,7 @@ export default function LayerFarm() {
                             <button onClick={() => !isCompleted && triggerCompleteConfirm(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'}`} aria-disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} title="Complete Visit">
                               {completingId === (v.LayerVisitID || v.LayerVisitId || v.id) ? <SmallSpinner /> : <Check size={16} />}
                             </button>
+                            <button onClick={() => handleView(v.LayerVisitID || v.LayerVisitId || v.id)} className="p-2 text-gray-500 rounded-full hover:text-sky-600 hover:bg-gray-200" title="View Visit"><Eye size={16} /></button>
                             <button onClick={() => !isCompleted && handleEdit(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
                             <button onClick={() => !isCompleted && handleDelete(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                           </>
@@ -835,13 +857,14 @@ export default function LayerFarm() {
         {/* Inline form moved to modal - new visit is created via popup */}
       </div>
 
-      <Modal open={showModal} onClose={() => { setShowModal(false); setEditingId(null); resetForm() }} title={editingId ? 'Edit Layer Farm Visit' : 'New Layer Farm Visit'}>
+      <Modal open={showModal} onClose={() => { setShowModal(false); setEditingId(null); setViewMode(false); resetForm() }} title={viewMode ? 'View Layer Farm Visit' : (editingId ? 'Edit Layer Farm Visit' : 'New Layer Farm Visit')}>
         <LayerFarmVisitForm
           form={form}
           onChange={(newData) => setForm(newData)}
           onSave={() => handleSubmit()}
-          onCancel={() => { setShowModal(false); setEditingId(null); resetForm() }}
+          onCancel={() => { setShowModal(false); setEditingId(null); setViewMode(false); resetForm() }}
           loading={saving}
+          readOnly={viewMode}
         />
       </Modal>
 

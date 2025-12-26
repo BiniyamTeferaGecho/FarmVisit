@@ -5,7 +5,7 @@ import Modal from '../components/Modal'
 import DairyFarmVisitForm from '../components/schedule/DairyFarmVisitForm'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Plus, RefreshCw, Edit, Trash2, Check } from 'lucide-react'
+import { Plus, RefreshCw, Edit, Trash2, Check, Eye } from 'lucide-react'
 
 const initialForm = {
   DairyFarmVisitId: '',
@@ -94,6 +94,7 @@ export default function DairyFarm() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(initialForm)
+  const [viewMode, setViewMode] = useState(false)
 
   const [showDelete, setShowDelete] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -369,8 +370,6 @@ export default function DairyFarm() {
           } catch (e) { /* ignore */ }
         }
       } else {
-        saveRes = await fetchWithAuth({ url: '/dairy-farm', method: 'post', data: payload })
-        // Backend returns 201 and the newly created visit row; surface DB validation messages for 400
         const created = saveRes?.data?.data || saveRes?.data || null
         if (created) {
           const newId = created.DairyFarmVisitId || created.DairyFarmVisitID || created.id || null
@@ -468,6 +467,26 @@ export default function DairyFarm() {
         setMessage({ type: 'error', text: err.response?.data?.message || err.message || 'Save failed' })
       }
     }
+  }
+
+  const handleView = async (id) => {
+    if (!id) return
+    setLoading(true); setMessage(null)
+    try {
+      const res = await fetchWithAuth({ url: `/dairy-farm/${id}`, method: 'get' })
+      const d = res?.data?.data || res?.data || null
+      if (d) {
+        setForm(d)
+        setEditingId(id)
+        setViewMode(true)
+        setShowForm(true)
+      } else {
+        setMessage({ type: 'error', text: 'Could not load visit for viewing' })
+      }
+    } catch (err) {
+      console.error('openView error', err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to load visit' })
+    } finally { setLoading(false) }
   }
 
   const confirmDelete = (it) => { setDeleteTarget(it); setShowDelete(true) }
@@ -846,13 +865,14 @@ export default function DairyFarm() {
         </table>
       </div>
 
-      <Modal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); setForm(initialForm); }} title={editingId ? 'Edit Dairy Visit' : 'New Dairy Visit'}>
+      <Modal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); setViewMode(false); setForm(initialForm); }} title={viewMode ? 'View Dairy Visit' : (editingId ? 'Edit Dairy Visit' : 'New Dairy Visit')}>
         <DairyFarmVisitForm
           form={form}
           onChange={(newData) => setForm(newData)}
           onSave={() => { handleSubmit(); }}
-          onCancel={() => { setShowForm(false); setEditingId(null); setForm(initialForm); }}
+          onCancel={() => { setShowForm(false); setEditingId(null); setViewMode(false); setForm(initialForm); }}
           loading={loading}
+          readOnly={viewMode}
         />
       </Modal>
 
