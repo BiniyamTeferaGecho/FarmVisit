@@ -271,6 +271,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     setImagePreviews(urls);
   };
 
+  // Load lookup-driven dropdown options once when the form mounts.
   useEffect(() => {
     let mounted = true
 
@@ -332,9 +333,6 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         if (mounted) setBreedLoading(false)
       }
     }
-
-    loadBreeds()
-    
     const loadFeeders = async () => {
       try {
         setFeederLoading(true)
@@ -384,9 +382,6 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         if (mounted) setFeederLoading(false)
       }
     }
-
-    loadFeeders()
-
     const loadDrinkers = async () => {
       try {
         setDrinkerLoading(true)
@@ -436,9 +431,6 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         if (mounted) setDrinkerLoading(false)
       }
     }
-
-    loadDrinkers()
-
     const loadVentilation = async () => {
       try {
         setVentilationLoading(true)
@@ -488,9 +480,6 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         if (mounted) setVentilationLoading(false)
       }
     }
-
-    loadVentilation()
-
     const loadLitter = async () => {
       try {
         setLitterLoading(true)
@@ -540,9 +529,6 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         if (mounted) setLitterLoading(false)
       }
     }
-
-    loadLitter()
-
     const loadSources = async () => {
       try {
         setSourceLoading(true)
@@ -592,9 +578,21 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         if (mounted) setSourceLoading(false)
       }
     }
+    // Trigger initial loads in parallel
+    loadBreeds();
+    loadFeeders();
+    loadDrinkers();
+    loadVentilation();
+    loadLitter();
+    loadSources();
 
-    loadSources()
+    return () => { mounted = false }
+  }, []);
 
+  // Separate effect: respond to incoming `data` changes for image previews and
+  // location read-only state. This runs when `data` or `readOnly` change, but
+  // it does NOT re-fetch lookup dropdowns.
+  useEffect(() => {
     // If initial/updated data contains string URLs, show them.
     if (Array.isArray(data.AnyRelatedEvidenceImage) && data.AnyRelatedEvidenceImage.length > 0) {
       const arr = data.AnyRelatedEvidenceImage.map((it) => (it instanceof File ? URL.createObjectURL(it) : String(it)));
@@ -619,12 +617,11 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     }
 
     return () => {
-      mounted = false
       // cleanup created blob urls
       createdBlobUrlsRef.current.forEach((u) => { try { URL.revokeObjectURL(u); } catch {} });
       createdBlobUrlsRef.current = [];
     };
-  }, [data, readOnly, fetchWithAuth]);
+  }, [data, readOnly]);
 
   const handleGetLocation = () => {
     if (readOnly) return;
