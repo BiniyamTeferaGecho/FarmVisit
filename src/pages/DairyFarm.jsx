@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import Modal from '../components/Modal'
 import DairyFarmVisitForm from '../components/schedule/DairyFarmVisitForm'
+import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Plus, RefreshCw, Edit, Trash2, Check, Eye } from 'lucide-react'
@@ -95,6 +96,20 @@ export default function DairyFarm() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [viewMode, setViewMode] = useState(false)
+  const [showPrintPreview, setShowPrintPreview] = useState(false)
+  const [printData, setPrintData] = useState(null)
+
+  const buildEntriesFromForm = (f) => {
+    if (!f) return []
+    const keys = ['LactationCows','AvgMilkProductionPerDayPerCow','TotalMilkPerDay','FeedingSystem','RecommendationorAdvice']
+    return keys.map(k => ({ [k]: f[k] ?? f[k.toLowerCase()] ?? '' }))
+  }
+
+  const handlePrint = (data) => {
+    const payload = data || form || {}
+    setPrintData({ ...payload })
+    setShowPrintPreview(true)
+  }
 
   const [showDelete, setShowDelete] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -867,6 +882,9 @@ export default function DairyFarm() {
       </div>
 
       <Modal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); setViewMode(false); setForm(initialForm); }} title={viewMode ? 'View Dairy Visit' : (editingId ? 'Edit Dairy Visit' : 'New Dairy Visit')}>
+        <div className="flex justify-end mb-3 gap-2 print:hidden">
+          <button onClick={() => handlePrint(form)} className="px-3 py-1 bg-indigo-600 text-white rounded-md">Print</button>
+        </div>
         <DairyFarmVisitForm
           form={form}
           onChange={(newData) => setForm(newData)}
@@ -876,6 +894,19 @@ export default function DairyFarm() {
           readOnly={viewMode}
         />
       </Modal>
+
+      {showPrintPreview && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded shadow-lg max-h-[95vh] overflow-auto">
+            <VisitPrintPreview
+              visit={printData}
+              entries={buildEntriesFromForm(printData)}
+              type="Dairy"
+              onClose={() => setShowPrintPreview(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <ConfirmModal open={showDelete} title="Confirm Deletion" onCancel={() => setShowDelete(false)} onConfirm={doDelete}>
         <p className="text-gray-600">Are you sure you want to delete this dairy visit?</p>

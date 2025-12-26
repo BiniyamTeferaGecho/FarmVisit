@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import Modal from '../components/Modal'
 import LayerFarmVisitForm from '../components/schedule/LayerFarmVisitForm'
+import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Plus, RefreshCw, Edit, Trash2, Check, Eye } from 'lucide-react'
@@ -35,6 +36,8 @@ export default function LayerFarm() {
   const [editingId, setEditingId] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [viewMode, setViewMode] = useState(false)
+  const [showPrintPreview, setShowPrintPreview] = useState(false)
+  const [printData, setPrintData] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [showDelete, setShowDelete] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -51,6 +54,21 @@ export default function LayerFarm() {
   )
 
   const resetForm = () => setForm(initialForm)
+
+  const buildEntriesFromForm = (f) => {
+    if (!f) return []
+    // Select a concise set of fields to show in the structured table
+    const keys = [
+      'Breed','FlockSize','AgeInWeeks','FeedIntakePerChickenGm','AverageBodyWeightKG','MortalityTotal','RecommendationAdvice'
+    ]
+    return keys.map(k => ({ [k]: f[k] ?? f[k.toLowerCase()] ?? '' }))
+  }
+
+  const handlePrint = (data) => {
+    const payload = data || form || {}
+    setPrintData({ ...payload })
+    setShowPrintPreview(true)
+  }
 
   const handleSubmit = async (e) => {
     e && e.preventDefault()
@@ -858,6 +876,10 @@ export default function LayerFarm() {
       </div>
 
       <Modal open={showModal} onClose={() => { setShowModal(false); setEditingId(null); setViewMode(false); resetForm() }} title={viewMode ? 'View Layer Farm Visit' : (editingId ? 'Edit Layer Farm Visit' : 'New Layer Farm Visit')}>
+        {/* Print control (hidden when printing) */}
+        <div className="flex justify-end mb-3 gap-2 print:hidden">
+          <button onClick={() => handlePrint(form)} className="px-3 py-1 bg-indigo-600 text-white rounded-md">Print</button>
+        </div>
         <LayerFarmVisitForm
           form={form}
           onChange={(newData) => setForm(newData)}
@@ -867,6 +889,20 @@ export default function LayerFarm() {
           readOnly={viewMode}
         />
       </Modal>
+
+      {/* Full-screen preview overlay */}
+      {showPrintPreview && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded shadow-lg max-h-[95vh] overflow-auto">
+            <VisitPrintPreview
+              visit={printData}
+              entries={buildEntriesFromForm(printData)}
+              type="Layer"
+              onClose={() => setShowPrintPreview(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <ConfirmModal open={showDelete} title="Confirm Deletion" onCancel={() => setShowDelete(false)} onConfirm={doDelete}>
         <p className="text-gray-600">Are you sure you want to delete this layer farm visit?</p>
