@@ -1092,9 +1092,28 @@ const FarmVisitSchedule = () => {
                 try {
                   const payload = await api.getFilledFormByScheduleId(dispatch, id, auth.fetchWithAuth);
                   console.debug('onView: fetched filled form payload', { id, payload });
-                  const normalized = extractFillForm(payload);
-                  const serverSchedule = normalized.schedule || payload?.schedule || schedule;
-                  const form = normalized.form || {};
+                  let normalized = extractFillForm(payload);
+                  let serverSchedule = normalized.schedule || payload?.schedule || schedule;
+                  let form = normalized.form || {};
+                  // Fallback: if filled-form endpoint returned no form, try dairy-specific route
+                  if ((!form || Object.keys(form).length === 0) && serverSchedule && (serverSchedule.FarmType || serverSchedule.FarmTypeCode || '').toString().toUpperCase() === 'DAIRY') {
+                    try {
+                      const alt = await auth.fetchWithAuth({ url: `/dairy-farm/by-schedule/${encodeURIComponent(id)}`, method: 'GET' });
+                      const altBody = alt?.data?.data || alt?.data || alt;
+                      // altBody may be an array or object; pick first record if array
+                      const altForm = Array.isArray(altBody) ? (altBody[0] || null) : (altBody || null);
+                      if (altForm) {
+                        form = altForm;
+                        // some dairy route returns joined schedule fields; ensure schedule is set
+                        serverSchedule = serverSchedule || (altForm.ScheduleID ? { ScheduleID: altForm.ScheduleID } : schedule);
+                        console.debug('onView: dairy fallback populated form from /dairy-farm/by-schedule', { id, altForm });
+                      }
+                    } catch (altErr) {
+                      console.debug('onView: dairy fallback failed', altErr);
+                    }
+                    // update normalized shape after fallback
+                    normalized = { schedule: serverSchedule, form };
+                  }
                   const farmType = (serverSchedule?.FarmType || serverSchedule?.FarmTypeCode || '').toString().toUpperCase();
                   const fillData = farmType === 'LAYER' ? { layerForm: form, dairyForm: {} } : { layerForm: {}, dairyForm: form };
                   // Update local state first so parent prop is ready when modal mounts
