@@ -131,7 +131,7 @@ const VisitPrintPreview = ({ visit = {}, schedule = null, entries = [], logo = n
                         {scheduleOtherFields.map((it,i) => (
                           <div key={i} className="flex gap-2">
                             <div className="text-gray-600 w-36">{String(it.k)}</div>
-                            <div className="text-gray-800 break-words">{it.v === null || it.v === undefined || it.v === '' ? '—' : String(it.v)}</div>
+                            <div className="text-gray-800 wrap-break-words">{it.v === null || it.v === undefined || it.v === '' ? '—' : String(it.v)}</div>
                           </div>
                         ))}
                       </div>
@@ -201,7 +201,7 @@ const VisitPrintPreview = ({ visit = {}, schedule = null, entries = [], logo = n
                     {otherFields.map((it, i) => (
                       <div key={String(i)} className="flex gap-2">
                         <div className="text-gray-600 w-40">{String(it.k)}</div>
-                        <div className="text-gray-800 break-words">{it.v === null || it.v === undefined || it.v === '' ? '—' : String(it.v)}</div>
+                        <div className="text-gray-800 wrap-break-words">{it.v === null || it.v === undefined || it.v === '' ? '—' : String(it.v)}</div>
                       </div>
                     ))}
                   </div>
@@ -228,15 +228,15 @@ const VisitPrintPreview = ({ visit = {}, schedule = null, entries = [], logo = n
                           const keys = Object.keys(row);
                           return keys.map((k, i) => (
                             <tr key={`${idx}-${i}`} className="align-top no-break" role="row">
-                              <td className="px-4 py-3 text-gray-700 align-top break-words" role="cell">{k}</td>
-                                <td className="px-4 py-3 text-gray-800 align-top break-words" role="cell">{String(row[k])}</td>
+                              <td className="px-4 py-3 text-gray-700 align-top wrap-break-words" role="cell">{k}</td>
+                                <td className="px-4 py-3 text-gray-800 align-top wrap-break-words" role="cell">{String(row[k])}</td>
                             </tr>
                           ));
                         }
                         return (
                           <tr key={idx} className="no-break" role="row">
                             <td className="px-4 py-3 text-gray-700" role="cell">{idx + 1}</td>
-                            <td className="px-4 py-3 text-gray-800 break-words" role="cell">{String(row)}</td>
+                            <td className="px-4 py-3 text-gray-800 wrap-break-words" role="cell">{String(row)}</td>
                           </tr>
                         );
                       })
