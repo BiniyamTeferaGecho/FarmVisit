@@ -302,20 +302,22 @@ const FarmVisitSchedule = () => {
   }, [location.search]);
 
   // Auto-open schedule modal when dashboard navigation includes
-  // `?open=edit|view|fill&scheduleId=<id>` so other pages can request the Schedule tab
+  // `?open=edit|view&scheduleId=<id>` so other pages can request the Schedule tab.
+  // NOTE: we intentionally do NOT auto-open the fill modal via `?open=fill` anymore
+  // because sidebar/menu navigation used to trigger `open=fill` and that caused
+  // the fill form to show unexpectedly. Removing `fill` prevents that behavior.
   useEffect(() => {
     try {
       const p = new URLSearchParams(location.search || window.location.search);
       const op = p.get('open');
       const sid = p.get('scheduleId') || p.get('ScheduleID') || p.get('id');
-      if ((op === 'edit' || op === 'view' || op === 'fill') && sid) {
+      if ((op === 'edit' || op === 'view') && sid) {
         (async () => {
           try {
             const res = await auth.fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(sid)}`, method: 'get' });
             const body = res?.data?.data || res?.data || res;
             const rec = Array.isArray(body) ? body[0] : (body && body.recordset ? body.recordset[0] : body);
-            if (op === 'fill') openModal('fillVisit', rec);
-            else openModal('schedule', rec);
+            openModal('schedule', rec);
           } catch (e) {
             console.warn('Failed to load schedule for open param', e);
           }
