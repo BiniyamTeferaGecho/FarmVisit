@@ -23,20 +23,27 @@ const VisitPrintPreview = ({ visit = {}, entries = [], logo = null, type = 'Farm
       <style>
         {`@media print {
             @page { size: A4; margin: 20mm }
-            body { -webkit-print-color-adjust: exact; }
+            body { -webkit-print-color-adjust: exact; color-adjust: exact; }
+            /* Prevent breaking inside important sections */
             .no-break { break-inside: avoid; page-break-inside: avoid; }
-            .page-footer { position: fixed; bottom: 0; left: 0; right: 0; }
-            .page-number:after { content: counter(page); }
-            .total-pages:after { content: counter(pages); }
+            /* Avoid breaking table rows across pages and repeat header */
+            table { border-collapse: collapse; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+            /* Page numbering (current page). Browser support for total pages varies. */
+            .page-number:before { content: counter(page); }
+            /* Ensure backgrounds and borders render in print */
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
-          /* Some browsers support counter-increment on @page; for broad compatibility
-             the page number span will be filled by browser using counter(page).
-          */`}
+          /* Hide print-only helpers on screen */
+          @media screen { .print-only { display: none; } }
+        `}
       </style>
 
       <div className="w-full flex flex-col items-center">
         {/* Controls (hidden in print) */}
-        <div className="w-full flex justify-end mb-4 gap-2 print:hidden">
+        <div className="w-full flex justify-end mb-4 gap-2 print:hidden" role="navigation" aria-label="Print controls">
           <button
             onClick={() => window.print()}
             className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none"
@@ -78,9 +85,10 @@ const VisitPrintPreview = ({ visit = {}, entries = [], logo = null, type = 'Farm
             </header>
 
             {/* Key information */}
-            <section className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 no-break">
+            <section className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 no-break" aria-labelledby="key-info-heading">
               <div className="bg-gray-50 p-4 rounded border border-gray-100">
                 <dl className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                  <h3 id="key-info-heading" className="sr-only">Key information</h3>
                   <dt className="text-gray-600">Farm Name</dt>
                   <dd className="font-medium text-gray-800">{visit.FarmName || visit.farmName || '—'}</dd>
 
@@ -108,33 +116,33 @@ const VisitPrintPreview = ({ visit = {}, entries = [], logo = null, type = 'Farm
             </section>
 
             {/* Structured table */}
-            <section className="mb-6 flex-1 no-break">
+            <section className="mb-6 flex-1 no-break" aria-label="Structured data table">
               <div className="overflow-auto border border-gray-100 rounded">
-                <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm print:text-sm">
-                  <thead className="bg-gray-50 print:bg-gray-50">
+                <table className="min-w-full table-fixed divide-y divide-gray-200 text-sm print:text-sm" role="table">
+                  <thead className="bg-gray-50 print:bg-gray-50" role="rowgroup">
                     <tr>
                       {/* Example columns: adjust according to entries shape */}
                       <th className="w-1/4 px-4 py-3 text-left font-medium text-gray-700">Item</th>
                       <th className="w-3/4 px-4 py-3 text-left font-medium text-gray-700">Value / Details</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
+                  <tbody className="bg-white divide-y divide-gray-100" role="rowgroup">
                     {entries && entries.length > 0 ? (
                       entries.map((row, idx) => {
                         // If row is an object with a single key/value, render them; otherwise stringify
                         if (typeof row === 'object' && !Array.isArray(row)) {
                           const keys = Object.keys(row);
                           return keys.map((k, i) => (
-                            <tr key={`${idx}-${i}`} className="align-top">
-                              <td className="px-4 py-3 text-gray-700 align-top wrap-break-words">{k}</td>
-                              <td className="px-4 py-3 text-gray-800 align-top wrap-break-words">{String(row[k])}</td>
+                            <tr key={`${idx}-${i}`} className="align-top no-break" role="row">
+                              <td className="px-4 py-3 text-gray-700 align-top break-words" role="cell">{k}</td>
+                              <td className="px-4 py-3 text-gray-800 align-top break-words" role="cell">{String(row[k])}</td>
                             </tr>
                           ));
                         }
                         return (
-                          <tr key={idx}>
-                            <td className="px-4 py-3 text-gray-700">{idx + 1}</td>
-                            <td className="px-4 py-3 text-gray-800">{String(row)}</td>
+                          <tr key={idx} className="no-break" role="row">
+                            <td className="px-4 py-3 text-gray-700" role="cell">{idx + 1}</td>
+                            <td className="px-4 py-3 text-gray-800 break-words" role="cell">{String(row)}</td>
                           </tr>
                         );
                       })
