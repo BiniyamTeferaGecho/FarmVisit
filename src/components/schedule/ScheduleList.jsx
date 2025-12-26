@@ -191,8 +191,8 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
             const fillDisabled = isCompleted || isVisitCompletedFlag || Boolean(recentlyFilled[id]) || Boolean(confirmedFilled[id]) ? true : !isApproved;
             const fillDisabledReason = isCompleted || isVisitCompletedFlag || Boolean(confirmedFilled[id]) ? 'Visit already completed' : (Boolean(recentlyFilled[id]) ? 'Visit saved — awaiting server confirmation' : (!isApproved ? 'Requires approved schedule' : ''));
             const isDraft = normalizedVisitStatus === 'draft' || normalizedVisitStatus === 'd';
-            const submitDisabledReason = isCompleted ? 'Schedule already completed' : (isSubmitted ? 'Already submitted for approval' : (isScheduled ? 'Visit is scheduled — cannot submit' : (!isDraft ? 'Submit allowed only when visit status is Draft' : '')));
-            const submitDisabled = !isDraft || isCompleted || isSubmitted || isScheduled || Boolean(recentlyFilled[id]) || Boolean(confirmedFilled[id]);
+            const submitDisabledReason = !isDraft ? 'Submit allowed only when visit status is Draft' : '';
+            const submitDisabled = !isDraft;
             const approveDisabledReason = aNorm === 'approved' ? 'Already approved' : (!isScheduled ? 'Approve only allowed when visit is Scheduled' : '');
             
 
