@@ -1,4 +1,5 @@
 import React from 'react';
+import AKFLogo from '../../image/AKF Logo.png';
 
 /**
  * VisitPrintPreview
@@ -12,10 +13,27 @@ import React from 'react';
  * print-focused CSS block is embedded for A4 sizing and page numbering, which
  * require small bits of CSS not expressible via Tailwind utilities alone.
  */
-const VisitPrintPreview = ({ visit = {}, entries = [], logo = null, type = 'Farm', onClose = null }) => {
+const VisitPrintPreview = ({ visit = {}, schedule = null, entries = [], logo = null, type = 'Farm', onClose = null }) => {
   const title = `${type} Schedule Report`;
   const now = new Date();
   const formattedDate = now.toLocaleString();
+
+  // build a list of visit object fields that were rendered in primary groups
+  const renderedFieldNames = [
+    'ProposedDate','proposedDate','NextFollowUpDate','nextFollowUpDate','VisitPurpose','visitPurpose','VisitFrequency','visitFrequency','Status','VisitStatus',
+    'FarmName','farmName','Farm','FarmCode','farmCode','FarmID','FarmType','farmType','Location','LocationName','AdvisorName','Advisor','ManagerName','Manager','Summary','Notes','VisitSummary'
+  ];
+  const renderedSet = new Set(renderedFieldNames.map(s => String(s).toLowerCase()));
+  const otherFields = Object.keys(visit || {}).filter(k => {
+    if (!k) return false;
+    const low = String(k).toLowerCase();
+    return !renderedSet.has(low);
+  }).map(k => ({ k, v: visit[k] }));
+
+  // schedule other fields
+  const scheduleRenderedNames = ['scheduleid','schedulecode','visitcode','advisor','advisorname','approvalstatus','visitstatus','proposeddate','planneddate','createdby','createdat','frequency','farmid','farmname'];
+  const schedRenderedSet = new Set(scheduleRenderedNames.map(s => String(s).toLowerCase()));
+  const scheduleOtherFields = schedule ? Object.keys(schedule).filter(k => { const low = String(k).toLowerCase(); return !schedRenderedSet.has(low); }).map(k => ({ k, v: schedule[k] })) : [];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 print:bg-white">
@@ -67,53 +85,129 @@ const VisitPrintPreview = ({ visit = {}, entries = [], logo = null, type = 'Farm
 
             {/* Header */}
             <header className="flex items-center justify-between mb-6 no-break">
-              <div className="flex items-start gap-4">
-                {logo ? (
-                  <img src={logo} alt="Logo" className="h-16 w-16 object-contain" />
-                ) : (
-                  <div className="h-16 w-16 bg-gray-100 flex items-center justify-center text-sm text-gray-500">Logo</div>
-                )}
+              <div className="flex items-center gap-4">
+                <img src={logo || AKFLogo} alt="AKF Logo" className="h-16 w-16 object-contain" />
                 <div>
-                  <h1 className="text-xl print:text-2xl font-semibold text-gray-900">Company / Organization Name</h1>
-                  <p className="text-sm text-gray-600 mt-1">123 Business Rd, City, Country • +1 (555) 123-4567</p>
+                  <h1 className="text-2xl print:text-3xl font-bold text-gray-900">Alema Koudijs Feed PLC</h1>
+                  <p className="text-sm text-gray-600 mt-1">Bishoftu, Ethiopia • +251 (930) 23-4567</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm text-gray-600">Document</div>
-                <div className="text-lg font-semibold text-gray-800">{title}</div>
+                <div className="text-sm text-gray-600">{title}</div>
+                <div className="text-lg font-semibold text-gray-800">{formattedDate}</div>
               </div>
             </header>
 
-            {/* Key information */}
-            <section className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 no-break" aria-labelledby="key-info-heading">
-              <div className="bg-gray-50 p-4 rounded border border-gray-100">
-                <dl className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-                  <h3 id="key-info-heading" className="sr-only">Key information</h3>
-                  <dt className="text-gray-600">Farm Name</dt>
-                  <dd className="font-medium text-gray-800">{visit.FarmName || visit.farmName || '—'}</dd>
+            {/* Grouped information: Visit Details + Farm Details */}
+            {/* Schedule Details (if present) */}
+            {schedule && (
+              <section className="mb-6 no-break">
+                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Schedule Details</h3>
+                  <dl className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                    <dt className="text-gray-600">Schedule ID</dt>
+                    <dd className="font-medium text-gray-800">{schedule.ScheduleID || schedule.id || schedule.ScheduleId || '—'}</dd>
 
-                  <dt className="text-gray-600">Advisor</dt>
-                  <dd className="font-medium text-gray-800">{visit.AdvisorName || visit.Advisor || '—'}</dd>
+                    <dt className="text-gray-600">Schedule Code</dt>
+                    <dd className="font-medium text-gray-800">{schedule.VisitCode || schedule.ScheduleCode || schedule.ScheduleNumber || '—'}</dd>
 
-                  <dt className="text-gray-600">Proposed Date</dt>
-                  <dd className="font-medium text-gray-800">{visit.ProposedDate || visit.proposedDate || '—'}</dd>
+                    <dt className="text-gray-600">Advisor</dt>
+                    <dd className="font-medium text-gray-800">{schedule.AdvisorName || schedule.Advisor || '—'}</dd>
 
-                  <dt className="text-gray-600">Farm Type</dt>
-                  <dd className="font-medium text-gray-800">{visit.FarmType || visit.farmType || '—'}</dd>
+                    <dt className="text-gray-600">Approval Status</dt>
+                    <dd className="font-medium text-gray-800">{schedule.ApprovalStatus || schedule.approvalStatus || '—'}</dd>
 
-                  <dt className="text-gray-600">Manager</dt>
-                  <dd className="font-medium text-gray-800">{visit.ManagerName || visit.Manager || '—'}</dd>
+                    <dt className="text-gray-600">Visit Status</dt>
+                    <dd className="font-medium text-gray-800">{schedule.VisitStatus || schedule.visitStatus || '—'}</dd>
 
-                  <dt className="text-gray-600">Status</dt>
-                  <dd className="font-medium text-gray-800">{visit.Status || '—'}</dd>
-                </dl>
+                    <dt className="text-gray-600">Planned Date</dt>
+                    <dd className="font-medium text-gray-800">{schedule.ProposedDate || schedule.proposedDate || schedule.PlannedDate || '—'}</dd>
+                  </dl>
+
+                  {scheduleOtherFields && scheduleOtherFields.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-xs font-medium text-gray-600 mb-2">More schedule fields</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        {scheduleOtherFields.map((it,i) => (
+                          <div key={i} className="flex gap-2">
+                            <div className="text-gray-600 w-36">{String(it.k)}</div>
+                            <div className="text-gray-800 break-words">{it.v === null || it.v === undefined || it.v === '' ? '—' : String(it.v)}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+            <section className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 no-break" aria-labelledby="visit-groups">
+              <div className="col-span-2 grid grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Visit Details</h3>
+                  <dl className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                    <dt className="text-gray-600">Proposed Date</dt>
+                    <dd className="font-medium text-gray-800">{visit.ProposedDate || visit.proposedDate || '—'}</dd>
+
+                    <dt className="text-gray-600">Next Follow-up</dt>
+                    <dd className="font-medium text-gray-800">{visit.NextFollowUpDate || visit.nextFollowUpDate || '—'}</dd>
+
+                    <dt className="text-gray-600">Visit Purpose</dt>
+                    <dd className="font-medium text-gray-800">{visit.VisitPurpose || visit.visitPurpose || '—'}</dd>
+
+                    <dt className="text-gray-600">Frequency</dt>
+                    <dd className="font-medium text-gray-800">{visit.VisitFrequency || visit.visitFrequency || '—'}</dd>
+
+                    <dt className="text-gray-600">Status</dt>
+                    <dd className="font-medium text-gray-800">{visit.Status || visit.VisitStatus || '—'}</dd>
+                  </dl>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Farm Details</h3>
+                  <dl className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
+                    <dt className="text-gray-600">Farm Name</dt>
+                    <dd className="font-medium text-gray-800">{visit.FarmName || visit.farmName || visit.Farm || '—'}</dd>
+
+                    <dt className="text-gray-600">Farm Code</dt>
+                    <dd className="font-medium text-gray-800">{visit.FarmCode || visit.farmCode || visit.FarmID || '—'}</dd>
+
+                    <dt className="text-gray-600">Farm Type</dt>
+                    <dd className="font-medium text-gray-800">{visit.FarmType || visit.farmType || '—'}</dd>
+
+                    <dt className="text-gray-600">Location</dt>
+                    <dd className="font-medium text-gray-800">{visit.Location || visit.LocationName || '—'}</dd>
+
+                    <dt className="text-gray-600">Advisor</dt>
+                    <dd className="font-medium text-gray-800">{visit.AdvisorName || visit.Advisor || '—'}</dd>
+
+                    <dt className="text-gray-600">Manager</dt>
+                    <dd className="font-medium text-gray-800">{visit.ManagerName || visit.Manager || '—'}</dd>
+                  </dl>
+                </div>
               </div>
 
-              <div className="bg-white p-4 rounded border border-gray-100">
-                <h2 className="text-sm font-medium text-gray-700 mb-2">Summary</h2>
-                <p className="text-sm text-gray-700">{visit.Summary || visit.Notes || 'No additional notes provided.'}</p>
+              <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Summary & Notes</h3>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{visit.Summary || visit.Notes || visit.VisitSummary || 'No additional notes provided.'}</p>
               </div>
             </section>
+
+            {/* Additional fields not in primary groups */}
+            {otherFields && otherFields.length > 0 && (
+              <section className="mb-6 no-break">
+                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Other Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {otherFields.map((it, i) => (
+                      <div key={String(i)} className="flex gap-2">
+                        <div className="text-gray-600 w-40">{String(it.k)}</div>
+                        <div className="text-gray-800 break-words">{it.v === null || it.v === undefined || it.v === '' ? '—' : String(it.v)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Structured table */}
             <section className="mb-6 flex-1 no-break" aria-label="Structured data table">
@@ -134,15 +228,15 @@ const VisitPrintPreview = ({ visit = {}, entries = [], logo = null, type = 'Farm
                           const keys = Object.keys(row);
                           return keys.map((k, i) => (
                             <tr key={`${idx}-${i}`} className="align-top no-break" role="row">
-                              <td className="px-4 py-3 text-gray-700 align-top wrap-break-words" role="cell">{k}</td>
-                              <td className="px-4 py-3 text-gray-800 align-top wrap-break-words" role="cell">{String(row[k])}</td>
+                              <td className="px-4 py-3 text-gray-700 align-top break-words" role="cell">{k}</td>
+                                <td className="px-4 py-3 text-gray-800 align-top break-words" role="cell">{String(row[k])}</td>
                             </tr>
                           ));
                         }
                         return (
                           <tr key={idx} className="no-break" role="row">
                             <td className="px-4 py-3 text-gray-700" role="cell">{idx + 1}</td>
-                            <td className="px-4 py-3 text-gray-800 wrap-break-words" role="cell">{String(row)}</td>
+                            <td className="px-4 py-3 text-gray-800 break-words" role="cell">{String(row)}</td>
                           </tr>
                         );
                       })

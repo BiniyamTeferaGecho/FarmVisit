@@ -64,9 +64,28 @@ export default function LayerFarm() {
     return keys.map(k => ({ [k]: f[k] ?? f[k.toLowerCase()] ?? '' }))
   }
 
-  const handlePrint = (data) => {
+  const handlePrint = async (data) => {
     const payload = data || form || {}
-    setPrintData({ ...payload })
+    let schedule = null
+    try {
+      const scheduleId = payload.ScheduleID || payload.scheduleId || payload.ScheduleId || payload.Schedule || null
+      if (scheduleId) {
+        schedule = scheduleMap[String(scheduleId)] || null
+        if (!schedule) {
+          try {
+            const res = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}`, method: 'get' })
+            schedule = res?.data?.data || res?.data || null
+            if (schedule) setScheduleMap(prev => ({ ...(prev || {}), [String(scheduleId)]: schedule }))
+          } catch (e) {
+            // ignore schedule fetch failure for printing
+          }
+        }
+      }
+    } catch (e) {
+      // ignore errors while resolving schedule
+    }
+
+    setPrintData({ ...payload, schedule })
     setShowPrintPreview(true)
   }
 
@@ -897,6 +916,7 @@ export default function LayerFarm() {
           <div className="bg-white rounded shadow-lg max-h-[95vh] overflow-auto">
             <VisitPrintPreview
               visit={printData}
+              schedule={printData?.schedule}
               entries={buildEntriesFromForm(printData)}
               type="Layer"
               onClose={() => setShowPrintPreview(false)}
