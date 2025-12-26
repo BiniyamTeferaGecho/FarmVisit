@@ -419,15 +419,7 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField label="Recent Medication Time" name="RecentMedicationTime" value={data.RecentMedicationTime} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <TextAreaField label="Issues / Complaints" name="IssuesComplaints" value={data.IssuesComplaints} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <TextAreaField label="Analysis Requested" name="AnalyzeRequested" value={data.AnalyzeRequested} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <TextAreaField label="Recommendation / Advice" name="RecommendationAdvice" value={data.RecommendationAdvice} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <TextAreaField label="Farm Advisor Conclusion" name="FarmAdvisorConclusion" value={data.FarmAdvisorConclusion} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <TextAreaField label="Feedback on AKF / Customer Feedback" name="FeedBackOnAKF" value={data.FeedBackOnAKF} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <TextAreaField label="Customer Feedback or Complaints" name="CustomerFeedbackorCompliants" value={data.CustomerFeedbackorCompliants} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-        </SectionCard>
-
-
-
-        <SectionCard title="Sampling & Evidence" icon={<Microscope className="text-teal-600" />}>
+  <SectionCard title="Sampling & Evidence" icon={<Microscope className="text-teal-600" />}>
           <div className="col-span-1 md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 text-left mb-1">Related Evidence Image</label>
             <div
@@ -465,6 +457,16 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
             </div>
           </div>
         </SectionCard>
+          
+          <TextAreaField label="Feedback on AKF / Customer Feedback" name="FeedBackOnAKF" value={data.FeedBackOnAKF} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <TextAreaField label="Customer Feedback or Complaints" name="CustomerFeedbackorCompliants" value={data.CustomerFeedbackorCompliants} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <TextAreaField label="Farm Advisor Conclusion" name="FarmAdvisorConclusion" value={data.FarmAdvisorConclusion} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <TextAreaField label="Recommendation / Advice" name="RecommendationAdvice" value={data.RecommendationAdvice} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+        </SectionCard>
+
+
+
+        
 
         {readOnly ? (
           <div className="sticky bottom-0 bg-white border-t p-4 mt-8">
