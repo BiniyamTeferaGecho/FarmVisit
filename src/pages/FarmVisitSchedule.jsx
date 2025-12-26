@@ -1081,48 +1081,11 @@ const FarmVisitSchedule = () => {
                 // Not completed: open editable modal (do not auto-start here).
                 // The visit will be started at submit-time inside `onFillVisitSave` so users can add Location first.
                 setIsFillReadOnly(false);
-                    // Attempt to fetch current user's employee name and prefill advisor fields in the fill form
-                    try {
-                      const currentUser = auth.user || {};
-                      const uid = currentUser.EmployeeID || currentUser.employeeId || currentUser.UserID || currentUser.userId || currentUser.id || currentUser.sub || null;
-                      let nameObj = null;
-                      if (uid && typeof auth.fetchWithAuth === 'function') {
-                        try {
-                          const resp = await auth.fetchWithAuth({ url: `/users/${encodeURIComponent(uid)}/employee-name`, method: 'GET' });
-                          // resp may be axios-like or fetch JSON
-                          const body = resp && resp.data !== undefined ? resp.data : resp;
-                          if (body) {
-                            // body may be string or object { name: '...' }
-                            if (typeof body === 'string') nameObj = { name: body };
-                            else if (body.name || body.Name || body.fullName || body.FullName) nameObj = { name: body.name || body.Name || body.fullName || body.FullName };
-                            else if (body.data && (body.data.name || body.data.FullName)) nameObj = { name: body.data.name || body.data.FullName };
-                          }
-                        } catch (e) {
-                          console.debug('Could not fetch employee-name for current user', e);
-                          nameObj = null;
-                        }
-                      }
-
-                      // open editable modal with schedule as starting data, merge advisor info where available
-                      const merged = { ...(schedule || {}) };
-                      if (nameObj && nameObj.name) {
-                        // preferred fields: AdvisorID (id), AdvisorName
-                        merged.AdvisorID = merged.AdvisorID || uid;
-                        merged.AdvisorName = merged.AdvisorName || nameObj.name;
-                      }
-
-                      dispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: merged });
-                      setLocalFillData(merged);
-                      dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: merged });
-                      openModal('fillVisit', merged);
-                    } catch (e) {
-                      // fallback to original behavior on any error
-                      console.debug('fill modal prefill error', e);
-                      dispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: schedule });
-                      setLocalFillData(schedule);
-                      dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
-                      openModal('fillVisit', schedule);
-                    }
+                // open editable modal with schedule as starting data
+                dispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: schedule });
+                setLocalFillData(schedule);
+                dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
+                openModal('fillVisit', schedule);
               })();
             }}
             onView={(schedule) => {
@@ -1230,6 +1193,8 @@ const FarmVisitSchedule = () => {
         state={state}
         dispatch={dispatch}
         fetchWithAuth={auth.fetchWithAuth}
+        isAdvisor={auth?.user && (auth.user.roles || []).includes('ROLE_ADVISOR')}
+        currentUserId={auth?.user?.UserID || auth?.user?.userId || auth?.user?.id}
         closeModal={closeModal}
         onSave={onSave}
         onUpdate={onUpdate}

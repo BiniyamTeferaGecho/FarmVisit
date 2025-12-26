@@ -22,7 +22,7 @@ const InputField = ({ label, name, value, onChange, placeholder, type = 'text', 
   </div>
 );
 
-const SelectField = ({ label, name, value, onChange, children, icon }) => (
+const SelectField = ({ label, name, value, onChange, children, icon, disabled = false }) => (
   <div>
     <label className="text-left block text-sm font-medium text-gray-700 mb-1">{label}</label>
     <div className="relative">
@@ -31,6 +31,7 @@ const SelectField = ({ label, name, value, onChange, children, icon }) => (
         name={name}
         value={value || ''}
         onChange={onChange}
+        disabled={disabled}
         className={`w-full p-2 border rounded-md focus:ring-2 focus:ring-indigo-500 ${icon ? 'pl-10' : ''}`}
       >
         {children}
@@ -103,6 +104,9 @@ const ScheduleModals = ({
   fillVisitFormData: externalFillVisitFormData = null,
   // whether FillVisitModal should render read-only
   fillReadOnly = false,
+  // whether current user has advisor role and their id
+  isAdvisor = false,
+  currentUserId = null,
 }) => {
   const {
     showForm: isScheduleModalOpen,
@@ -205,6 +209,8 @@ const ScheduleModals = ({
 
   // Visit frequency options (loaded from lookup: "Visit Frequency")
   const [visitFrequencies, setVisitFrequencies] = useState([]);
+  // If the modal is opened by an advisor creating a schedule, we'll fetch their employee name
+  const [advisorSelfName, setAdvisorSelfName] = useState(null);
   useEffect(() => {
     let mounted = true;
     const extractItems = (body) => {
@@ -321,6 +327,70 @@ const ScheduleModals = ({
     } catch (e) { /* ignore logging errors */ }
   }, [isFillVisitModalOpen]);
 
+  // When the schedule modal opens for creation and the current user is an advisor,
+  // fetch the advisor's display name and set the AdvisorID on the form (read-only behavior).
+  useEffect(() => {
+    let mounted = true;
+    const tryPrefillAdvisor = async () => {
+      try {
+        const isOpen = isScheduleModalOpen;
+        const editing = isEditing;
+        if (!isOpen || editing) return;
+        if (!isAdvisor || !currentUserId) return;
+
+        // If AdvisorID already set in formData, leave it alone
+        if (formData && (formData.AdvisorID || formData.AdvisorId)) {
+          // still try to fetch display name for UI
+        }
+
+        // Fetch advisor name via public route: /users/:id/employee-name
+        try {
+          let res = null;
+          if (typeof fetchWithAuth === 'function') {
+            res = await fetchWithAuth({ url: `/users/${encodeURIComponent(currentUserId)}/employee-name`, method: 'GET' });
+          } else {
+            const base = window.location.origin;
+            const r = await fetch(`${base}/api/users/${encodeURIComponent(currentUserId)}/employee-name`, { credentials: 'include' });
+            if (r.ok) res = await r.json();
+          }
+          const body = res && res.data !== undefined ? res.data : res;
+          // Body may be simple string or object; handle multiple shapes
+          let name = null;
+          if (!body) name = null;
+          else if (typeof body === 'string') name = body;
+          else if (typeof body === 'object') {
+            if (body.name) name = body.name;
+            else if (body.EmployeeName) name = body.EmployeeName;
+            else if (body.employeeName) name = body.employeeName;
+            else if (body.FullName) name = body.FullName;
+            else if (body.fullName) name = body.fullName;
+            else {
+              // try to build from first/last
+              const first = body.FirstName || body.firstName || '';
+              const last = body.LastName || body.lastName || '';
+              name = `${first} ${last}`.trim() || null;
+            }
+          }
+          if (mounted) {
+            setAdvisorSelfName(name || String(currentUserId));
+            // Ensure form has AdvisorID set so validation passes
+            setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
+          }
+        } catch (err) {
+          // On error, still set AdvisorID to currentUserId so form is valid
+          if (mounted) {
+            setAdvisorSelfName(String(currentUserId));
+            setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    tryPrefillAdvisor();
+    return () => { mounted = false };
+  }, [isScheduleModalOpen, isEditing, isAdvisor, currentUserId, fetchWithAuth, formData]);
+
   return (
     <>
       <Modal open={isScheduleModalOpen} title={isEditing ? 'Edit Schedule' : 'New Schedule'} onClose={() => closeModal('schedule')}>
@@ -330,14 +400,24 @@ const ScheduleModals = ({
             name="AdvisorID"
             value={formData.AdvisorID}
             onChange={handleFormChange}
+            disabled={isAdvisor && !isEditing}
             icon={<User size={16} className="text-gray-400" />}
           >
-            <option value="">Select Advisor</option>
-            {advisors.map(e => {
-              const id = e.EmployeeID || e.EmployeeId || e.EmployeeId || e.id || e.UserID || e.UserId || e.id
-              const name = `${e.FirstName || e.firstName || ''} ${e.FatherName || e.fatherName || e.LastName || e.lastName || ''} ${e.GrandFatherName || ''}`.replace(/\s+/g, ' ').trim() || e.Name || e.name || e.fullName || e.FullName || id
-              return <option key={id} value={id}>{name}</option>
-            })}
+                {isAdvisor && !isEditing ? (
+                  <>
+                    <option value="">Select Advisor</option>
+                    <option value={currentUserId}>{advisorSelfName || 'Loading...'}</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="">Select Advisor</option>
+                    {advisors.map(e => {
+                      const id = e.EmployeeID || e.EmployeeId || e.EmployeeId || e.id || e.UserID || e.UserId || e.id
+                      const name = `${e.FirstName || e.firstName || ''} ${e.FatherName || e.fatherName || e.LastName || e.lastName || ''} ${e.GrandFatherName || ''}`.replace(/\s+/g, ' ').trim() || e.Name || e.name || e.fullName || e.FullName || id
+                      return <option key={id} value={id}>{name}</option>
+                    })}
+                  </>
+                )}
           </SelectField>
           <SelectField
             label="Farm"
