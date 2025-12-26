@@ -267,6 +267,17 @@ export const getFilledFormByScheduleId = async (dispatch, id, fetchWithAuth) => 
   }
 };
 
+export const getLayerFilledFormByScheduleId = async (dispatch, id, fetchWithAuth) => {
+  try {
+    const res = await callWithAuthOrApi(fetchWithAuth, { url: `/layer-farm/filled-form/${id}`, method: 'GET' });
+    const payload = res && res.data ? (res.data.data || res.data) : null;
+    return payload;
+  } catch (error) {
+    handleError(dispatch, error);
+    throw error;
+  }
+};
+
 export const downloadCsvTemplate = () => {
   // Use the shared axios client's baseURL for the template link
   const base = apiClient.defaults?.baseURL || '';
@@ -303,6 +314,7 @@ const api = {
   fillVisit,
   startFarmVisit,
   getFilledFormByScheduleId,
+  getLayerFilledFormByScheduleId,
   downloadCsvTemplate,
   uploadBulk,
 };

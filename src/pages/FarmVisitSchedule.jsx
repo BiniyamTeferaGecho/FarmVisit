@@ -1114,16 +1114,22 @@ const FarmVisitSchedule = () => {
                     // update normalized shape after fallback
                     normalized = { schedule: serverSchedule, form };
                   }
-                  // If still no form and schedule indicates Layer, try layer-specific route
+                  // If still no form and schedule indicates Layer, try layer-specific unified filled-form endpoint
                   if ((!form || Object.keys(form).length === 0) && serverSchedule && (serverSchedule.FarmType || serverSchedule.FarmTypeCode || '').toString().toUpperCase() === 'LAYER') {
                     try {
-                      const alt = await auth.fetchWithAuth({ url: `/layer-farm/by-schedule/${encodeURIComponent(id)}`, method: 'GET' });
-                      const altBody = alt?.data?.data || alt?.data || alt;
-                      const altForm = Array.isArray(altBody) ? (altBody[0] || null) : (altBody || null);
+                      const altPayload = await api.getLayerFilledFormByScheduleId(dispatch, id, auth.fetchWithAuth).catch(() => null);
+                      let altBody = altPayload || null;
+                      if (altBody && altBody.data) altBody = altBody.data;
+                      // altBody may be array, an object with { schedule, form, layerForm }, or a raw row
+                      let altForm = null;
+                      if (Array.isArray(altBody)) altForm = altBody[0] || null;
+                      else if (altBody && (altBody.layerForm || altBody.form)) altForm = altBody.layerForm || altBody.form;
+                      else altForm = altBody || null;
+
                       if (altForm) {
                         form = altForm;
-                        serverSchedule = serverSchedule || (altForm.ScheduleID ? { ScheduleID: altForm.ScheduleID } : schedule);
-                        console.debug('onView: layer fallback populated form from /layer-farm/by-schedule', { id, altForm });
+                        serverSchedule = serverSchedule || (altBody && altBody.schedule ? altBody.schedule : (altForm.ScheduleID ? { ScheduleID: altForm.ScheduleID } : schedule));
+                        console.debug('onView: layer fallback populated form from /layer-farm/filled-form', { id, altForm });
                       }
                     } catch (altErr) {
                       console.debug('onView: layer fallback failed', altErr);
