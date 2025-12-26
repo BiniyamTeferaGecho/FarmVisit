@@ -1114,6 +1114,22 @@ const FarmVisitSchedule = () => {
                     // update normalized shape after fallback
                     normalized = { schedule: serverSchedule, form };
                   }
+                  // If still no form and schedule indicates Layer, try layer-specific route
+                  if ((!form || Object.keys(form).length === 0) && serverSchedule && (serverSchedule.FarmType || serverSchedule.FarmTypeCode || '').toString().toUpperCase() === 'LAYER') {
+                    try {
+                      const alt = await auth.fetchWithAuth({ url: `/layer-farm/by-schedule/${encodeURIComponent(id)}`, method: 'GET' });
+                      const altBody = alt?.data?.data || alt?.data || alt;
+                      const altForm = Array.isArray(altBody) ? (altBody[0] || null) : (altBody || null);
+                      if (altForm) {
+                        form = altForm;
+                        serverSchedule = serverSchedule || (altForm.ScheduleID ? { ScheduleID: altForm.ScheduleID } : schedule);
+                        console.debug('onView: layer fallback populated form from /layer-farm/by-schedule', { id, altForm });
+                      }
+                    } catch (altErr) {
+                      console.debug('onView: layer fallback failed', altErr);
+                    }
+                    normalized = { schedule: serverSchedule, form };
+                  }
                   const farmType = (serverSchedule?.FarmType || serverSchedule?.FarmTypeCode || '').toString().toUpperCase();
                   const fillData = farmType === 'LAYER' ? { layerForm: form, dairyForm: {} } : { layerForm: {}, dairyForm: form };
                   // Update local state first so parent prop is ready when modal mounts
