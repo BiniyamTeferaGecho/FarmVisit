@@ -224,7 +224,6 @@ export default function DairyFarm() {
             FarmAdvisorConclusion: d.FarmAdvisorConclusion || '',
             CustomerFeedbackorCompliants: d.CustomerFeedbackorCompliants || d.FeedBackOnAKF || '',
             ComplainSampleTaken: !!d.ComplainSampleTaken || !!d.SampleTaken,
-            BatchNumberorProductionDate: d.BatchNumberorProductionDate || d.BatchNumber || '',
             AnyRelatedEvidenceImage: d.AnyRelatedEvidenceImage || '',
             IsVisitCompleted: !!d.IsVisitCompleted,
           })

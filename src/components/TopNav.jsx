@@ -5,7 +5,7 @@ const SettingsModal = React.lazy(() => import('../pages/settings'));
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaUserCircle, FaCog, FaSignOutAlt, FaBell, FaSearch, FaBars, FaTh } from 'react-icons/fa';
-import akfLogo from '../assets/images/AKF Logo.png';
+import akfLogo from '../assets/images/AKF-Logo.png';
 import { useAuth } from '../auth/AuthProvider';
 
 function getInitials(name, fallback) {

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import api, { getActiveApiBase } from '../utils/api'
-import reactLogo from '../assets/images/AKF Logo.png'
+import reactLogo from '../assets/images/AKF-Logo.png'
 import bgImage from '../assets/images/BackGround.jpg'
 
 export default function Login() {
