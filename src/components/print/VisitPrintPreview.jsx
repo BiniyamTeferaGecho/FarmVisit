@@ -1,5 +1,6 @@
 import React from 'react';
-import AKFLogo from '../../image/AKF Logo.png';
+// The logo lives under `src/assets/images` — use that path so the bundler can resolve it
+import AKFLogo from '../../assets/images/AKF Logo.png';
 
 /**
  * VisitPrintPreview
