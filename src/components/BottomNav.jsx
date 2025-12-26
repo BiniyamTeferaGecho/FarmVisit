@@ -51,7 +51,7 @@ export default function BottomNav() {
   }
 
   return (
-    <nav className="block lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200">
+    <nav className="block lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700">
       <div className="max-w-5xl mx-auto px-2">
         <div className="flex justify-between items-center h-14">
           {items.map((it) => {
@@ -72,7 +72,7 @@ export default function BottomNav() {
                 key={it.key}
                 onClick={() => go(it.key)}
                 aria-label={it.label}
-                className={`flex-1 flex flex-col items-center justify-center gap-0 py-1 px-2 text-xs transition-colors ${isActive ? 'text-teal-600' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex-1 flex flex-col items-center justify-center gap-0 py-1 px-2 text-xs transition-colors ${isActive ? 'text-teal-600 dark:text-teal-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}
               >
                 <Icon className="h-5 w-5" />
                 <span className="text-[10px] leading-none mt-1">{it.label}</span>
