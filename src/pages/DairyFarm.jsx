@@ -845,8 +845,9 @@ export default function DairyFarm() {
                       const isCompleted = Boolean(
                         it.IsVisitCompleted === true || it.IsVisitCompleted === 1 || String(it.IsVisitCompleted) === '1' || String(it.IsVisitCompleted).toLowerCase() === 'true'
                       );
-                      const editClass = `p-2 text-gray-500 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-indigo-600 hover:bg-gray-200'}`;
-                      const deleteClass = `p-2 text-gray-500 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-red-600 hover:bg-gray-200'}`;
+                      const deleteClass = `p-2 text-red-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-red-600'}`;
+                      // Make edit action clearly visible
+                      const editClass = `p-2 text-indigo-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-indigo-600'}`;
                       return (
                         <> 
                           <button onClick={() => !isCompleted && triggerCompleteConfirm(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted || completingId === (it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'}`} aria-disabled={isCompleted} title="Complete Visit">

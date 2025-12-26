@@ -77,7 +77,7 @@ const ActionButton = ({ onClick, icon: Icon, title, disabled = false, disabledRe
       disabled={disabled}
       aria-label={title}
       className={`p-2 rounded-md transition-colors duration-150 ${
-        disabled ? 'text-gray-400 opacity-50 cursor-not-allowed bg-transparent' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+        disabled ? 'text-gray-400 opacity-50 cursor-not-allowed bg-transparent' : 'text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
       } focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 ${className}`}
     >
       {Icon ? <Icon className="h-4 w-4" /> : null}
@@ -223,7 +223,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
                     <ActionButton onClick={() => onSubmit(schedule)} icon={ArrowUpCircle} title="Submit" disabled={submitDisabled} disabledReason={submitDisabledReason} />
                     <ActionButton onClick={() => onProcess && onProcess(schedule)} icon={Check} title="Approve" disabled={!isScheduled || String(approvalStatus || '').toLowerCase().includes('approved')} disabledReason={approveDisabledReason} className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" />
                     <ActionButton onClick={() => onFill(schedule)} icon={FilePenLine} title="Fill Visit" disabled={fillDisabled} disabledReason={fillDisabledReason} />
-                    <ActionButton onClick={() => onView && onView(schedule)} icon={File} title="View" />
+                    <ActionButton onClick={() => onView && onView(schedule)} icon={File} title="View" className="text-sky-600" />
                     
                     <ActionButton onClick={() => onDelete(schedule)} icon={Trash2} title="Delete" className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" />
                   </div>

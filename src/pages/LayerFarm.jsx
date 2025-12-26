@@ -833,14 +833,14 @@ export default function LayerFarm() {
                         const isCompleted = Boolean(
                           v.IsVisitCompleted === true || v.IsVisitCompleted === 1 || String(v.IsVisitCompleted) === '1' || String(v.IsVisitCompleted).toLowerCase() === 'true'
                         )
-                        const editClass = `p-2 text-gray-500 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-indigo-600 hover:bg-gray-200'}`
-                        const deleteClass = `p-2 text-gray-500 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-red-600 hover:bg-gray-200'}`
+                        const editClass = `p-2 text-indigo-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-indigo-600'}`
+                        const deleteClass = `p-2 text-red-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-red-600'}`
                         return (
                           <>
                             <button onClick={() => !isCompleted && triggerCompleteConfirm(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'}`} aria-disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} title="Complete Visit">
                               {completingId === (v.LayerVisitID || v.LayerVisitId || v.id) ? <SmallSpinner /> : <Check size={16} />}
                             </button>
-                            <button onClick={() => handleView(v.LayerVisitID || v.LayerVisitId || v.id)} className="p-2 text-gray-500 rounded-full hover:text-sky-600 hover:bg-gray-200" title="View Visit"><Eye size={16} /></button>
+                            <button onClick={() => handleView(v.LayerVisitID || v.LayerVisitId || v.id)} className="p-2 text-sky-600 rounded-full hover:text-white hover:bg-sky-600" title="View Visit"><Eye size={16} /></button>
                             <button onClick={() => !isCompleted && handleEdit(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
                             <button onClick={() => !isCompleted && handleDelete(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                           </>
