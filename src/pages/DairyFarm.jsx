@@ -749,7 +749,7 @@ export default function DairyFarm() {
               <th className="px-4 py-3">#</th>
               <th className="px-4 py-3">Visit Code</th>
               <th className="px-4 py-3">Farm</th>
-              <th className="px-4 py-3">Location</th>
+              <th className="px-4 py-3">City / Zone</th>
               <th className="px-4 py-3">Advisor</th>
               <th className="px-4 py-3">Avg Milk (L/day)</th>
               <th className="px-4 py-3">Total Milk (L/day)</th>
@@ -776,7 +776,10 @@ export default function DairyFarm() {
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   return sched?.FarmName || sched?.FarmCode || it.FarmName || it.FarmCode || (it.Farm && (it.Farm.FarmCode || it.Farm.FarmName || it.Farm.Name)) || ''
                 })()}</td>
-                <td className="px-4 py-3">{savedLocationMap[String(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)] || it.Location || it.FarmLocation || ''}</td>
+                <td className="px-4 py-3">{(() => {
+                  // Prefer explicit city or zone fields when available, then fall back to saved coordinate or location
+                  return it.CityTown || it.City || it.Zone || it.Wereda || savedLocationMap[String(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)] || it.Location || it.FarmLocation || ''
+                })()}</td>
                 <td className="px-4 py-3">{(() => {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
