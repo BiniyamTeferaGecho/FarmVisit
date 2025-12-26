@@ -388,7 +388,7 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
             }}
             aria-hidden={!(data && data.IsLocalMix)}
           >
-            <TextAreaField label="List of Ingredients" name="ListofIngridiant" value={data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
+            <TextAreaField label="List of Ingredients" name="ListOfHomeMixingIngridient" value={data.ListOfHomeMixingIngridient || data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
           </div>
           <div className="col-span-1 md:col-span-2">
             <CheckboxField label="Sample Collected" name="SampleCollection" checked={data.SampleCollection} onChange={handleChange} disabled={readOnly} />
@@ -479,12 +479,12 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
                 ))}
               </div>
             )}
-            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="mt-4 grid grid-cols-2 gap-4">
               <div>
                 <CheckboxField label="Sample Taken" name="SampleTaken" checked={data.SampleTaken} onChange={handleChange} disabled={readOnly} />
               </div>
               <div>
-                <InputField label="Batch Number" name="BatchNumber" value={data.BatchNumber} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+                <InputField label="Batch Number / Production Date" name="BatchNumberorProductionDate" value={data.BatchNumberorProductionDate || data.BatchNumber} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
               </div>
             </div>
           </div>
