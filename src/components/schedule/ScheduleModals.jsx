@@ -104,6 +104,7 @@ const ScheduleModals = ({
   fillVisitFormData: externalFillVisitFormData = null,
   // whether FillVisitModal should render read-only
   fillReadOnly = false,
+  createLocked = false,
   // whether current user has advisor role and their id
   isAdvisor = false,
   currentUserId = null,
@@ -593,7 +594,13 @@ const ScheduleModals = ({
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <ActionButton onClick={() => closeModal('schedule')} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Cancel</ActionButton>
-          <ActionButton onClick={isEditing ? (typeof onUpdate === 'function' ? onUpdate : onSave) : onSave} className="bg-indigo-600 hover:bg-indigo-700">{isEditing ? 'Update Schedule' : 'Save Schedule'}</ActionButton>
+          <ActionButton
+            onClick={isEditing ? (typeof onUpdate === 'function' ? onUpdate : onSave) : onSave}
+            className={`${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+            disabled={!isEditing && createLocked}
+          >
+            {isEditing ? 'Update Schedule' : (createLocked ? 'Creating...' : 'Save Schedule')}
+          </ActionButton>
         </div>
       </Modal>
 

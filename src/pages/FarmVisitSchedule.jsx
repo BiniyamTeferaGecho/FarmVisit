@@ -43,6 +43,8 @@ const FarmVisitSchedule = () => {
 
   // Initial data loading: use the AuthProvider's fetchWithAuth for authenticated calls
   const [reloadKey, setReloadKey] = useState(0);
+  const [creatingScheduleLocked, setCreatingScheduleLocked] = useState(false);
+  const creatingScheduleLockRef = React.useRef(false);
   const location = useLocation();
 
   // Helper: normalize various possible shapes returned by getFilledFormByScheduleId
@@ -228,6 +230,13 @@ const FarmVisitSchedule = () => {
   const openModal = (modalName, data = null) => {
     switch (modalName) {
       case 'schedule':
+        // If this is a create (no schedule id present), prevent duplicate opens from rapid clicks.
+        const isCreate = !data || !(data.id || data.ScheduleID || data.ScheduleId || data.ScheduleId);
+        if (isCreate) {
+          if (creatingScheduleLockRef.current) return; // ignore subsequent rapid clicks
+          creatingScheduleLockRef.current = true;
+          setCreatingScheduleLocked(true);
+        }
         dispatch({ type: 'OPEN_FORM', payload: data });
         break;
       case 'delete':
@@ -341,6 +350,9 @@ const FarmVisitSchedule = () => {
     switch (modalName) {
       case 'schedule':
         dispatch({ type: 'CLOSE_FORM' });
+        // release create lock when schedule modal is closed (canceled or after successful save)
+        creatingScheduleLockRef.current = false;
+        setCreatingScheduleLocked(false);
         break;
       case 'delete':
         dispatch({ type: 'CLOSE_DELETE_MODAL' });
@@ -988,6 +1000,7 @@ const FarmVisitSchedule = () => {
         onReset={handleReset}
         onRefresh={() => handleSearch()}
         onNew={() => openModal('schedule')}
+        newDisabled={creatingScheduleLocked}
         onShowDrafts={() => api.fetchDrafts(dispatch, auth.fetchWithAuth).then(() => dispatch({ type: 'OPEN_DRAFTS_MODAL' }))}
         onBulkUpload={() => openModal('bulkUpload')}
         onDownloadTemplate={api.downloadCsvTemplate}
@@ -1214,11 +1227,13 @@ const FarmVisitSchedule = () => {
         processData={localProcessData}
         completeData={localCompleteData}
         fillReadOnly={isFillReadOnly}
+        createLocked={creatingScheduleLocked}
       />
       {/* Mobile Floating Action Button for creating a new schedule */}
       <button
         onClick={() => openModal('schedule')}
-        className="fixed bottom-6 right-4 sm:hidden z-50 bg-teal-600 text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:bg-teal-700 transition"
+        disabled={creatingScheduleLocked}
+        className={`fixed bottom-6 right-4 sm:hidden z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition ${creatingScheduleLocked ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'}`}
         aria-label="New schedule"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

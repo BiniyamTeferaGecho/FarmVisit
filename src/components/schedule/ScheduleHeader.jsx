@@ -59,10 +59,11 @@ function useFetchStats(reloadKey) {
   return { stats };
 }
 
-const ScheduleHeader = ({
+  const ScheduleHeader = ({
   onNew, onRefresh, onClear, onReset, onShowDrafts, onBulkUpload, onDownloadTemplate,
   dateRange, onDateChange, farmType, onFarmTypeChange, onFilterChange,
   stats: parentStats, showDatePicker, onToggleDatePicker,
+  newDisabled = false,
 }) => {
   const [reloadKey, setReloadKey] = useState(0);
   const { stats: localStats } = useFetchStats(reloadKey);
@@ -115,7 +116,7 @@ const ScheduleHeader = ({
 
           {/* Right side: actions (New, Refresh) */}
           <div className="flex items-center gap-2">
-            <button onClick={handleAction(onNew)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 transition-all">
+            <button onClick={handleAction(onNew)} disabled={newDisabled} className={`flex items-center gap-2 px-4 py-2 ${newDisabled ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'} rounded-lg shadow-sm transition-all`}>
               <FaPlus /> New Schedule
             </button>
             <button onClick={handleAction(onRefresh, () => setReloadKey(k => k + 1))} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
