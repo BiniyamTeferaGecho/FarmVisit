@@ -234,8 +234,14 @@ const FarmVisitSchedule = () => {
         const isCreate = !data || !(data.id || data.ScheduleID || data.ScheduleId || data.ScheduleId);
         if (isCreate) {
           if (creatingScheduleLockRef.current) return; // ignore subsequent rapid clicks
+          // Acquire a ref lock to prevent duplicate opens, but only show the
+          // UI "creating" state while an actual submission is in-flight.
           creatingScheduleLockRef.current = true;
+          // Set the transient flag so other UI (like header button/FAB) is disabled
+          // briefly while the modal opens. Release the visible flag on next tick
+          // so the Save button remains enabled for the user to submit.
           setCreatingScheduleLocked(true);
+          setTimeout(() => setCreatingScheduleLocked(false), 50);
         }
         dispatch({ type: 'OPEN_FORM', payload: data });
         break;
@@ -453,7 +459,18 @@ const FarmVisitSchedule = () => {
         await api.updateSchedule(dispatch, payload, auth.fetchWithAuth);
       } else {
         const payload = { ...formData, CreatedBy: userEmployeeId }
-        await api.createSchedule(dispatch, payload, auth.fetchWithAuth);
+        // Mark create as in-progress so modal shows "Creating..." and other
+        // create triggers remain disabled while request is in-flight.
+        creatingScheduleLockRef.current = true;
+        setCreatingScheduleLocked(true);
+        try {
+          await api.createSchedule(dispatch, payload, auth.fetchWithAuth);
+        } catch (createErr) {
+          // Clear transient locks so user can retry after a failed request
+          creatingScheduleLockRef.current = false;
+          setCreatingScheduleLocked(false);
+          throw createErr;
+        }
       }
       // Clear any prior messages on success and close modal
       dispatch({ type: 'SET_MESSAGE', payload: null });
@@ -461,6 +478,9 @@ const FarmVisitSchedule = () => {
       handleSearch();
     } catch (err) {
       console.error('onSave error', err)
+      // Ensure any transient create locks are cleared so user can retry
+      try { creatingScheduleLockRef.current = false; } catch (e) { /* ignore */ }
+      try { setCreatingScheduleLocked(false); } catch (e) { /* ignore */ }
       dispatch({ type: 'SET_MESSAGE', payload: err?.response?.data?.message || err.message || 'Failed to save schedule' });
     }
   };
