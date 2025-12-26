@@ -8,6 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { Plus, RefreshCw, Edit, Trash2, Check } from 'lucide-react'
 
 const initialForm = {
+  DairyFarmVisitId: '',
   ScheduleID: '',
   Location: '',
   LocationCoordinate: '',
@@ -18,64 +19,67 @@ const initialForm = {
   Buls: '',
   BodyConditionLactetingCow: '',
   BodyConditionDryCow: '',
-  FeedingPerCow: '',
-  HowTheyGiveForCows: '',
-  UsesConcentrate: false,
+
+  FeedingSystem: '',
+  CompoundFeedSource: '',
   WhichCompany: '',
-  IsLocalMix: false,
+  ListOfHomeMixingIngridient: '',
   ListofIngridiant: '',
-    ListOfHomeMixingIngridient: '',
-    BatchNumberorProductionDate: '',
+  QuantityOfCommercialFeed: '',
+  QuantityOfHomeMix: '',
+  HowManyTimes: '',
+  FeedingMechanism: '',
   SampleCollection: false,
+
   HasForage: false,
   TypeOfForage: '',
   ForageAmount: '',
-  ConcentrateFeedSample: false,
-  HowManyTimes: '',
-  FeedingSystem: '',
-  CompoundFeedSource: '',
-  QuantityOfCommercialFeed: '',
-  QuantityOfHomeMix: '',
-  FeedingMechanism: '',
+  WateringSystem: '',
   AmountofWaterProvided: '',
+  IfLimitedHowMuch: '',
+
   ManureScore1: '',
   ManureScore2: '',
   ManureScore3: '',
   ManureScore4: '',
+
   Ventilation: '',
   LightIntensity: '',
   BeddingType: '',
   SpaceAvailability: '',
-  VaccinationHistory: '',
-  VaccinationType: '',
-  VaccinationTime: '',
+
   BreedingHistory: '',
   BreedingMethod: '',
-  AreTheyUsingNaturalorAI: '',
   InseminationFrequency: '',
   CalvingInterval: '',
   AgeAtFirstCalving: '',
+
   AvgMilkProductionPerDayPerCow: '',
   MaxMilkProductionPerDayPerCow: '',
   TotalMilkPerDay: '',
   MilkSupplyTo: '',
   MilkPricePerLitter: '',
-  Medication: false,
-  WhatTypeofMedication: '',
-  IssuesComplaints: '',
-  AnalyzeRequested: '',
-  RecommendationAdvice: '',
-  FarmAdvisorConclusion: '',
+
+  VaccinationType: '',
+  VaccinationTime: '',
+  RecentMedicationType: '',
+  RecentMedicationTime: '',
+
   CustomerFeedbackorCompliants: '',
   ComplainSampleTaken: false,
   BatchNumberorProductionDate: '',
+
+  AnalyzeRequested: '',
+  IssuesComplaints: '',
   AnyRelatedEvidenceImage: '',
+  FarmAdvisorConclusion: '',
+  RecommendationorAdvice: '',
+
   IsVisitCompleted: false,
 }
 
 export default function DairyFarm() {
   const { user, fetchWithAuth } = useAuth()
-  // Prefer EmployeeID when present for DB FK fields 
   const actorId = user && (user.EmployeeID || user.employeeId || user.UserID || user.userId || user.userId || user.id || user.ID)
 
   const [list, setList] = useState([])
@@ -122,7 +126,7 @@ export default function DairyFarm() {
         if (!mounted) return
         if (d) {
           setForm({
-            ScheduleID: d.ScheduleID || d.ScheduleID || ScheduleID || '',
+            ScheduleID: d.ScheduleID || '',
             Location: d.Location || d.FarmLocation || '',
             LocationCoordinate: d.LocationCoordinate || d.Location || '',
             LactationCows: d.LactationCows ?? d.LactationCows ?? '',
@@ -137,9 +141,8 @@ export default function DairyFarm() {
             UsesConcentrate: !!d.UsesConcentrate,
             WhichCompany: d.WhichCompany || '',
             IsLocalMix: !!d.IsLocalMix,
-            ListofIngridiant: d.ListofIngridiant || '',
-                        ListofIngridiant: d.ListofIngridiant || d.ListOfHomeMixingIngridient || '',
-                        ListOfHomeMixingIngridient: d.ListOfHomeMixingIngridient || d.ListofIngridiant || '',
+            ListofIngridiant: d.ListofIngridiant || d.ListOfHomeMixingIngridient || '',
+            ListOfHomeMixingIngridient: d.ListOfHomeMixingIngridient || d.ListofIngridiant || '',
             SampleCollection: !!d.SampleCollection,
             HasForage: !!d.HasForage,
             TypeOfForage: d.TypeOfForage || '',
@@ -173,8 +176,6 @@ export default function DairyFarm() {
             SampleTaken: !!d.SampleTaken,
             BatchNumber: d.BatchNumber || '',
                         BatchNumberorProductionDate: d.BatchNumberorProductionDate || d.BatchNumber || '',
-              ListofIngridiant: form.ListofIngridiant || form.ListOfHomeMixingIngridient || null,
-              ListOfHomeMixingIngridient: form.ListOfHomeMixingIngridient || form.ListofIngridiant || null,
             AvgMilkProductionPerDayPerCow: d.AvgMilkProductionPerDayPerCow ?? d.AvgMilkProductionPerDay ?? '',
             MaxMilkProductionPerDayPerCow: d.MaxMilkProductionPerDayPerCow ?? d.MaxMilkProductionPerCow ?? '',
             TotalMilkPerDay: d.TotalMilkPerDay ?? '',
@@ -264,7 +265,7 @@ export default function DairyFarm() {
         FeedingSystem: form.FeedingSystem || null,
         CompoundFeedSource: form.CompoundFeedSource || null,
         WhichCompany: form.WhichCompany || null,
-        ListOfHomeMixingIngridient: form.ListofIngridiant || null,
+        ListOfHomeMixingIngridient: form.ListOfHomeMixingIngridient || form.ListofIngridiant || null,
         QuantityOfCommercialFeed: form.QuantityOfCommercialFeed ? Number(form.QuantityOfCommercialFeed) : null,
         QuantityOfHomeMix: form.QuantityOfHomeMix ? Number(form.QuantityOfHomeMix) : null,
         HowManyTimes: form.HowManyTimes || null,

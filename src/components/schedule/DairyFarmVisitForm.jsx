@@ -354,51 +354,27 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField label="Bulls" name="Buls" type="number" value={data.Buls} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.Buls} />
           <InputField label="Body Condition (Lactating cows)" name="BodyConditionLactetingCow" type="number" step="0.1" value={data.BodyConditionLactetingCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.BodyConditionLactetingCow} />
           <InputField label="Body Condition (Dry cows)" name="BodyConditionDryCow" type="number" step="0.1" value={data.BodyConditionDryCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.BodyConditionDryCow} />
-          <InputField label="Feeding Per Cow" name="FeedingPerCow" value={data.FeedingPerCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="How They Give For Cows" name="HowTheyGiveForCows" value={data.HowTheyGiveForCows || data.HowTheyGiveForCos} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
 
+          {/* Feeding and feed source fields - always visible and ordered */}
+          <InputField label="Feeding System" name="FeedingSystem" value={data.FeedingSystem} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Compound Feed Source" name="CompoundFeedSource" value={data.CompoundFeedSource} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Which Company" name="WhichCompany" value={data.WhichCompany} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <TextAreaField label="List of Home Mixing Ingredient" name="ListOfHomeMixingIngridient" value={data.ListOfHomeMixingIngridient || data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Quantity of Commercial Feed" name="QuantityOfCommercialFeed" type="number" value={data.QuantityOfCommercialFeed} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Quantity of Home Mix" name="QuantityOfHomeMix" type="number" value={data.QuantityOfHomeMix} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="How Many Times (feeding)" name="HowManyTimes" value={data.HowManyTimes} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Feeding Mechanism" name="FeedingMechanism" value={data.FeedingMechanism} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
 
-        </SectionCard>
-
-        <SectionCard title="Feeding & Forage" icon={<ClipboardList className="text-green-600" />}>
-          <CheckboxField label="Uses Concentrate" name="UsesConcentrate" checked={data.UsesConcentrate} onChange={handleChange} disabled={readOnly} />
-          <div
-            className="transition-all duration-200 ease-out overflow-hidden"
-            style={{
-              maxHeight: data && data.UsesConcentrate ? '400px' : '0px',
-              opacity: data && data.UsesConcentrate ? 1 : 0,
-              paddingTop: data && data.UsesConcentrate ? '0.5rem' : '0px'
-            }}
-            aria-hidden={!(data && data.UsesConcentrate)}
-          >
-            <InputField label="Which Company" name="WhichCompany" value={data.WhichCompany} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-            <InputField label="Feeding System" name="FeedingSystem" value={data.FeedingSystem} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-            <InputField label="Compound Feed Source" name="CompoundFeedSource" value={data.CompoundFeedSource} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-            <InputField label="Quantity of Commercial Feed" name="QuantityOfCommercialFeed" type="number" value={data.QuantityOfCommercialFeed} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-            <InputField label="Quantity of Home Mix" name="QuantityOfHomeMix" type="number" value={data.QuantityOfHomeMix} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-            <InputField label="Feeding Mechanism" name="FeedingMechanism" value={data.FeedingMechanism} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          </div>
-          <CheckboxField label="Is Local Mix" name="IsLocalMix" checked={data.IsLocalMix} onChange={handleChange} disabled={readOnly} />
-          <div
-            className="col-span-1 md:col-span-2 transition-all duration-200 ease-out overflow-hidden"
-            style={{
-              maxHeight: data && data.IsLocalMix ? '600px' : '0px',
-              opacity: data && data.IsLocalMix ? 1 : 0,
-              paddingTop: data && data.IsLocalMix ? '0.5rem' : '0px'
-            }}
-            aria-hidden={!(data && data.IsLocalMix)}
-          >
-            <TextAreaField label="List of Ingredients" name="ListOfHomeMixingIngridient" value={data.ListOfHomeMixingIngridient || data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
-          </div>
-          <div className="col-span-1 md:col-span-2">
-            <CheckboxField label="Sample Collected" name="SampleCollection" checked={data.SampleCollection} onChange={handleChange} disabled={readOnly} />
-          </div>
+          <CheckboxField label="Sample Collected" name="SampleCollection" checked={data.SampleCollection} onChange={handleChange} disabled={readOnly} />
           <CheckboxField label="Has Forage" name="HasForage" checked={data.HasForage} onChange={handleChange} disabled={readOnly} />
           <InputField label="Type of Forage" name="TypeOfForage" value={data.TypeOfForage} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <InputField label="Forage Amount" name="ForageAmount" type="number" value={data.ForageAmount} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.ForageAmount} />
           <CheckboxField label="Concentrate Feed Sample" name="ConcentrateFeedSample" checked={data.ConcentrateFeedSample} onChange={handleChange} disabled={readOnly} />
-          <InputField label="How Many Times (feeding)" name="HowManyTimes" value={data.HowManyTimes} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <TextAreaField label="Type of Feed (with complaint)" name="TypeofFeedwithComplain" value={data.TypeofFeedwithComplain} onChange={handleChange} placeholder="Describe feed with complaint..." readOnly={readOnly} disabled={readOnly} />
+
+          {/* Retain older feeding inputs (if present) */}
+          <InputField label="Feeding Per Cow" name="FeedingPerCow" value={data.FeedingPerCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="How They Give For Cows" name="HowTheyGiveForCows" value={data.HowTheyGiveForCows || data.HowTheyGiveForCos} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+
         </SectionCard>
 
         <SectionCard title="Production & Water" icon={<Thermometer className="text-red-600" />}>
