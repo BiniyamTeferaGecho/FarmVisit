@@ -6,7 +6,7 @@ import LayerFarmVisitForm from '../components/schedule/LayerFarmVisitForm'
 import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Plus, RefreshCw, Edit, Trash2, Check, Eye } from 'lucide-react'
+import { Plus, RefreshCw, Edit, Trash2, Check, Eye, Printer } from 'lucide-react'
 
 
 export default function LayerFarm() {
@@ -859,6 +859,7 @@ export default function LayerFarm() {
                               {completingId === (v.LayerVisitID || v.LayerVisitId || v.id) ? <SmallSpinner /> : <Check size={16} />}
                             </button>
                             <button onClick={() => handleView(v.LayerVisitID || v.LayerVisitId || v.id)} className="p-2 text-sky-600 rounded-full hover:text-white hover:bg-sky-600" title="View Visit"><Eye size={16} /></button>
+                            <button onClick={() => handlePrint(v)} className="p-2 text-indigo-600 rounded-full hover:text-white hover:bg-indigo-600" title="Print Visit" aria-label="Print Visit"><Printer size={16} /></button>
                             <button onClick={() => !isCompleted && handleEdit(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
                             <button onClick={() => !isCompleted && handleDelete(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                           </>

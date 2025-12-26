@@ -134,15 +134,15 @@ const VisitPrintPreview = ({ visit = {}, entries = [], logo = null, type = 'Farm
                           const keys = Object.keys(row);
                           return keys.map((k, i) => (
                             <tr key={`${idx}-${i}`} className="align-top no-break" role="row">
-                              <td className="px-4 py-3 text-gray-700 align-top break-words" role="cell">{k}</td>
-                              <td className="px-4 py-3 text-gray-800 align-top break-words" role="cell">{String(row[k])}</td>
+                              <td className="px-4 py-3 text-gray-700 align-top wrap-break-words" role="cell">{k}</td>
+                              <td className="px-4 py-3 text-gray-800 align-top wrap-break-words" role="cell">{String(row[k])}</td>
                             </tr>
                           ));
                         }
                         return (
                           <tr key={idx} className="no-break" role="row">
                             <td className="px-4 py-3 text-gray-700" role="cell">{idx + 1}</td>
-                            <td className="px-4 py-3 text-gray-800 break-words" role="cell">{String(row)}</td>
+                            <td className="px-4 py-3 text-gray-800 wrap-break-words" role="cell">{String(row)}</td>
                           </tr>
                         );
                       })

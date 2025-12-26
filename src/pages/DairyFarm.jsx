@@ -6,7 +6,7 @@ import DairyFarmVisitForm from '../components/schedule/DairyFarmVisitForm'
 import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { Plus, RefreshCw, Edit, Trash2, Check, Eye } from 'lucide-react'
+import { Plus, RefreshCw, Edit, Trash2, Check, Eye, Printer } from 'lucide-react'
 
 const initialForm = {
   DairyFarmVisitId: '',
@@ -868,6 +868,7 @@ export default function DairyFarm() {
                           <button onClick={() => !isCompleted && triggerCompleteConfirm(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted || completingId === (it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'}`} aria-disabled={isCompleted} title="Complete Visit">
                             {completingId === (it.DairyFarmVisitId || it.DairyFarmVisitID || it.id) ? <SmallSpinner /> : <Check size={16} />}
                           </button>
+                          <button onClick={() => handlePrint(it)} className="p-2 text-indigo-600 rounded-full hover:text-white hover:bg-indigo-600" title="Print Visit" aria-label="Print Visit"><Printer size={16} /></button>
                           <button onClick={() => !isCompleted && openEdit(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
                           <button onClick={() => !isCompleted && confirmDelete(it)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                         </>
