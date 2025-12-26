@@ -897,7 +897,7 @@ export default function DairyFarm() {
       </Modal>
 
       {showPrintPreview && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-white rounded shadow-lg max-h-[95vh] overflow-auto">
             <VisitPrintPreview
               visit={printData}
