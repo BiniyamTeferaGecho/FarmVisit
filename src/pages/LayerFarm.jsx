@@ -312,7 +312,7 @@ export default function LayerFarm() {
               } catch (e) { /* ignore per-row failures */ }
             }))
             setScheduleMap(prev => ({ ...prev, ...map }));
-          // populate farm map so the Farm column can show FarmCode / FarmName instead of raw IDs
+          // populate farm map so the Farm columns can show FarmName and FarmCode instead of raw IDs
           try {
             const farmIds = (Array.isArray(data) ? data : []).map(d => d.FarmID || d.farmId || d.Farm || null).filter(Boolean)
             const uniqFarms = Array.from(new Set(farmIds.map(String)))
@@ -325,7 +325,8 @@ export default function LayerFarm() {
                 if (Array.isArray(farmsData) && farmsData.length > 0) {
                   farmsData.forEach(f => {
                     const id = String(f.FarmID || f.farmId || f.id || f.FarmId || f.Id || f.ID)
-                    fmap[id] = f.FarmCode || f.FarmName || f.Name || f.code || id
+                    // store full farm object so we can render both name and code
+                    fmap[id] = f
                   })
                 } else {
                   // fallback to per-id fetch
@@ -333,7 +334,7 @@ export default function LayerFarm() {
                     try {
                       const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
                       const ff = r?.data?.data || r?.data || null
-                      if (ff) fmap[id] = ff.FarmCode || ff.FarmName || ff.Name || id
+                      if (ff) fmap[id] = ff
                     } catch (e) { /* ignore per-farm failures */ }
                   }))
                 }
@@ -343,7 +344,7 @@ export default function LayerFarm() {
                   try {
                     const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
                     const ff = r?.data?.data || r?.data || null
-                    if (ff) fmap[id] = ff.FarmCode || ff.FarmName || ff.Name || id
+                    if (ff) fmap[id] = ff
                   } catch (err) { /* ignore */ }
                 }))
               }
@@ -765,7 +766,8 @@ export default function LayerFarm() {
               <tr>
                 <th className="px-4 py-3">#</th>
                 <th className="px-4 py-3">Visit Code</th>
-                <th className="px-4 py-3">FarmID</th>
+                <th className="px-4 py-3">Farm Name</th>
+                <th className="px-4 py-3">Farm Code</th>
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Breed</th>
                 <th className="px-4 py-3">Flock</th>
@@ -775,9 +777,9 @@ export default function LayerFarm() {
             </thead>
             <tbody>
               {loadingVisits ? (
-                <tr><td colSpan={8} className="p-6 text-center"><LoadingSpinner /></td></tr>
+                    <tr><td colSpan={9} className="p-6 text-center"><LoadingSpinner /></td></tr>
               ) : visits.length === 0 ? (
-                <tr><td colSpan={8} className="p-6 text-center text-gray-500">No visits found.</td></tr>
+                    <tr><td colSpan={9} className="p-6 text-center text-gray-500">No visits found.</td></tr>
               ) : visits.map((v, idx) => (
                 <tr key={v.LayerVisitID || idx} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-3">{idx + 1}</td>
@@ -788,14 +790,18 @@ export default function LayerFarm() {
                     return code || v.VisitCode || v.LayerVisitID || v.VisitId || '';
                   })()}</td>
                   
-                  <td className="px-4 py-3">{(() => {
+                  {(() => {
                     const fid = v.FarmID || v.farmId || v.Farm || null
-                    if (fid) {
-                      const fm = farmMap[String(fid)]
-                      return fm || (v.FarmName || String(fid))
-                    }
-                    return v.FarmName || v.FarmCode || ''
-                  })()}</td>
+                    const fm = fid ? farmMap[String(fid)] : null
+                    const name = fm ? (fm.FarmName || fm.Name || fm.farmName || fm.FarmCode || '') : (v.FarmName || '')
+                    const code = fm ? (fm.FarmCode || fm.Code || fm.code || '') : (v.FarmCode || '')
+                    return (
+                      <>
+                        <td className="px-4 py-3">{name}</td>
+                        <td className="px-4 py-3">{code}</td>
+                      </>
+                    )
+                  })()}
                   <td className="px-4 py-3">{v.Location || v.FarmLocation || ''}</td>
                   <td className="px-4 py-3">{v.Breed || ''}</td>
                   <td className="px-4 py-3">{v.FlockSize ?? ''}</td>
