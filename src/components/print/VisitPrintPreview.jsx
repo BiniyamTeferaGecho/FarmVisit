@@ -1,5 +1,6 @@
 import React from 'react';
 import AKFLogo from '../../assets/images/AKF-Logo.png';
+import FarmPrintForm from './forms/FarmPrintForm';
 
 const VisitPrintPreview = ({
   visit = {},
@@ -168,6 +169,13 @@ const VisitPrintPreview = ({
               </div>
             </div>
           </section>
+
+          {/* ===== Farm Full Details (from API) ===== */}
+          {visit?.FarmCode && (
+            <section className="mb-8 no-break">
+              <FarmPrintForm farmCode={visit.FarmCode} />
+            </section>
+          )}
 
           {/* ===== Structured Table ===== */}
           <section className="mb-8 flex-1 no-break">
