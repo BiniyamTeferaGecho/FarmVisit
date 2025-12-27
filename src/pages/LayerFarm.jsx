@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import Modal from '../components/Modal'
 import LayerFarmVisitForm from '../components/schedule/LayerFarmVisitForm'
+import LayerVisitPrintForm from '../components/print/forms/LayerVisitPrintForm'
 import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -38,6 +39,7 @@ export default function LayerFarm() {
   const [viewMode, setViewMode] = useState(false)
   const [showPrintPreview, setShowPrintPreview] = useState(false)
   const [printData, setPrintData] = useState(null)
+  const [modalTab, setModalTab] = useState('form')
   const [fieldErrors, setFieldErrors] = useState({})
   const [showDelete, setShowDelete] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -399,6 +401,8 @@ export default function LayerFarm() {
   }
 
   useEffect(() => { fetchVisits() }, [])
+
+  useEffect(() => { if (!showModal) setModalTab('form') }, [showModal])
 
   // Prefill ScheduleID from query string or navigation state when present
   useEffect(() => {
@@ -896,18 +900,35 @@ export default function LayerFarm() {
       </div>
 
       <Modal open={showModal} onClose={() => { setShowModal(false); setEditingId(null); setViewMode(false); resetForm() }} title={viewMode ? 'View Layer Farm Visit' : (editingId ? 'Edit Layer Farm Visit' : 'New Layer Farm Visit')}>
-        {/* Print control (hidden when printing) */}
-        <div className="flex justify-end mb-3 gap-2 print:hidden">
-          <button onClick={() => handlePrint(form)} className="px-3 py-1 bg-indigo-600 text-white rounded-md">Print</button>
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setModalTab('form')} className={`px-3 py-1 rounded ${modalTab==='form' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>Form</button>
+            <button type="button" onClick={() => setModalTab('print')} className={`px-3 py-1 rounded ${modalTab==='print' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>Print Data</button>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Print control (hidden when printing) */}
+            {modalTab === 'form' && (
+              <div className="print:hidden">
+                <button onClick={() => handlePrint(form)} className="px-3 py-1 bg-indigo-600 text-white rounded-md">Print</button>
+              </div>
+            )}
+          </div>
         </div>
-        <LayerFarmVisitForm
-          form={form}
-          onChange={(newData) => setForm(newData)}
-          onSave={() => handleSubmit()}
-          onCancel={() => { setShowModal(false); setEditingId(null); setViewMode(false); resetForm() }}
-          loading={saving}
-          readOnly={viewMode}
-        />
+
+        {modalTab === 'form' && (
+          <LayerFarmVisitForm
+            form={form}
+            onChange={(newData) => setForm(newData)}
+            onSave={() => handleSubmit()}
+            onCancel={() => { setShowModal(false); setEditingId(null); setViewMode(false); resetForm() }}
+            loading={saving}
+            readOnly={viewMode}
+          />
+        )}
+
+        {modalTab === 'print' && (
+          <LayerVisitPrintForm visitCode={form.VisitCode || (form.VisitCodeName) || (scheduleMap[String(form.ScheduleID)] && scheduleMap[String(form.ScheduleID)].VisitCode) || ''} />
+        )}
       </Modal>
 
       {/* Full-screen preview overlay */}

@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import Modal from '../components/Modal'
 import DairyFarmVisitForm from '../components/schedule/DairyFarmVisitForm'
+import DairyVisitPrintForm from '../components/print/forms/DairyVisitPrintForm'
 import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -98,6 +99,7 @@ export default function DairyFarm() {
   const [viewMode, setViewMode] = useState(false)
   const [showPrintPreview, setShowPrintPreview] = useState(false)
   const [printData, setPrintData] = useState(null)
+  const [modalTab, setModalTab] = useState('form')
 
   const buildEntriesFromForm = (f) => {
     if (!f) return []
@@ -138,6 +140,8 @@ export default function DairyFarm() {
   
 
   useEffect(() => { fetchList() }, [])
+
+  useEffect(() => { if (!showForm) setModalTab('form') }, [showForm])
 
   // If the page was opened with a visitId in the querystring (from schedules Fill action),
   // fetch the authoritative form-data and open the modal so user can fill or edit the visit.
@@ -901,17 +905,34 @@ export default function DairyFarm() {
       </div>
 
       <Modal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); setViewMode(false); setForm(initialForm); }} title={viewMode ? 'View Dairy Visit' : (editingId ? 'Edit Dairy Visit' : 'New Dairy Visit')}>
-        <div className="flex justify-end mb-3 gap-2 print:hidden">
-          <button onClick={() => handlePrint(form)} className="px-3 py-1 bg-indigo-600 text-white rounded-md">Print</button>
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setModalTab('form')} className={`px-3 py-1 rounded ${modalTab==='form' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>Form</button>
+            <button type="button" onClick={() => setModalTab('print')} className={`px-3 py-1 rounded ${modalTab==='print' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>Print Data</button>
+          </div>
+          <div className="flex items-center gap-2">
+            {modalTab === 'form' && (
+              <div className="print:hidden">
+                <button onClick={() => handlePrint(form)} className="px-3 py-1 bg-indigo-600 text-white rounded-md">Print</button>
+              </div>
+            )}
+          </div>
         </div>
-        <DairyFarmVisitForm
-          form={form}
-          onChange={(newData) => setForm(newData)}
-          onSave={() => { handleSubmit(); }}
-          onCancel={() => { setShowForm(false); setEditingId(null); setViewMode(false); setForm(initialForm); }}
-          loading={loading}
-          readOnly={viewMode}
-        />
+
+        {modalTab === 'form' && (
+          <DairyFarmVisitForm
+            form={form}
+            onChange={(newData) => setForm(newData)}
+            onSave={() => { handleSubmit(); }}
+            onCancel={() => { setShowForm(false); setEditingId(null); setViewMode(false); setForm(initialForm); }}
+            loading={loading}
+            readOnly={viewMode}
+          />
+        )}
+
+        {modalTab === 'print' && (
+          <DairyVisitPrintForm visitCode={form.VisitCode || form.VisitCodeName || (scheduleMap[String(form.ScheduleID)] && scheduleMap[String(form.ScheduleID)].VisitCode) || ''} />
+        )}
       </Modal>
 
       {showPrintPreview && (

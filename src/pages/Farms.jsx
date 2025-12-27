@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import FarmForm from './FarmForm';
+import FarmPrintForm from '../components/print/forms/FarmPrintForm'
 import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
@@ -44,6 +45,7 @@ export default function Farms() {
     const [farmTypeNameCache, setFarmTypeNameCache] = useState({});
     const [editingId, setEditingId] = useState(null);
     const [showForm, setShowForm] = useState(false);
+    const [modalTab, setModalTab] = useState('form');
     const [showDelete, setShowDelete] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [bulkFile, setBulkFile] = useState(null);
@@ -664,6 +666,12 @@ export default function Farms() {
             </div>
 
             <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Edit Farm' : 'Create New Farm'}>
+                <div className="mb-4 flex gap-2">
+                    <button type="button" onClick={() => setModalTab('form')} className={`px-3 py-1 rounded ${modalTab==='form' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>Form</button>
+                    <button type="button" onClick={() => setModalTab('print')} className={`px-3 py-1 rounded ${modalTab==='print' ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>Print Data</button>
+                </div>
+
+                {modalTab === 'form' && (
                 <FarmForm
                     form={form}
                     setForm={setForm}
@@ -675,6 +683,11 @@ export default function Farms() {
                     onCancel={() => setShowForm(false)}
                     onSubmit={handleSubmit}
                 />
+                )}
+
+                {modalTab === 'print' && (
+                    <FarmPrintForm farmCode={form.FarmCode || form.FarmCode || ''} />
+                )}
             </Modal>
 
             <Modal open={gpsModalOpen} onClose={() => setGpsModalOpen(false)} title={`Update GPS for ${gpsFor?.FarmName}`}>
