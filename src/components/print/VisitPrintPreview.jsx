@@ -10,7 +10,27 @@ const VisitPrintPreview = ({
   onClose = null
 }) => {
   const title = `${type} Schedule Report`;
-  const now = new Date().toLocaleString();
+  const now = new Date()
+
+  const formatValue = (v) => {
+    if (v === null || v === undefined) return ''
+    // Date object
+    if (v instanceof Date) {
+      const dd = String(v.getDate()).padStart(2, '0')
+      const mm = String(v.getMonth() + 1).padStart(2, '0')
+      const yyyy = v.getFullYear()
+      return `${dd}-${mm}-${yyyy}`
+    }
+    // ISO string
+    if (typeof v === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}T/.test(v)) {
+        const d = new Date(v)
+        if (!isNaN(d)) return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`
+      }
+      return v
+    }
+    return String(v)
+  }
 
   return (
     <div className="min-h-screen bg-neutral-100 flex justify-center p-6 print:bg-white">
@@ -93,7 +113,7 @@ const VisitPrintPreview = ({
                   ['Advisor', schedule.AdvisorName || '—'],
                   ['Approval Status', schedule.ApprovalStatus || '—'],
                   ['Visit Status', schedule.VisitStatus || '—'],
-                  ['Planned Date', schedule.ProposedDate || '—']
+                  ['Planned Date', formatValue(schedule.ProposedDate) || '—']
                 ].map(([label, value]) => (
                   <div key={label} className="border rounded-md p-3">
                     <div className="text-xs text-neutral-500">{label}</div>
@@ -117,11 +137,11 @@ const VisitPrintPreview = ({
                 </h2>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   {[
-                    ['Proposed Date', visit.ProposedDate],
-                    ['Next Follow-up', visit.NextFollowUpDate],
-                    ['Purpose', visit.VisitPurpose],
-                    ['Frequency', visit.VisitFrequency],
-                    ['Status', visit.Status || visit.VisitStatus]
+                    ['Proposed Date', formatValue(visit.ProposedDate) || '—'],
+                    ['Next Follow-up', formatValue(visit.NextFollowUpDate) || '—'],
+                    ['Purpose', visit.VisitPurpose || '—'],
+                    ['Frequency', visit.VisitFrequency || '—'],
+                    ['Status', visit.Status || visit.VisitStatus || '—']
                   ].map(([label, value]) => (
                     <div key={label}>
                       <div className="text-xs text-neutral-500">{label}</div>
@@ -195,9 +215,9 @@ const VisitPrintPreview = ({
                           <td className="px-4 py-3 text-neutral-600 align-top">
                             {k}
                           </td>
-                          <td className="px-4 py-3 text-neutral-800">
-                            {String(v)}
-                          </td>
+                                <td className="px-4 py-3 text-neutral-800">
+                                  {formatValue(v) || ''}
+                                </td>
                         </tr>
                       ))
                     )
