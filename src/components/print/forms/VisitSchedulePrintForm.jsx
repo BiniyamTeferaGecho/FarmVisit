@@ -7,6 +7,24 @@ export default function VisitSchedulePrintForm({ visitCode, onLoaded }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
 
+  const formatValue = (v) => {
+    if (v === null || v === undefined) return ''
+    if (v instanceof Date) {
+      const dd = String(v.getDate()).padStart(2, '0')
+      const mm = String(v.getMonth() + 1).padStart(2, '0')
+      const yyyy = v.getFullYear()
+      return `${dd}-${mm}-${yyyy}`
+    }
+    if (typeof v === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}T/.test(v)) {
+        const d = new Date(v)
+        if (!isNaN(d)) return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`
+      }
+      return v
+    }
+    return String(v)
+  }
+
   useEffect(() => {
     if (!visitCode) return
     let mounted = true
@@ -40,7 +58,7 @@ export default function VisitSchedulePrintForm({ visitCode, onLoaded }) {
         {Object.keys(data).map(k => (
           <div key={k} className="flex gap-2">
             <div className="text-gray-600 w-40">{k}</div>
-            <div className="text-gray-800 wrap-break-word">{String(data[k] ?? '')}</div>
+            <div className="text-gray-800 wrap-break-word">{formatValue(data[k] ?? '')}</div>
           </div>
         ))}
       </div>

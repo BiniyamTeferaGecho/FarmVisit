@@ -132,6 +132,24 @@ export default function LayerVisitPrintForm({ visitCode, onLoaded }) {
   const approvedDate = get(['ApprovedDate','ApprovedOn','ApprovedAt'])
   const createdDate = get(['CreatedAt','CreatedDate','CreatedOn'])
 
+  const formatValue = (v) => {
+    if (v === null || v === undefined) return ''
+    if (v instanceof Date) {
+      const dd = String(v.getDate()).padStart(2, '0')
+      const mm = String(v.getMonth() + 1).padStart(2, '0')
+      const yyyy = v.getFullYear()
+      return `${dd}-${mm}-${yyyy}`
+    }
+    if (typeof v === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}T/.test(v)) {
+        const d = new Date(v)
+        if (!isNaN(d)) return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`
+      }
+      return v
+    }
+    return String(v)
+  }
+
   return (
     <div className="p-4 bg-white rounded shadow-sm print:p-0">
       <article className="mx-auto w-[210mm] max-w-full border border-gray-100 shadow-sm print:shadow-none bg-white">
@@ -157,7 +175,7 @@ export default function LayerVisitPrintForm({ visitCode, onLoaded }) {
                 {g.keys.map((ks, idx) => (
                   <div key={idx} className="flex gap-3">
                     <div className="w-40 text-gray-600">{labelFor(ks)}</div>
-                    <div className="text-gray-800 wrap-break-word">{String(get(ks) ?? '')}</div>
+                    <div className="text-gray-800 wrap-break-word">{formatValue(get(ks) ?? '')}</div>
                   </div>
                 ))}
               </div>

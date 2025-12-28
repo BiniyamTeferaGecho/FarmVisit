@@ -7,6 +7,28 @@ export default function DairyVisitPrintForm({ visitCode, onLoaded }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
 
+  const formatValue = (v) => {
+    if (v === null || v === undefined) return ''
+    // If already a Date
+    if (v instanceof Date) {
+      const dd = String(v.getDate()).padStart(2, '0')
+      const mm = String(v.getMonth() + 1).padStart(2, '0')
+      const yyyy = v.getFullYear()
+      return `${dd}-${mm}-${yyyy}`
+    }
+    // If ISO-ish string, try parse
+    if (typeof v === 'string') {
+      // quick ISO date detection
+      const iso = /^\d{4}-\d{2}-\d{2}T/.test(v)
+      if (iso) {
+        const d = new Date(v)
+        if (!isNaN(d)) return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`
+      }
+      return v
+    }
+    return String(v)
+  }
+
   useEffect(() => {
     if (!visitCode) return
     let mounted = true
@@ -40,7 +62,7 @@ export default function DairyVisitPrintForm({ visitCode, onLoaded }) {
         {Object.keys(data).map(k => (
           <div key={k} className="flex gap-2">
             <div className="text-gray-600 w-40">{k}</div>
-            <div className="text-gray-800 wrap-break-word">{String(data[k] ?? '')}</div>
+            <div className="text-gray-800 wrap-break-word">{formatValue(data[k] ?? '')}</div>
           </div>
         ))}
       </div>
