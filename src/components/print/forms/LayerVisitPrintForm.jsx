@@ -163,7 +163,7 @@ export default function LayerVisitPrintForm({ visitCode, onLoaded }) {
           </div>
           <div className="text-sm text-right text-gray-600">
             <div><span className="font-medium">Visit:</span> {String(get(['VisitCode','VisitCodeName','LayerVisitID']) || visitCode)}</div>
-            <div><span className="font-medium">Date:</span> {String(get(['VisitDate','CreatedAt','CreatedDate']) || new Date().toLocaleDateString())}</div>
+            <div><span className="font-medium">Date:</span> {formatValue(get(['VisitDate','CreatedAt','CreatedDate']) || new Date())}</div>
           </div>
         </header>
 
@@ -200,14 +200,14 @@ export default function LayerVisitPrintForm({ visitCode, onLoaded }) {
               <div className="text-sm text-gray-600">Approved by</div>
               <div className="mt-6 w-64 border-b border-gray-300"></div>
               <div className="text-sm text-gray-800 mt-2">{approvedBy || '____________________'}</div>
-              <div className="text-xs text-gray-500">{approvedDate ? String(approvedDate) : ''}</div>
+              <div className="text-xs text-gray-500">{approvedDate ? formatValue(approvedDate) : ''}</div>
             </div>
 
             <div className="flex flex-col items-start">
               <div className="text-sm text-gray-600">Created by</div>
               <div className="mt-6 w-64 border-b border-gray-300"></div>
               <div className="text-sm text-gray-800 mt-2">{createdBy || '____________________'}</div>
-              <div className="text-xs text-gray-500">{createdDate ? String(createdDate) : ''}</div>
+              <div className="text-xs text-gray-500">{createdDate ? formatValue(createdDate) : ''}</div>
             </div>
           </div>
         </footer>

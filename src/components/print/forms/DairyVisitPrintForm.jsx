@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../../auth/AuthProvider'
+import logo from '../../../assets/images/AKF-Logo.png'
 
 export default function DairyVisitPrintForm({ visitCode, onLoaded }) {
   const { fetchWithAuth } = useAuth()
@@ -29,6 +30,16 @@ export default function DairyVisitPrintForm({ visitCode, onLoaded }) {
     return String(v)
   }
 
+  const humanizeKey = (k) => {
+    if (!k) return ''
+    // replace underscores and camelCase with spaces, then title-case
+    const spaced = k
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_-]+/g, ' ')
+      .toLowerCase()
+    return spaced.split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
+  }
+
   useEffect(() => {
     if (!visitCode) return
     let mounted = true
@@ -56,16 +67,40 @@ export default function DairyVisitPrintForm({ visitCode, onLoaded }) {
   if (!data) return <div className="p-4 text-gray-500">No data available</div>
 
   return (
-    <div className="p-4 bg-white rounded shadow-sm">
-      <h3 className="text-lg font-semibold mb-2">Dairy Visit — {data.VisitCode || visitCode}</h3>
+    <div className="p-4 bg-white rounded shadow-sm print:shadow-none print:p-6">
+      <div className="flex items-center justify-between mb-4">
+        <img src={logo} alt="AKF" className="h-12" />
+        <div className="text-right">
+          <div className="text-sm text-gray-600">Dairy Visit Printout</div>
+          <div className="text-xs text-gray-500">Generated: {formatValue(new Date())}</div>
+        </div>
+      </div>
+
+      <h3 className="text-xl font-bold mb-2">Dairy Visit — {data.VisitCode || visitCode}</h3>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
         {Object.keys(data).map(k => (
           <div key={k} className="flex gap-2">
-            <div className="text-gray-600 w-40">{k}</div>
+            <div className="text-gray-600 w-44">{humanizeKey(k)}</div>
             <div className="text-gray-800 wrap-break-word">{formatValue(data[k] ?? '')}</div>
           </div>
         ))}
       </div>
+
+      <footer className="mt-6 pt-4 border-t text-xs text-gray-600 flex flex-col md:flex-row md:justify-between gap-4">
+        <div className="flex-1">
+          <div className="text-xs text-gray-500">Prepared By</div>
+          <div className="w-52 h-7 border-b mt-3" />
+        </div>
+        <div className="flex-1">
+          <div className="text-xs text-gray-500">Approved By</div>
+          <div className="w-52 h-7 border-b mt-3" />
+        </div>
+        <div className="flex-1 text-right">
+          <div className="text-xs text-gray-500">Generated On</div>
+          <div className="mt-2">{formatValue(new Date())}</div>
+        </div>
+      </footer>
     </div>
   )
 }
