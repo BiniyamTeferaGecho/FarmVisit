@@ -40,6 +40,77 @@ export default function LayerVisitPrintForm({ visitCode, onLoaded }) {
     return fallback
   }
 
+  const humanizeKey = (k) => {
+    if (!k) return ''
+    // convert camelCase / PascalCase / snake_case to Title Case
+    const spaced = k
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[_\-]+/g, ' ')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    return spaced.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
+
+  const labelMap = {
+    VisitCode: 'Visit Code',
+    VisitCodeName: 'Visit Code',
+    ScheduleID: 'Schedule ID',
+    ScheduleId: 'Schedule ID',
+    LayerVisitID: 'Visit ID',
+    LayerVisitId: 'Visit ID',
+    FarmName: 'Farm Name',
+    Farm: 'Farm',
+    FarmCode: 'Farm Code',
+    Location: 'Location',
+    FarmLocation: 'Location',
+    CityTown: 'Town/City',
+    Breed: 'Breed',
+    FlockSize: 'Flock Size',
+    AgeInWeeks: 'Age (weeks)',
+    AverageBodyWeightKG: 'Avg Body Weight (kg)',
+    AvgBodyWeightKg: 'Avg Body Weight (kg)',
+    CurrEggProdinPercent: 'Egg Production (%)',
+    EggProductionPercent: 'Egg Production (%)',
+    MortalityTotal: 'Mortality (total)',
+    FeedingManagement: 'Feeding Management',
+    FeedIntakePerChickenGm: 'Feed Intake (g/chicken/day)',
+    FreqFeedDistPerDay: 'Feed Distribution Frequency (per day)',
+    HowMuchFeedLOvergmPerChicken: 'Feed Left Over (g/chicken)',
+    FeedLeftOver: 'Feed Left Over',
+    SourceOfWater: 'Source of Water',
+    WaterInTakePerChickenPerDay: 'Water Intake (per chicken/day)',
+    VaccinationsGivenLast4Weeks: 'Vaccinations (last 4 weeks)',
+    WhichTypeandDataofVaccin: 'Vaccination Details',
+    VaccinationNote: 'Vaccination Details',
+    AnyMedicationGiven: 'Any Medication Given',
+    WhichTypeandWhy: 'Medication Details',
+    BiosecurityComment: 'Biosecurity Comments',
+    SampleTaken: 'Sample Taken',
+    AbnormalSigns: 'Abnormal Signs',
+    ExplainPostmortemFindings: 'Postmortem Findings',
+    IssuesComplaints: 'Issues / Complaints',
+    RecommendationAdvice: 'Recommendations',
+    RecommendationGiven: 'Recommendations',
+    AnyRelatedEvidenceImage: 'Attachments',
+    Notes: 'Notes',
+    Observation: 'Observations',
+    Observations: 'Observations',
+    Results: 'Results',
+  }
+
+  const labelFor = (ks) => {
+    let key = ks
+    if (Array.isArray(ks)) {
+      // prefer first alias, but try to find one that exists in data to use as canonical
+      key = ks[0]
+      for (const candidate of ks) {
+        if ((data && (data[candidate] !== undefined && data[candidate] !== null))) { key = candidate; break }
+      }
+    }
+    const lbl = labelMap[key]
+    if (lbl) return lbl
+    return humanizeKey(String(key))
+  }
+
   if (!visitCode) return <div className="p-4 text-sm text-gray-500">No visit code provided</div>
   if (loading) return <div className="p-4">Loading...</div>
   if (error) return <div className="p-4 text-red-600">{error}</div>
@@ -85,7 +156,7 @@ export default function LayerVisitPrintForm({ visitCode, onLoaded }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                 {g.keys.map((ks, idx) => (
                   <div key={idx} className="flex gap-3">
-                    <div className="w-40 text-gray-600">{Array.isArray(ks) ? (ks[0]) : ks}</div>
+                    <div className="w-40 text-gray-600">{labelFor(ks)}</div>
                     <div className="text-gray-800 wrap-break-word">{String(get(ks) ?? '')}</div>
                   </div>
                 ))}
