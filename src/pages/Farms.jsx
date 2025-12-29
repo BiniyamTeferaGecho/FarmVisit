@@ -786,7 +786,7 @@ export default function Farms() {
                 </div>
             </Modal>
 
-            <ConfirmModal open={showDelete} title="Confirm Deletion" onClose={() => setShowDelete(false)} onConfirm={doDelete}>
+            <ConfirmModal open={showDelete} title="Confirm Deletion" onCancel={() => setShowDelete(false)} onConfirm={doDelete}>
                 Are you sure you want to delete farm {deleteTarget?.FarmName}? This will mark it as inactive.
             </ConfirmModal>
         </main>

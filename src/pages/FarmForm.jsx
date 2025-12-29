@@ -106,6 +106,34 @@ function FarmersDropdown({ valueDisplay = '', valueId = '', onSelect }) {
         return () => document.removeEventListener('click', onBodyClick);
     }, []);
 
+    // Fetch an initial list of farmers when the component mounts so the owner
+    // dropdown is populated immediately (useful when the form/modal opens).
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            try {
+                const res = await fetchWithAuth({ url: `/farms/farmers-dropdown`, method: 'get' });
+                const payload = res?.data?.data || res?.data || res;
+                let arr = null;
+                if (Array.isArray(payload)) arr = payload;
+                else if (Array.isArray(payload.items)) arr = payload.items;
+                else if (Array.isArray(payload.recordset)) arr = payload.recordset;
+                else if (Array.isArray(payload.data)) arr = payload.data;
+                if (!arr && payload && typeof payload === 'object') {
+                    for (const k of Object.keys(payload)) if (Array.isArray(payload[k])) { arr = payload[k]; break; }
+                }
+                const norm = (arr || []).map(it => ({ id: it.FarmerID || it.Id || it.id || it.ID || it.farmerId || '', text: it.DisplayText || it.Display || it.label || it.Name || it.OwnerName || '' }));
+                if (!cancelled) {
+                    setOptions(norm);
+                }
+            } catch (err) {
+                console.debug('FarmersDropdown initial fetch failed', err);
+            } finally { if (!cancelled) setLoading(false); }
+        })();
+        return () => { cancelled = true; };
+    }, [fetchWithAuth]);
+
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         if (!query || query.trim().length < 1) { setOptions([]); return; }
