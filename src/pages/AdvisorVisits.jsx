@@ -186,6 +186,20 @@ export default function AdvisorVisits() {
             console.error('Failed to create schedule inline', e)
           }
         }}
+        // Provide setters and data objects so modal code doesn't access undefined
+        approvalData={schState.approvalData || {}}
+        processData={schState.processData || {}}
+        completeData={schState.completeData || {}}
+        setApprovalData={(payload) => schDispatch({ type: 'SET_APPROVAL_DATA', payload })}
+        setProcessData={(payload) => schDispatch({ type: 'SET_PROCESS_DATA', payload })}
+        setCompleteData={(payload) => schDispatch({ type: 'SET_COMPLETE_DATA', payload })}
+        onDeleteConfirm={() => {}}
+        onSubmitApproval={() => {}}
+        onProcessApproval={() => {}}
+        onCompleteVisit={() => {}}
+        onBulkUpload={() => {}}
+        onFillVisitSave={() => {}}
+        setFillVisitFormData={(payload) => schDispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload })}
         setFormData={(updater) => {
           if (typeof updater === 'function') {
             const newForm = updater(schState.form)
