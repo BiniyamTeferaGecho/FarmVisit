@@ -42,6 +42,7 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
             setForm({
                 id: farmer.FarmerID || farmer.id || null,
                 FirstName: farmer.FirstName || farmer.first_name || '',
+                        Gender: farmer.Gender || farmer.gender || '',
                 LastName: farmer.LastName || farmer.last_name || '',
                 PhoneNumber: farmer.PhoneNumber || farmer.contact?.phone || '',
                 Email: farmer.Email || farmer.contact?.email || '',
@@ -59,7 +60,7 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
             });
         } else {
             setForm({
-                FirstName: '', LastName: '', PhoneNumber: '', Email: '', Region: '', Zone: '', Woreda: '', Kebele: '', Village: '', NationalID: '', FarmingExperience: '', HouseholdIncome: '', PreferredContactMethod: 'Phone', PrimaryLanguage: '', EducationLevel: ''
+                FirstName: '', Gender: '', LastName: '', PhoneNumber: '', Email: '', Region: '', Zone: '', Woreda: '', Kebele: '', Village: '', NationalID: '', FarmingExperience: '', HouseholdIncome: '', PreferredContactMethod: 'Phone', PrimaryLanguage: '', EducationLevel: ''
             });
         }
         setErrors({});
@@ -124,6 +125,19 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                                         <input type="text" id="PhoneNumber" name="PhoneNumber" value={form.PhoneNumber} onChange={handleChange} className={`form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 ${errors.PhoneNumber ? 'border-red-500' : 'border-gray-300'}`} />
                                     </div>
                                     {errors.PhoneNumber && <p className="text-xs text-red-500">{errors.PhoneNumber}</p>}
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="Gender" className="text-sm font-medium text-gray-600">Gender</label>
+                                    <div className="relative">
+                                        <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <select id="Gender" name="Gender" value={form.Gender} onChange={handleChange} className="form-select w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                                            <option value="">Select gender</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                            <option value="Prefer not to say">Prefer not to say</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label htmlFor="Email" className="text-sm font-medium text-gray-600">Email</label>
