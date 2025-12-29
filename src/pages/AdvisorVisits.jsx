@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useReducer } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import ScheduleList from '../components/schedule/ScheduleList'
+import ScheduleModals from '../components/schedule/ScheduleModals'
+import { scheduleReducer, initialState } from '../reducers/scheduleReducer'
+import { fetchLookups, createSchedule } from '../services/api'
 
 export default function AdvisorVisits() {
   const { user, fetchWithAuth } = useAuth()
@@ -18,6 +21,18 @@ export default function AdvisorVisits() {
   const [sortBy, setSortBy] = useState('VisitDate')
   const [sortDir, setSortDir] = useState('desc')
   const [statuses, setStatuses] = useState([])
+  // local schedule modal state (so AdvisorVisits can open schedule modal inline)
+  const [schState, schDispatch] = useReducer(scheduleReducer, initialState)
+
+  // ensure lookups (advisors, employees, farms, managers) are available for the modal
+  useEffect(() => {
+    const load = async () => {
+      try {
+        await fetchLookups(schDispatch, fetchWithAuth)
+      } catch (e) { /* ignore */ }
+    }
+    load()
+  }, [fetchWithAuth])
 
   useEffect(() => {
     let mounted = true
@@ -68,14 +83,9 @@ export default function AdvisorVisits() {
           <button
             onClick={() => {
               try {
-                const p = new URLSearchParams(window.location.search || '');
-                p.set('tab', 'farmvisitschedule');
-                p.set('open', 'create');
-                if (advisorId) p.set('AdvisorID', String(advisorId));
-                const newUrl = `${window.location.pathname}?${p.toString()}`;
-                window.history.pushState({}, '', newUrl);
-                window.dispatchEvent(new PopStateEvent('popstate'));
-              } catch (e) { console.debug('failed to open new schedule', e) }
+                // Open schedule modal inline (no redirect)
+                schDispatch({ type: 'OPEN_FORM', payload: advisorId ? { AdvisorID: String(advisorId) } : null })
+              } catch (e) { console.debug('failed to open new schedule inline', e) }
             }}
             className="px-3 py-1 bg-indigo-600 text-white rounded text-sm"
           >
