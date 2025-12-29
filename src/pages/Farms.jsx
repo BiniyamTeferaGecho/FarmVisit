@@ -412,6 +412,8 @@ export default function Farms() {
     const validateForm = (f) => {
         const errs = {};
         if (!f.FarmName) errs.FarmName = 'Farm name is required';
+        // Require a FarmerID (owner) because backend stored-proc now enforces it
+        if (!f.FarmerID) errs.OwnerName = 'Owner is required. Please select from the dropdown';
         if (!f.FarmTypeID) errs.FarmTypeID = 'Farm type is required';
         if (!validators.phone(f.ContactPhone)) errs.ContactPhone = 'Invalid phone number';
         if (!validators.email(f.ContactEmail)) errs.ContactEmail = 'Invalid email address';
