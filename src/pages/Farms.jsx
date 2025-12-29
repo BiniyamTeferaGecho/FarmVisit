@@ -39,6 +39,7 @@ export default function Farms() {
 
     const [list, setList] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
     const [form, setForm] = useState(initialForm);
     const [farmTypes, setFarmTypes] = useState([]);
     const [farmTypesLoadError, setFarmTypesLoadError] = useState(null);
@@ -258,6 +259,7 @@ export default function Farms() {
         try {
             const res = await fetchWithAuth({ url: `/farms`, method: 'get' });
             const payload = res.data?.data || res.data;
+            try { console.debug('fetchList response summary', { url: '/farms', payloadShape: Object.prototype.toString.call(payload), payloadSample: Array.isArray(payload) ? payload.length : (payload && typeof payload === 'object' ? Object.keys(payload).slice(0,5) : null) }); } catch(e) {}
             // tolerant parsing for different API shapes
             const arr = (arrCandidate => {
                 if (!arrCandidate) return null;
@@ -273,7 +275,10 @@ export default function Farms() {
                 return null;
             })(payload);
 
-            if (arr) setList(arr);
+            if (arr) {
+                setList(arr);
+                try { console.debug('fetchList setList', { listLength: (arr || []).length }); } catch(e) {}
+            }
             else {
                 // fallback: if payload is an object with farm-like keys, wrap it
                 if (payload && typeof payload === 'object' && (payload.FarmID || payload.FarmName)) setList([payload]);
@@ -319,6 +324,14 @@ export default function Farms() {
         })();
         return () => { cancelled = true; };
     }, [list]);
+
+    // adjust pageIndex if list shrinks or pageSize changes
+    useEffect(() => {
+        const pageCount = Math.max(1, Math.ceil(list.length / pagination.pageSize));
+        if (pagination.pageIndex >= pageCount) {
+            setPagination(p => ({ ...p, pageIndex: Math.max(0, pageCount - 1) }));
+        }
+    }, [list, pagination.pageSize]);
 
     const openCreate = () => { setEditingId(null); setForm(initialForm); setFieldErrors({}); setShowForm(true) };
 
@@ -588,6 +601,22 @@ export default function Farms() {
                         </button>
                     </div>
                 </div>
+                {/* Pagination controls */}
+                <div className="mt-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">Rows per page:</span>
+                        <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm">
+                            {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div className="text-sm text-gray-600">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(list.length / pagination.pageSize))}</div>
+                    <div className="flex items-center space-x-2">
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(list.length / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(list.length / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(list.length / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(list.length / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+                    </div>
+                </div>
 
                 {error ? <div className="mb-4 p-4 bg-red-100 text-red-700 border border-red-400 rounded-lg">An error occurred. Please try again.</div> : null}
                 <AlertModal open={showErrorModal} title="Error" message={"An unexpected error occurred. Please try again or contact support."} details={error} onClose={() => { setShowErrorModal(false); setError(null); }} />
@@ -620,46 +649,55 @@ export default function Farms() {
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={8} className="text-center p-4"><LoadingSpinner /></td></tr>
+                                <tr><td colSpan={9} className="text-center p-4"><LoadingSpinner /></td></tr>
                             ) : list.length === 0 ? (
-                                <tr><td colSpan={8} className="text-center p-4">No farms found.</td></tr>
-                            ) : list.map((it, idx) => (
-                                <tr key={it.FarmID || idx} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-4 py-3">{it.FarmCode || it.Code || ''}</td>
-                                    <td className="px-4 py-3">{idx + 1}</td>
-                                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FarmName || ''}</td>
-                                    <td className="px-4 py-3">{
-                                        (() => {
-                                            const idKey = (it?.FarmTypeID || it?.farmTypeID || it?.FarmType || '')?.toString();
-                                            return (idKey && farmTypeNameCache[idKey]) ? farmTypeNameCache[idKey] : (it.FarmTypeName || it.FarmType || it.Type || it.FarmTypeCode || '');
-                                        })()
-                                    }</td>
-                                    <td className="px-4 py-3">{it.FarmOwner || it.OwnerName || it.Owner || it.FarmerName || it.ContactPerson || ''}</td>
-                                    <td className="px-4 py-3">{it.ContactPhone || it.ContactNumber || it.Phone || it.WorkPhone || it.ContactEmail || ''}</td>
-                                    <td className="px-4 py-3">{(() => {
-                                        // Use pickFirst and substring heuristic so Region displays whether it's nested, aliased, or oddly named
-                                        const val = pickFirst(it, regionAliases) || findByKeySubstring(it, ['region', 'regionname', 'region_label']);
-                                        return val || '';
-                                    })()}</td>
-                                    <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 rounded-full text-xs ${it.IsActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                            {it.IsActive ? 'Active' : 'Inactive'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 flex items-center justify-center space-x-2">
-                                        <button onClick={() => openEdit(it)} className="text-indigo-500 hover:text-indigo-700"><FaEdit /></button>
-                                        <button onClick={() => openGpsModal(it)} className="text-blue-500 hover:text-blue-700"><FaMapMarkerAlt /></button>
-                                        {it.DeletedAt ? (
-                                            <>
-                                                <button onClick={() => restoreFarm(it)} className="text-green-500 hover:text-green-700"><FaUndo /></button>
-                                                <button onClick={() => permanentDelete(it)} className="text-red-700 hover:text-red-900"><FaTrash /></button>
-                                            </>
-                                        ) : (
-                                            <button onClick={() => confirmDelete(it)} className="text-red-500 hover:text-red-700"><FaTrash /></button>
-                                        )}
-                                    </td>
-                                </tr>
-                            ))}
+                                <tr><td colSpan={9} className="text-center p-4">No farms found.</td></tr>
+                            ) : (
+                                (() => {
+                                    const pageIndex = pagination.pageIndex || 0;
+                                    const pageSize = pagination.pageSize || 10;
+                                    const start = pageIndex * pageSize;
+                                    const end = start + pageSize;
+                                    const paged = list.slice(start, end);
+                                    try { console.debug('Farms pagination debug', { listLength: list.length, pageIndex, pageSize, start, end, pagedLength: paged.length }); } catch(e) {}
+                                    return paged.map((it, idx) => (
+                                        <tr key={it.FarmID || start + idx} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                            <td className="px-4 py-3">{it.FarmCode || it.Code || ''}</td>
+                                            <td className="px-4 py-3">{start + idx + 1}</td>
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FarmName || ''}</td>
+                                            <td className="px-4 py-3">{
+                                                (() => {
+                                                    const idKey = (it?.FarmTypeID || it?.farmTypeID || it?.FarmType || '')?.toString();
+                                                    return (idKey && farmTypeNameCache[idKey]) ? farmTypeNameCache[idKey] : (it.FarmTypeName || it.FarmType || it.Type || it.FarmTypeCode || '');
+                                                })()
+                                            }</td>
+                                            <td className="px-4 py-3">{it.FarmOwner || it.OwnerName || it.Owner || it.FarmerName || it.ContactPerson || ''}</td>
+                                            <td className="px-4 py-3">{it.ContactPhone || it.ContactNumber || it.Phone || it.WorkPhone || it.ContactEmail || ''}</td>
+                                            <td className="px-4 py-3">{(() => {
+                                                const val = pickFirst(it, regionAliases) || findByKeySubstring(it, ['region', 'regionname', 'region_label']);
+                                                return val || '';
+                                            })()}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`px-2 py-1 rounded-full text-xs ${it.IsActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                    {it.IsActive ? 'Active' : 'Inactive'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 flex items-center justify-center space-x-2">
+                                                <button onClick={() => openEdit(it)} className="text-indigo-500 hover:text-indigo-700"><FaEdit /></button>
+                                                <button onClick={() => openGpsModal(it)} className="text-blue-500 hover:text-blue-700"><FaMapMarkerAlt /></button>
+                                                {it.DeletedAt ? (
+                                                    <>
+                                                        <button onClick={() => restoreFarm(it)} className="text-green-500 hover:text-green-700"><FaUndo /></button>
+                                                        <button onClick={() => permanentDelete(it)} className="text-red-700 hover:text-red-900"><FaTrash /></button>
+                                                    </>
+                                                ) : (
+                                                    <button onClick={() => confirmDelete(it)} className="text-red-500 hover:text-red-700"><FaTrash /></button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ));
+                                })()
+                            )}
                         </tbody>
                     </table>
                 </div>

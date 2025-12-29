@@ -464,11 +464,43 @@ const DataTable = ({
                     Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
                 </div>
                     <div className="flex items-center space-x-2">
-                    <button onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-                    <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-                    <button onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-                    <button onClick={() => table.setPageIndex(table.getPageCount() - 1)} disabled={!table.getCanNextPage()} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
-                </div>
+                        {
+                          // compute safe values
+                        }
+                        <button
+                            onClick={() => {
+                                console.log('Pagination First click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount() });
+                                setPagination(p => ({ ...p, pageIndex: 0 }));
+                            }}
+                            disabled={table.getState().pagination.pageIndex === 0}
+                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                        >First</button>
+                        <button
+                            onClick={() => {
+                                console.log('Pagination Prev click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount() });
+                                setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }));
+                            }}
+                            disabled={table.getState().pagination.pageIndex === 0}
+                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                        >Prev</button>
+                        <button
+                            onClick={() => {
+                                const next = Math.min(table.getState().pagination.pageIndex + 1, Math.max(0, table.getPageCount() - 1));
+                                console.log('Pagination Next click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount(), next });
+                                setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, table.getPageCount() - 1)) }));
+                            }}
+                            disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)}
+                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                        >Next</button>
+                        <button
+                            onClick={() => {
+                                console.log('Pagination Last click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount() });
+                                setPagination(p => ({ ...p, pageIndex: Math.max(0, table.getPageCount() - 1) }));
+                            }}
+                            disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)}
+                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                        >Last</button>
+                    </div>
             </div>
         </div>
     );
