@@ -304,9 +304,20 @@ const FarmVisitSchedule = () => {
     try {
       const p = new URLSearchParams(location.search || window.location.search);
       if (p.get('open') === 'create') {
-        openModal('schedule');
+        // If caller provided an AdvisorID in the query string, pass it
+        // to the modal so the form can be prefilled (Advisor must still
+        // be a valid GUID / lookup on save will validate on server).
+        const advisorParam = p.get('AdvisorID') || p.get('advisor') || p.get('advisorId');
+        if (advisorParam) {
+          openModal('schedule', { AdvisorID: advisorParam });
+        } else {
+          openModal('schedule');
+        }
         // remove the flag from URL so repeated navigation doesn't re-open modal
         p.delete('open');
+        p.delete('AdvisorID');
+        p.delete('advisor');
+        p.delete('advisorId');
         const next = p.toString();
         const newUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
         window.history.replaceState({}, '', newUrl);

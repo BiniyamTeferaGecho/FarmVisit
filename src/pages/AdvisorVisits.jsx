@@ -70,7 +70,7 @@ export default function AdvisorVisits() {
               try {
                 const p = new URLSearchParams(window.location.search || '');
                 p.set('tab', 'farmvisitschedule');
-                p.set('open', 'new');
+                p.set('open', 'create');
                 if (advisorId) p.set('AdvisorID', String(advisorId));
                 const newUrl = `${window.location.pathname}?${p.toString()}`;
                 window.history.pushState({}, '', newUrl);
