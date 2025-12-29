@@ -65,6 +65,22 @@ export default function AdvisorVisits() {
       <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
         <h3 className="text-lg font-medium">My Scheduled Visits</h3>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              try {
+                const p = new URLSearchParams(window.location.search || '');
+                p.set('tab', 'farmvisitschedule');
+                p.set('open', 'new');
+                if (advisorId) p.set('AdvisorID', String(advisorId));
+                const newUrl = `${window.location.pathname}?${p.toString()}`;
+                window.history.pushState({}, '', newUrl);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+              } catch (e) { console.debug('failed to open new schedule', e) }
+            }}
+            className="px-3 py-1 bg-indigo-600 text-white rounded text-sm"
+          >
+            New Schedule
+          </button>
           <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search farm or purpose" className="p-1 border rounded text-sm" />
           <select value={status} onChange={e => { setStatus(e.target.value); setPage(1) }} className="p-1 border rounded text-sm">
             <option value="">All status</option>
