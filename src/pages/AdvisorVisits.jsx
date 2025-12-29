@@ -190,7 +190,34 @@ export default function AdvisorVisits() {
               return
             }
 
-            await createSchedule(schDispatch, schState.form, fetchWithAuth)
+            // Ensure CreatedBy is present and is an EmployeeID (backend requires EmployeeID)
+            let payload = { ...schState.form }
+            if (!payload.CreatedBy) {
+              const currentUserId = user && (user.UserID || user.userId || user.id || user.UserId)
+              let matched = null
+              try {
+                // schState.employees comes from fetchLookups called earlier
+                const emps = schState.employees || []
+                if (Array.isArray(emps) && emps.length > 0 && currentUserId) {
+                  matched = emps.find(e => {
+                    const uids = [e.UserID, e.userId, e.UserId, e.id, e.UserName, e.username].filter(Boolean)
+                    return uids.map(String).some(x => String(x).toLowerCase() === String(currentUserId).toLowerCase())
+                  })
+                }
+              } catch (e) {
+                // ignore lookup errors here
+              }
+
+              if (matched && (matched.EmployeeID || matched.EmployeeId || matched.id)) {
+                payload.CreatedBy = matched.EmployeeID || matched.EmployeeId || matched.id
+              } else {
+                // If we cannot resolve an EmployeeID, inform the user rather than sending a bad request
+                schDispatch({ type: 'SET_MESSAGE', payload: 'Unable to determine your EmployeeID. Make sure your account is linked to an employee record.' })
+                return
+              }
+            }
+
+            await createSchedule(schDispatch, payload, fetchWithAuth)
             // close modal and refresh list by resetting page (effect will reload)
             schDispatch({ type: 'CLOSE_FORM' })
             setPage(1)
