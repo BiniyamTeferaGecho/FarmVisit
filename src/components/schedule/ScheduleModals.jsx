@@ -218,10 +218,6 @@ const ScheduleModals = ({
 
   // Visit frequency options (loaded from lookup: "Visit Frequency")
   const [visitFrequencies, setVisitFrequencies] = useState([]);
-  // If the modal is opened by an advisor creating a schedule, we'll fetch their employee name
-  const [advisorSelfName, setAdvisorSelfName] = useState(null);
-  const [advisorSelfId, setAdvisorSelfId] = useState(null);
-  const advisorPrefetchedRef = useRef(false);
   useEffect(() => {
     let mounted = true;
     const extractItems = (body) => {
@@ -237,7 +233,6 @@ const ScheduleModals = ({
       try {
         let res = null;
         if (typeof fetchWithAuth === 'function') {
-          // fetchWithAuth returns parsed JSON (not axios) from AuthProvider.fetchWithAuth
           res = await fetchWithAuth({ url: '/lookups/by-type-name/Visit Frequency', method: 'GET' });
         } else {
           const base = window.location.origin;
@@ -248,7 +243,6 @@ const ScheduleModals = ({
         const items = extractItems(res);
         if (mounted) setVisitFrequencies(items || []);
       } catch (err) {
-        // non-fatal: keep default options if lookup fails
         console.debug('loadVisitFreq error', err);
       }
     };
@@ -340,79 +334,9 @@ const ScheduleModals = ({
 
   // When the schedule modal opens for creation and the current user is an advisor,
   // fetch the advisor's display name and set the AdvisorID on the form (read-only behavior).
-  useEffect(() => {
-    let mounted = true;
-    const tryPrefillAdvisor = async () => {
-      try {
-        const isOpen = isScheduleModalOpen;
-        const editing = isEditing;
-        if (!isOpen || editing) return;
-        if (!isAdvisor || !currentUserId) return;
-
-        // If AdvisorID already set in formData, leave it alone
-        if (formData && (formData.AdvisorID || formData.AdvisorId)) {
-          // still try to fetch display name for UI
-        }
-
-        // Fetch advisor name via public route: /users/:id/employee-name
-        try {
-          let res = null;
-          if (typeof fetchWithAuth === 'function') {
-            res = await fetchWithAuth({ url: `/users/${encodeURIComponent(currentUserId)}/employee-name`, method: 'GET' });
-          } else {
-            const base = window.location.origin;
-            const r = await fetch(`${base}/api/users/${encodeURIComponent(currentUserId)}/employee-name`, { credentials: 'include' });
-            if (r.ok) res = await r.json();
-          }
-          const body = res && res.data !== undefined ? res.data : res;
-          // Body may be simple string or object; handle multiple shapes
-          let name = null;
-          if (!body) name = null;
-          else if (typeof body === 'string') name = body;
-          else if (typeof body === 'object') {
-            if (body.name) name = body.name;
-            else if (body.EmployeeName) name = body.EmployeeName;
-            else if (body.employeeName) name = body.employeeName;
-            else if (body.FullName) name = body.FullName;
-            else if (body.fullName) name = body.fullName;
-            else {
-              // try to build from first/last
-              const first = body.FirstName || body.firstName || '';
-              const last = body.LastName || body.lastName || '';
-              name = `${first} ${last}`.trim() || null;
-            }
-          }
-          if (mounted) {
-            setAdvisorSelfName(name || String(currentUserId));
-            // record the resolved EmployeeID (may be same as currentUserId if backend didn't provide EmployeeID)
-            setAdvisorSelfId(resolvedAdvisorId || null);
-            // Prefer EmployeeID returned by the backend when available, otherwise fall back to currentUserId
-            const resolvedAdvisorId = (body && (body.EmployeeID || body.EmployeeId)) ? (body.EmployeeID || body.EmployeeId) : currentUserId;
-            // Only update form when AdvisorID is missing, or when it's the auth user id but we now have an EmployeeID
-            const shouldUpdateAdvisor = !formData || !formData.AdvisorID || (formData.AdvisorID === currentUserId && resolvedAdvisorId && resolvedAdvisorId !== currentUserId);
-            if (shouldUpdateAdvisor) {
-              setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || resolvedAdvisorId }));
-            }
-          }
-        } catch (err) {
-          // On error, still set AdvisorID to currentUserId so form is valid
-          if (mounted) {
-            setAdvisorSelfName(String(currentUserId));
-            setAdvisorSelfId(null);
-            // Only set AdvisorID if not already present to avoid infinite update loops
-            if (!formData || !formData.AdvisorID) {
-              setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
-            }
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-    };
-    tryPrefillAdvisor();
-    return () => { mounted = false; if (!isScheduleModalOpen) advisorPrefetchedRef.current = false; };
-  }, [isScheduleModalOpen, isEditing, isAdvisor, currentUserId, fetchWithAuth]);
-
+  // No login-based advisor prefill: advisor must be chosen explicitly by the user.
+  // (previous prefill effect removed)
+  
   return (
     <>
       <Modal open={isScheduleModalOpen} title={isEditing ? 'Edit Schedule' : 'New Schedule'} onClose={() => closeModal('schedule')}>
@@ -426,37 +350,14 @@ const ScheduleModals = ({
             readOnly={isScheduleReadOnly}
             icon={<User size={16} className="text-gray-400" />}
           >
-                {isAdvisor && !isEditing ? (
-                  <>
-                    <option value="">Select Advisor</option>
-                    {
-                      // Prefer advisorSelfName (from /users/:id/employee-name), then try to resolve from advisors/employees lists
-                      (() => {
-                        const resolvedId = advisorSelfId || currentUserId;
-                        let display = advisorSelfName || null;
-                        if (!display) {
-                          // try to find matching advisor/employee by id
-                          const findById = (arr) => arr && arr.find(x => (x.EmployeeID || x.EmployeeId || x.id || x.UserID || x.UserId) === resolvedId);
-                          const match = findById(advisors) || findById(employees) || null;
-                          if (match) {
-                            display = (match.FullName || match.FullNameWithGrandFather || `${match.FirstName || ''} ${match.FatherName || ''} ${match.GrandFatherName || ''}`.replace(/\s+/g, ' ').trim() || match.Name || match.name || null);
-                          }
-                        }
-                        if (!display) display = 'You';
-                        return <option value={resolvedId}>{display}</option>;
-                      })()
-                    }
-                  </>
-                ) : (
-                  <>
-                    <option value="">Select Advisor</option>
-                    {advisors.map(e => {
-                      const id = e.EmployeeID || e.EmployeeId || e.EmployeeId || e.id || e.UserID || e.UserId || e.id
-                      const name = `${e.FirstName || e.firstName || ''} ${e.FatherName || e.fatherName || e.LastName || e.lastName || ''} ${e.GrandFatherName || ''}`.replace(/\s+/g, ' ').trim() || e.Name || e.name || e.fullName || e.FullName || id
-                      return <option key={id} value={id}>{name}</option>
-                    })}
-                  </>
-                )}
+                      <>
+                        <option value="">Select Advisor</option>
+                        {advisors.map(e => {
+                          const id = e.EmployeeID || e.EmployeeId || e.id || e.UserID || e.UserId || e.id
+                          const name = `${e.FirstName || e.firstName || ''} ${e.FatherName || e.fatherName || e.LastName || e.lastName || ''} ${e.GrandFatherName || ''}`.replace(/\s+/g, ' ').trim() || e.Name || e.name || e.fullName || e.FullName || id
+                          return <option key={id} value={id}>{name}</option>
+                        })}
+                      </>
           </SelectField>
           <SelectField
             label="Farm"
