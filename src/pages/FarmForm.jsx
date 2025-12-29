@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaBuilding, FaUser, FaPhone, FaEnvelope, FaMapMarkerAlt, FaGlobe, FaInfoCircle } from 'react-icons/fa';
+import { FaBuilding, FaUser, FaPhone, FaEnvelope, FaMapMarkerAlt, FaGlobe, FaInfoCircle, FaChevronDown } from 'react-icons/fa';
 import { useAuth } from '../auth/AuthProvider';
 
 const InputField = React.memo(({ icon, label, name, value, onChange, error, ...props }) => (
@@ -146,7 +146,10 @@ function FarmersDropdown({ valueDisplay = '', valueId = '', onSelect }) {
         <div className="relative" ref={ref}>
             <div className="relative mt-1">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><FaUser /></div>
-                <input type="text" value={query} onChange={e => { setQuery(e.target.value); }} onFocus={() => { if ((options || []).length > 0) setShowList(true); }} className="text-left block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" placeholder="Search owner by name..." />
+                <input type="text" value={query} onChange={e => { setQuery(e.target.value); }} onFocus={() => { if ((options || []).length > 0) setShowList(true); }} className="text-left block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" placeholder="Search owner by name..." />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                    <FaChevronDown className={`${showList ? 'transform rotate-180' : ''}`} />
+                </div>
             </div>
             {showList && (
                 <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto">
