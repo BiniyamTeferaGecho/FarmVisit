@@ -827,6 +827,19 @@ export default function Farmers() {
                                     </div>
                                 </div>
                                 <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Gender</label>
+                                    <div className="relative">
+                                        <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <select name="Gender" value={form.Gender} onChange={handleFieldChange} className="form-select w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                                            <option value="">Select Gender</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    {fieldErrors?.Gender && <p className="text-xs text-red-500">{fieldErrors.Gender}</p>}
+                                </div>
+                                <div className="space-y-1">
                                     <label className="text-sm font-medium text-gray-600">Phone Number</label>
                                     <div className="relative">
                                         <FaPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
