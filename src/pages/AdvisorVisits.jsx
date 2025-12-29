@@ -170,6 +170,33 @@ export default function AdvisorVisits() {
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-2 py-1 border rounded bg-white">Next</button>
         </div>
       </div>
+      {/* Inline Schedule modal rendered locally so Advisor can create without navigating tabs */}
+      <ScheduleModals
+        state={schState}
+        dispatch={schDispatch}
+        fetchWithAuth={fetchWithAuth}
+        closeModal={() => schDispatch({ type: 'CLOSE_FORM' })}
+        onSave={async () => {
+          try {
+            await createSchedule(schDispatch, schState.form, fetchWithAuth)
+            // close modal and refresh list by resetting page (effect will reload)
+            schDispatch({ type: 'CLOSE_FORM' })
+            setPage(1)
+          } catch (e) {
+            console.error('Failed to create schedule inline', e)
+          }
+        }}
+        setFormData={(updater) => {
+          if (typeof updater === 'function') {
+            const newForm = updater(schState.form)
+            schDispatch({ type: 'SET_FORM_DATA', payload: newForm })
+          } else {
+            schDispatch({ type: 'SET_FORM_DATA', payload: updater })
+          }
+        }}
+        isAdvisor={!!advisorId}
+        currentUserId={advisorId}
+      />
     </div>
   )
 }
