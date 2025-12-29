@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaBuilding, FaUser, FaPhone, FaEnvelope, FaMapMarkerAlt, FaGlobe, FaInfoCircle } from 'react-icons/fa';
+import { useAuth } from '../auth/AuthProvider';
 
 const InputField = React.memo(({ icon, label, name, value, onChange, error, ...props }) => (
     <div>
@@ -49,7 +50,18 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
                         </option>
                     ))}
                 </SelectField>
-                <InputField icon={<FaUser />} label="Owner Name" name="OwnerName" value={form.OwnerName} onChange={handleChange} placeholder="e.g. John Doe" />
+                <div>
+                    <label className="text-left text-sm font-medium text-gray-700 dark:text-gray-300">Owner Name</label>
+                    <FarmersDropdown
+                        valueDisplay={form.OwnerName}
+                        valueId={form.FarmerID}
+                        onSelect={(display, id) => {
+                            // update both OwnerName (display text) and FarmerID
+                            setForm(s => ({ ...s, OwnerName: display, FarmerID: id }));
+                        }}
+                    />
+                    {fieldErrors.OwnerName && <p className="text-left mt-1 text-xs text-red-500">{fieldErrors.OwnerName}</p>}
+                </div>
                 <InputField icon={<FaPhone />} label="Contact Phone" name="ContactPhone" value={form.ContactPhone} onChange={handleChange} error={fieldErrors.ContactPhone} placeholder="0912345678" />
                 <InputField icon={<FaMapMarkerAlt />} label="Address" name="Address" value={form.Address} onChange={handleChange} placeholder="123 Main St" />
                 <InputField icon={<FaMapMarkerAlt />} label="Region" name="Region" value={form.Region} onChange={handleChange} placeholder="e.g. Amhara" />
@@ -76,3 +88,75 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
 
 export { InputField, SelectField };
 export default React.memo(FarmForm);
+
+function FarmersDropdown({ valueDisplay = '', valueId = '', onSelect }) {
+    const { fetchWithAuth } = useAuth();
+    const [query, setQuery] = useState(valueDisplay || '');
+    const [options, setOptions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [showList, setShowList] = useState(false);
+    const ref = useRef(null);
+    const debounceRef = useRef(null);
+
+    useEffect(() => { setQuery(valueDisplay || ''); }, [valueDisplay]);
+
+    useEffect(() => {
+        const onBodyClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setShowList(false); };
+        document.addEventListener('click', onBodyClick);
+        return () => document.removeEventListener('click', onBodyClick);
+    }, []);
+
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (!query || query.trim().length < 1) { setOptions([]); return; }
+        debounceRef.current = setTimeout(async () => {
+            setLoading(true);
+            try {
+                const qs = new URLSearchParams();
+                qs.append('search', query);
+                const res = await fetchWithAuth({ url: `/farms/farmers-dropdown?${qs.toString()}`, method: 'get' });
+                const payload = res?.data?.data || res?.data || res;
+                let arr = null;
+                if (Array.isArray(payload)) arr = payload;
+                else if (Array.isArray(payload.items)) arr = payload.items;
+                else if (Array.isArray(payload.recordset)) arr = payload.recordset;
+                else if (Array.isArray(payload.data)) arr = payload.data;
+                if (!arr && payload && typeof payload === 'object') {
+                    for (const k of Object.keys(payload)) if (Array.isArray(payload[k])) { arr = payload[k]; break; }
+                }
+                // normalize to objects with DisplayText and FarmerID
+                const norm = (arr || []).map(it => ({ id: it.FarmerID || it.Id || it.id || it.ID || it.farmerId || '', text: it.DisplayText || it.Display || it.label || it.Name || it.OwnerName || '' }));
+                setOptions(norm);
+                setShowList(true);
+            } catch (err) {
+                console.debug('FarmersDropdown fetch failed', err);
+                setOptions([]);
+            } finally { setLoading(false); }
+        }, 300);
+        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    }, [query, fetchWithAuth]);
+
+    const onChoose = (opt) => {
+        setQuery(opt.text || '');
+        setShowList(false);
+        if (typeof onSelect === 'function') onSelect(opt.text || '', opt.id || '');
+    };
+
+    return (
+        <div className="relative" ref={ref}>
+            <div className="relative mt-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><FaUser /></div>
+                <input type="text" value={query} onChange={e => { setQuery(e.target.value); }} onFocus={() => { if ((options || []).length > 0) setShowList(true); }} className="text-left block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" placeholder="Search owner by name..." />
+            </div>
+            {showList && (
+                <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {loading ? <div className="p-2 text-sm text-gray-500">Searching...</div> : null}
+                    {!loading && options.length === 0 ? <div className="p-2 text-sm text-gray-500">No matches</div> : null}
+                    {!loading && options.map(o => (
+                        <div key={`${o.id}:${o.text}`} onClick={() => onChoose(o)} className="px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm">{o.text}{o.id ? <span className="text-xs text-gray-400 ml-2">{o.id}</span> : null}</div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
