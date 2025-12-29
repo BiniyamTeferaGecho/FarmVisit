@@ -80,6 +80,12 @@ export const scheduleReducer = (state, action) => {
       return { ...state, loading: action.payload };
     case 'SET_MESSAGE':
       return { ...state, message: action.payload };
+    case 'SET_ERROR':
+      // normalize errors into message for UI
+      return { ...state, message: action.payload, loading: false };
+    case 'SET_SUCCESS':
+      // success payloads are surfaced via message for the UI
+      return { ...state, message: action.payload, loading: false };
     case 'SET_LIST':
       return { ...state, list: action.payload, loading: false };
     case 'SET_PAGINATION':

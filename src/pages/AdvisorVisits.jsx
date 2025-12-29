@@ -178,12 +178,26 @@ export default function AdvisorVisits() {
         closeModal={() => schDispatch({ type: 'CLOSE_FORM' })}
         onSave={async () => {
           try {
+            // Basic client-side validation to avoid sending requests that will 400
+            const f = schState.form || {}
+            const missing = []
+            if (!f.AdvisorID) missing.push('Advisor')
+            if (!f.FarmID) missing.push('Farm')
+            if (!f.ProposedDate) missing.push('Proposed Date')
+            if (!f.FarmType) missing.push('Farm Type')
+            if (missing.length > 0) {
+              schDispatch({ type: 'SET_MESSAGE', payload: `Please complete required fields: ${missing.join(', ')}` })
+              return
+            }
+
             await createSchedule(schDispatch, schState.form, fetchWithAuth)
             // close modal and refresh list by resetting page (effect will reload)
             schDispatch({ type: 'CLOSE_FORM' })
             setPage(1)
           } catch (e) {
             console.error('Failed to create schedule inline', e)
+            // surface a friendly message in the modal
+            schDispatch({ type: 'SET_MESSAGE', payload: e?.response?.data?.message || e?.message || 'Failed to create schedule' })
           }
         }}
         // Provide setters and data objects so modal code doesn't access undefined
