@@ -220,6 +220,7 @@ const ScheduleModals = ({
   const [visitFrequencies, setVisitFrequencies] = useState([]);
   // If the modal is opened by an advisor creating a schedule, we'll fetch their employee name
   const [advisorSelfName, setAdvisorSelfName] = useState(null);
+  const [advisorSelfId, setAdvisorSelfId] = useState(null);
   const advisorPrefetchedRef = useRef(false);
   useEffect(() => {
     let mounted = true;
@@ -383,15 +384,21 @@ const ScheduleModals = ({
           }
           if (mounted) {
             setAdvisorSelfName(name || String(currentUserId));
-            // Ensure form has AdvisorID set so validation passes — only update if missing
-            if (!formData || !formData.AdvisorID) {
-              setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
+            // record the resolved EmployeeID (may be same as currentUserId if backend didn't provide EmployeeID)
+            setAdvisorSelfId(resolvedAdvisorId || null);
+            // Prefer EmployeeID returned by the backend when available, otherwise fall back to currentUserId
+            const resolvedAdvisorId = (body && (body.EmployeeID || body.EmployeeId)) ? (body.EmployeeID || body.EmployeeId) : currentUserId;
+            // Only update form when AdvisorID is missing, or when it's the auth user id but we now have an EmployeeID
+            const shouldUpdateAdvisor = !formData || !formData.AdvisorID || (formData.AdvisorID === currentUserId && resolvedAdvisorId && resolvedAdvisorId !== currentUserId);
+            if (shouldUpdateAdvisor) {
+              setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || resolvedAdvisorId }));
             }
           }
         } catch (err) {
           // On error, still set AdvisorID to currentUserId so form is valid
           if (mounted) {
             setAdvisorSelfName(String(currentUserId));
+            setAdvisorSelfId(null);
             // Only set AdvisorID if not already present to avoid infinite update loops
             if (!formData || !formData.AdvisorID) {
               setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
@@ -422,7 +429,7 @@ const ScheduleModals = ({
                 {isAdvisor && !isEditing ? (
                   <>
                     <option value="">Select Advisor</option>
-                    <option value={currentUserId}>{advisorSelfName || 'Loading...'}</option>
+                    <option value={advisorSelfId || currentUserId}>{advisorSelfName || 'Loading...'}</option>
                   </>
                 ) : (
                   <>
