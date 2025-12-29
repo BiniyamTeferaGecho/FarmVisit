@@ -1021,6 +1021,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField disabled={readOnly} label="Batch Number/Production Date" name="BatchNumber" value={data.BatchNumber} onChange={handleChange} placeholder="Batch number if applicable" />
           <TextAreaField disabled={readOnly} label="Analysis Request" name="AnalyzeRequested" value={data.AnalyzeRequested || data.AnalysisRequest} onChange={handleChange} placeholder="Specify analysis required..." />
            <TextAreaField disabled={readOnly} label="Recommendations for Customer" name="RecommendationAdvice" value={data.RecommendationAdvice || data.RecommendationGiven} onChange={handleChange} placeholder="Enter recommendations..." />
+          <TextAreaField disabled={readOnly} label="Advisor Recommendation" name="AdvisorRecommendation" value={data.AdvisorRecommendation || data.AdvisorRecommendationNote} onChange={handleChange} placeholder="Advisor's recommendation to record..." />
         </SectionCard>
       </div>
 

@@ -25,7 +25,7 @@ export default function LayerFarm() {
     CurrEggProdinPercent: '', FarmHygieneComment: '', EggSizeAvgWeightGm: '', EggAbnormality: '', YolkColor: '', EggShellColor: '',
     RecentEggProdDeclinePrev1to3Weeks: '', MortalityTotal: '', RecentMortalityPrev1to3Weeks: '', ExplainAnyDiseaseHistory: '', AbnormalSigns: '',
     ExplainPostmortemFindings: '', IssuesComplaints: '', AnalyzeRequested: '', TypeofFeedwithComplain: '', SampleTaken: false, SampleType: '', BatchNumber: '', AnyRelatedEvidenceImage: '',
-    FeedBackOnAKF: '', RecommendationAdvice: '', IsVisitCompleted: false, VisitSequence: '', VisitYear: '', VisitQuarter: '', VisitMonth: ''
+    FeedBackOnAKF: '', RecommendationAdvice: '', AdvisorRecommendation: '', IsVisitCompleted: false, VisitSequence: '', VisitYear: '', VisitQuarter: '', VisitMonth: ''
   }
   const [form, setForm] = useState(initialForm)
   const [saving, setSaving] = useState(false)
@@ -186,6 +186,7 @@ export default function LayerFarm() {
         FeedBackOnAKF: form.FeedBackOnAKF || form.CustomerFeedbackOnAKF || null,
         AnyRelatedEvidenceImage: form.AnyRelatedEvidenceImage || form.AnyPictureRelatedtoVisit || null,
         RecommendationAdvice: form.RecommendationAdvice || form.RecommendationGiven || null,
+        AdvisorRecommendation: form.AdvisorRecommendation || null,
         IsVisitCompleted: !!form.IsVisitCompleted,
         VisitSequence: form.VisitSequence ? Number(form.VisitSequence) : null,
         VisitYear: form.VisitYear ? Number(form.VisitYear) : null,
