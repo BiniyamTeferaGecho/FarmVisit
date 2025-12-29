@@ -160,7 +160,7 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                                     <label htmlFor="Gender" className="text-sm font-medium text-gray-600">Gender</label>
                                     <div className="relative">
                                         <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                        <select id="Gender" name="Gender" value={form.Gender} onChange={handleChange} className="form-select w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                                        <select id="Gender" name="Gender" value={form.Gender} onChange={handleChange} aria-label="Gender" autoFocus className="form-select w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
                                             <option value="">Select gender</option>
                                             <option value="Male">Male</option>
                                             <option value="Female">Female</option>
@@ -830,7 +830,7 @@ export default function Farmers() {
                                     <label className="text-sm font-medium text-gray-600">Gender</label>
                                     <div className="relative">
                                         <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                        <select name="Gender" value={form.Gender} onChange={handleFieldChange} className="form-select w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
+                                        <select name="Gender" value={form.Gender} onChange={handleFieldChange} aria-label="Gender" autoFocus className="form-select w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300">
                                             <option value="">Select Gender</option>
                                             <option value="Male">Male</option>
                                             <option value="Female">Female</option>
