@@ -382,14 +382,19 @@ const ScheduleModals = ({
           }
           if (mounted) {
             setAdvisorSelfName(name || String(currentUserId));
-            // Ensure form has AdvisorID set so validation passes
-            setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
+            // Ensure form has AdvisorID set so validation passes — only update if missing
+            if (!formData || !formData.AdvisorID) {
+              setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
+            }
           }
         } catch (err) {
           // On error, still set AdvisorID to currentUserId so form is valid
           if (mounted) {
             setAdvisorSelfName(String(currentUserId));
-            setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
+            // Only set AdvisorID if not already present to avoid infinite update loops
+            if (!formData || !formData.AdvisorID) {
+              setFormData(prev => ({ ...(prev || {}), AdvisorID: prev?.AdvisorID || currentUserId }));
+            }
           }
         }
       } catch (e) {
@@ -616,21 +621,14 @@ const ScheduleModals = ({
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <ActionButton onClick={() => closeModal('schedule')} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Cancel</ActionButton>
-          {/* If the current user is an advisor and this is a create (not editing), disallow direct save */}
           <ActionButton
             onClick={isEditing ? (typeof onUpdate === 'function' ? onUpdate : onSave) : onSave}
             className={`${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} ${isScheduleReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
-            disabled={isScheduleReadOnly || (!isEditing && createLocked) || (!isEditing && isAdvisor)}
+            disabled={isScheduleReadOnly || (!isEditing && createLocked)}
           >
-            {isEditing ? 'Update Schedule' : (createLocked ? 'Creating...' : (isAdvisor && !isEditing ? 'Save Disabled' : 'Save Schedule'))}
+            {isEditing ? 'Update Schedule' : (createLocked ? 'Creating...' : 'Save Schedule')}
           </ActionButton>
         </div>
-        {/* Helper note for advisors */}
-        {isAdvisor && !isEditing && (
-          <div className="mt-3 text-sm text-yellow-700">
-            Advisors cannot save schedules directly. Your name will be prefilled, but schedule creation is restricted — please ask an administrator to create the schedule or use the submit-for-approval workflow if available.
-          </div>
-        )}
       </Modal>
 
       <Modal open={isDeleteModalOpen} title="Confirm Deletion" onClose={() => closeModal('delete')}>
