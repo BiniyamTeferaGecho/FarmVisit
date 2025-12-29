@@ -42,25 +42,34 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
             setForm({
                 id: farmer.FarmerID || farmer.id || null,
                 FirstName: farmer.FirstName || farmer.first_name || '',
-                        Gender: farmer.Gender || farmer.gender || '',
+                Gender: farmer.Gender || farmer.gender || '',
                 LastName: farmer.LastName || farmer.last_name || '',
+                FatherName: farmer.FatherName || farmer.father_name || '',
                 PhoneNumber: farmer.PhoneNumber || farmer.contact?.phone || '',
+                AlternatePhoneNumber: farmer.AlternatePhoneNumber || farmer.alternate_phone || '',
+                GeoLocation: farmer.GeoLocation || farmer.geo_location || '',
                 Email: farmer.Email || farmer.contact?.email || '',
+                NationalID: farmer.NationalID || farmer.national_id || '',
+                ProfilePicture: farmer.ProfilePicture || farmer.profile_picture || '',
                 Region: farmer.Region || farmer.farm?.region || '',
                 Zone: farmer.Zone || farmer.farm?.zone || '',
                 Woreda: farmer.Woreda || farmer.farm?.woreda || '',
                 Kebele: farmer.Kebele || farmer.farm?.kebele || '',
                 Village: farmer.Village || farmer.farm?.village || '',
-                NationalID: farmer.NationalID || farmer.national_id || '',
+                HouseNumber: farmer.HouseNumber || farmer.house_number || '',
                 FarmingExperience: farmer.FarmingExperience ?? farmer.farming_experience ?? '',
-                HouseholdIncome: farmer.HouseholdIncome ?? farmer.household_income ?? '',
-                PreferredContactMethod: farmer.PreferredContactMethod || farmer.preferred_contact_method || 'Phone',
                 PrimaryLanguage: farmer.PrimaryLanguage || farmer.primary_language || '',
                 EducationLevel: farmer.EducationLevel || farmer.education_level || '',
+                MaritalStatus: farmer.MaritalStatus || farmer.marital_status || '',
+                FamilySize: farmer.FamilySize || farmer.family_size || '',
+                Dependents: farmer.Dependents || farmer.dependents || '',
+                HouseholdIncome: farmer.HouseholdIncome ?? farmer.household_income ?? '',
+                PreferredContactMethod: farmer.PreferredContactMethod || farmer.preferred_contact_method || 'Phone',
+                CommunicationLanguage: farmer.CommunicationLanguage || farmer.communication_language || '',
             });
         } else {
             setForm({
-                FirstName: '', Gender: '', LastName: '', PhoneNumber: '', Email: '', Region: '', Zone: '', Woreda: '', Kebele: '', Village: '', NationalID: '', FarmingExperience: '', HouseholdIncome: '', PreferredContactMethod: 'Phone', PrimaryLanguage: '', EducationLevel: ''
+                FirstName: '', Gender: '', LastName: '', FatherName: '', PhoneNumber: '', AlternatePhoneNumber: '', GeoLocation: '', Email: '', NationalID: '', ProfilePicture: '', Region: '', Zone: '', Woreda: '', Kebele: '', Village: '', HouseNumber: '', FarmingExperience: '', PrimaryLanguage: '', EducationLevel: '', MaritalStatus: '', FamilySize: '', Dependents: '', HouseholdIncome: '', PreferredContactMethod: 'Phone', CommunicationLanguage: ''
             });
         }
         setErrors({});
@@ -119,12 +128,33 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                                     {errors.LastName && <p className="text-xs text-red-500">{errors.LastName}</p>}
                                 </div>
                                 <div className="space-y-1">
+                                    <label htmlFor="FatherName" className="text-sm font-medium text-gray-600">Father's Name</label>
+                                    <div className="relative">
+                                        <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input type="text" id="FatherName" name="FatherName" value={form.FatherName} onChange={handleChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="CommunicationLanguage" className="text-sm font-medium text-gray-600">Communication Language</label>
+                                    <div className="relative">
+                                        <FaLanguage className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input type="text" id="CommunicationLanguage" name="CommunicationLanguage" value={form.CommunicationLanguage} onChange={handleChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
                                     <label htmlFor="PhoneNumber" className="text-sm font-medium text-gray-600">Phone Number</label>
                                     <div className="relative">
                                         <FaPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input type="text" id="PhoneNumber" name="PhoneNumber" value={form.PhoneNumber} onChange={handleChange} className={`form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 ${errors.PhoneNumber ? 'border-red-500' : 'border-gray-300'}`} />
                                     </div>
                                     {errors.PhoneNumber && <p className="text-xs text-red-500">{errors.PhoneNumber}</p>}
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="AlternatePhoneNumber" className="text-sm font-medium text-gray-600">Alternate Phone</label>
+                                    <div className="relative">
+                                        <FaPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input type="text" id="AlternatePhoneNumber" name="AlternatePhoneNumber" value={form.AlternatePhoneNumber} onChange={handleChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label htmlFor="Gender" className="text-sm font-medium text-gray-600">Gender</label>
@@ -147,10 +177,24 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                                     </div>
                                 </div>
                                 <div className="space-y-1">
+                                    <label htmlFor="ProfilePicture" className="text-sm font-medium text-gray-600">Profile Picture (URL)</label>
+                                    <div className="relative">
+                                        <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input type="text" id="ProfilePicture" name="ProfilePicture" value={form.ProfilePicture} onChange={handleChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
                                     <label htmlFor="NationalID" className="text-sm font-medium text-gray-600">National ID</label>
                                     <div className="relative">
                                         <FaIdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input type="text" id="NationalID" name="NationalID" value={form.NationalID} onChange={handleChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="GeoLocation" className="text-sm font-medium text-gray-600">Geo Location</label>
+                                    <div className="relative">
+                                        <FaMapMarkerAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input type="text" id="GeoLocation" name="GeoLocation" value={form.GeoLocation} onChange={handleChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                     </div>
                                 </div>
                             </div>
@@ -183,6 +227,10 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                                     <label htmlFor="Village" className="text-sm font-medium text-gray-600">Village</label>
                                     <input type="text" id="Village" name="Village" value={form.Village} onChange={handleChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                 </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="HouseNumber" className="text-sm font-medium text-gray-600">House Number</label>
+                                    <input type="text" id="HouseNumber" name="HouseNumber" value={form.HouseNumber} onChange={handleChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                </div>
                             </div>
                         </div>
 
@@ -194,6 +242,24 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                                     <div className="relative">
                                         <FaTractor className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input type="number" id="FarmingExperience" name="FarmingExperience" value={form.FarmingExperience} onChange={handleChange} className="form-input w-full pl-10 h-12" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="MaritalStatus" className="text-sm font-medium text-gray-600">Marital Status</label>
+                                    <div className="relative">
+                                        <input type="text" id="MaritalStatus" name="MaritalStatus" value={form.MaritalStatus} onChange={handleChange} placeholder="e.g. Single, Married" className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 pl-3" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="FamilySize" className="text-sm font-medium text-gray-600">Family Size</label>
+                                    <div className="relative">
+                                        <input type="number" id="FamilySize" name="FamilySize" value={form.FamilySize} onChange={handleChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 pl-3" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label htmlFor="Dependents" className="text-sm font-medium text-gray-600">Dependents</label>
+                                    <div className="relative">
+                                        <input type="number" id="Dependents" name="Dependents" value={form.Dependents} onChange={handleChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 pl-3" />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
@@ -754,12 +820,26 @@ export default function Farmers() {
                                     {fieldErrors?.LastName && <p className="text-xs text-red-500">{fieldErrors.LastName}</p>}
                                 </div>
                                 <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Father's Name</label>
+                                    <div className="relative">
+                                        <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input name="FatherName" value={form.FatherName} onChange={handleFieldChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
                                     <label className="text-sm font-medium text-gray-600">Phone Number</label>
                                     <div className="relative">
                                         <FaPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input name="PhoneNumber" value={form.PhoneNumber} onChange={handleFieldChange} required className={`form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 ${fieldErrors?.PhoneNumber ? 'border-red-500' : 'border-gray-300'}`} />
                                     </div>
                                     {fieldErrors?.PhoneNumber && <p className="text-xs text-red-500">{fieldErrors.PhoneNumber}</p>}
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Alternate Phone</label>
+                                    <div className="relative">
+                                        <FaPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input name="AlternatePhoneNumber" value={form.AlternatePhoneNumber} onChange={handleFieldChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-sm font-medium text-gray-600">Email</label>
@@ -769,10 +849,24 @@ export default function Farmers() {
                                     </div>
                                 </div>
                                 <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Profile Picture (URL)</label>
+                                    <div className="relative">
+                                        <FaUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input name="ProfilePicture" value={form.ProfilePicture} onChange={handleFieldChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
                                     <label className="text-sm font-medium text-gray-600">National ID</label>
                                     <div className="relative">
                                         <FaIdCard className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input name="NationalID" value={form.NationalID} onChange={handleFieldChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Geo Location</label>
+                                    <div className="relative">
+                                        <FaMapMarkerAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input name="GeoLocation" value={form.GeoLocation} onChange={handleFieldChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                     </div>
                                 </div>
                             </div>
@@ -805,6 +899,10 @@ export default function Farmers() {
                                     <label className="text-sm font-medium text-gray-600">Village</label>
                                     <input name="Village" value={form.Village} onChange={handleFieldChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                 </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">House Number</label>
+                                    <input name="HouseNumber" value={form.HouseNumber} onChange={handleFieldChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                </div>
                             </div>
                         </div>
 
@@ -816,6 +914,24 @@ export default function Farmers() {
                                     <div className="relative">
                                         <FaTractor className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                         <input name="FarmingExperience" type="number" value={form.FarmingExperience} onChange={handleFieldChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Marital Status</label>
+                                    <div className="relative">
+                                        <input name="MaritalStatus" value={form.MaritalStatus} onChange={handleFieldChange} placeholder="e.g. Single, Married" className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 pl-3" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Family Size</label>
+                                    <div className="relative">
+                                        <input name="FamilySize" type="number" value={form.FamilySize} onChange={handleFieldChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 pl-3" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Dependents</label>
+                                    <div className="relative">
+                                        <input name="Dependents" type="number" value={form.Dependents} onChange={handleFieldChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 pl-3" />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
@@ -848,6 +964,13 @@ export default function Farmers() {
                                             <option>Email</option>
                                             <option>In Person</option>
                                         </select>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-600">Communication Language</label>
+                                    <div className="relative">
+                                        <FaLanguage className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input name="CommunicationLanguage" value={form.CommunicationLanguage} onChange={handleFieldChange} className="form-input w-full pl-10 h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                     </div>
                                 </div>
                             </div>
