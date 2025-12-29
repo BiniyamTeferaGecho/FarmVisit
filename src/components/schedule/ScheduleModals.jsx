@@ -429,7 +429,23 @@ const ScheduleModals = ({
                 {isAdvisor && !isEditing ? (
                   <>
                     <option value="">Select Advisor</option>
-                    <option value={advisorSelfId || currentUserId}>{advisorSelfName || 'Loading...'}</option>
+                    {
+                      // Prefer advisorSelfName (from /users/:id/employee-name), then try to resolve from advisors/employees lists
+                      (() => {
+                        const resolvedId = advisorSelfId || currentUserId;
+                        let display = advisorSelfName || null;
+                        if (!display) {
+                          // try to find matching advisor/employee by id
+                          const findById = (arr) => arr && arr.find(x => (x.EmployeeID || x.EmployeeId || x.id || x.UserID || x.UserId) === resolvedId);
+                          const match = findById(advisors) || findById(employees) || null;
+                          if (match) {
+                            display = (match.FullName || match.FullNameWithGrandFather || `${match.FirstName || ''} ${match.FatherName || ''} ${match.GrandFatherName || ''}`.replace(/\s+/g, ' ').trim() || match.Name || match.name || null);
+                          }
+                        }
+                        if (!display) display = 'You';
+                        return <option value={resolvedId}>{display}</option>;
+                      })()
+                    }
                   </>
                 ) : (
                   <>
