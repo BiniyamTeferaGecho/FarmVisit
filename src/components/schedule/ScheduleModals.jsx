@@ -346,8 +346,6 @@ const ScheduleModals = ({
             name="AdvisorID"
             value={formData.AdvisorID}
             onChange={handleFormChange}
-            disabled={isAdvisor && !isEditing}
-            readOnly={isScheduleReadOnly}
             icon={<User size={16} className="text-gray-400" />}
           >
                       <>
