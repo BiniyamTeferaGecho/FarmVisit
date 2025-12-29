@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api from '../../services/api';
 import { validateCompleteRequirements } from '../../utils/visitValidation';
 import FillVisitModal from './FillVisitModal'; 
@@ -220,6 +220,7 @@ const ScheduleModals = ({
   const [visitFrequencies, setVisitFrequencies] = useState([]);
   // If the modal is opened by an advisor creating a schedule, we'll fetch their employee name
   const [advisorSelfName, setAdvisorSelfName] = useState(null);
+  const advisorPrefetchedRef = useRef(false);
   useEffect(() => {
     let mounted = true;
     const extractItems = (body) => {
@@ -402,8 +403,8 @@ const ScheduleModals = ({
       }
     };
     tryPrefillAdvisor();
-    return () => { mounted = false };
-  }, [isScheduleModalOpen, isEditing, isAdvisor, currentUserId, fetchWithAuth, formData]);
+    return () => { mounted = false; if (!isScheduleModalOpen) advisorPrefetchedRef.current = false; };
+  }, [isScheduleModalOpen, isEditing, isAdvisor, currentUserId, fetchWithAuth]);
 
   return (
     <>
