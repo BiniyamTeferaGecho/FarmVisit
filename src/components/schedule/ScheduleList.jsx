@@ -97,6 +97,7 @@ const ActionButton = ({ onClick, icon: Icon, title, disabled = false, disabledRe
 const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {}, confirmedFilled = {}, pageStartOffset = 0 }) => {
   const [advisorMap, setAdvisorMap] = useState({});
   const [latestMap, setLatestMap] = useState({});
+  const [approvalFilter, setApprovalFilter] = useState('All');
 
   useEffect(() => {
     const ids = (schedules || []).map(s => s.id ?? s.ScheduleID).filter(Boolean);
@@ -150,8 +151,40 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
 
   
 
+  // apply approval status filter client-side
+  const filteredSchedules = (schedules || []).filter(s => {
+    if (!approvalFilter || approvalFilter === 'All') return true;
+    const approvalStatus = ((latestMap[s.id ?? s.ScheduleID]?.ApprovalStatus ?? s.ApprovalStatus) || '');
+    const a = String(approvalStatus).toLowerCase();
+    switch (approvalFilter) {
+      case 'Approved':
+        return a.includes('approved');
+      case 'Pending':
+        return a.includes('pending') || a.includes('submitted');
+      case 'Rejected':
+        return a.includes('rejected') || a.includes('denied');
+      case 'Submitted':
+        return a.includes('submitted');
+      case 'None':
+        return !a || a.trim() === '';
+      default:
+        return true;
+    }
+  });
+
   return (
     <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow-md">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-end gap-3">
+        <label className="text-sm text-gray-600 dark:text-gray-300">Approval:</label>
+        <select value={approvalFilter} onChange={e => setApprovalFilter(e.target.value)} className="form-select h-9 text-sm">
+          <option value="All">All</option>
+          <option value="Approved">Approved</option>
+          <option value="Pending">Pending</option>
+          <option value="Submitted">Submitted</option>
+          <option value="Rejected">Rejected</option>
+          <option value="None">None</option>
+        </select>
+      </div>
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-700">
           <tr>
@@ -164,14 +197,14 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-          {(schedules || []).map((schedule, _idx) => {
+          {(filteredSchedules || []).map((schedule, _idx) => {
             const idx = (pageStartOffset || 0) + _idx + 1;
             const id = schedule.id ?? schedule.ScheduleID;
             const latest = latestMap[id] || {};
             const visitStatus = latest.VisitStatus ?? schedule.VisitStatus;
             const approvalStatus = latest.ApprovalStatus ?? schedule.ApprovalStatus;
             const isCompleted = (visitStatus || '').toLowerCase() === 'completed';
-            const canComplete = validateCompleteRequirements(schedule).isValid;
+            const canComplete = validateCompleteRequirements(schedule).ready;
             const normalizedVisitStatus = String(visitStatus || '').toLowerCase();
             
             const aNorm = String(approvalStatus || '').toLowerCase();
@@ -216,7 +249,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{schedule.FarmType || schedule.FarmTypeCode || '—'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{schedule.VisitPurpose || schedule.VisitType || '—'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{visitStatus ? renderStatus(visitStatus, null) : <span className="text-sm text-gray-600">—</span>}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{visitStatus ? renderStatus(visitStatus, approvalStatus) : <span className="text-sm text-gray-600">—</span>}</td>
                 <td className="px-6 py-4 whitespace-nowrap">{renderApprovalBadge(approvalStatus)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center gap-2">
