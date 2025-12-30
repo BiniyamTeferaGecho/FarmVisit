@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -224,7 +224,7 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
                                     <input type="text" id="Kebele" name="Kebele" value={form.Kebele} onChange={handleChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                 </div>
                                 <div className="space-y-1">
-                                    <label htmlFor="Village" className="text-sm font-medium text-gray-600">Village</label>
+                                    <label htmlFor="Village" className="text-sm font-medium text-gray-600">Village/City</label>
                                     <input type="text" id="Village" name="Village" value={form.Village} onChange={handleChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                 </div>
                                 <div className="space-y-1">
@@ -384,16 +384,19 @@ const DataTable = ({
     fetchData,
     loading,
     onAdd,
-    onBulkUpload,
-    onDownloadTemplate,
     onRefresh,
     onBulkDelete,
     canCreate = true,
     canEdit = true,
     canDelete = true,
+    externalGlobalFilter = '',
+    onExternalGlobalFilterChange = null,
+    externalFilters = {},
+    onBulkUpload = null,
+    onDownloadTemplate = null,
 }) => {
     const [sorting, setSorting] = useState([]);
-    const [globalFilter, setGlobalFilter] = useState('');
+    const [globalFilter, setGlobalFilter] = useState(externalGlobalFilter || '');
     const [columnVisibility, setColumnVisibility] = useState({});
     const [rowSelection, setRowSelection] = useState({});
 
@@ -402,7 +405,27 @@ const DataTable = ({
         pageSize: 10,
     });
 
+    // local search / filters inside the table (placed near pagination)
+    const [localShowFilters, setLocalShowFilters] = useState(false);
+    const [localRegion, setLocalRegion] = useState(externalFilters?.Region ?? '');
+    const [localZone, setLocalZone] = useState(externalFilters?.Zone ?? '');
+    const [localWoreda, setLocalWoreda] = useState(externalFilters?.Woreda ?? '');
+    const [localKebele, setLocalKebele] = useState(externalFilters?.Kebele ?? '');
+    const [localVillage, setLocalVillage] = useState(externalFilters?.Village ?? '');
+    const [localGender, setLocalGender] = useState(externalFilters?.Gender ?? '');
+    const [localIsActive, setLocalIsActive] = useState(externalFilters?.IsActive == null ? 'All' : (externalFilters.IsActive ? 'Active' : 'Inactive'));
+    const [localIncludeDeleted, setLocalIncludeDeleted] = useState(Boolean(externalFilters?.IncludeDeleted));
+    const [localCreatedFrom, setLocalCreatedFrom] = useState(externalFilters?.CreatedDateFrom ?? '');
+    const [localCreatedTo, setLocalCreatedTo] = useState(externalFilters?.CreatedDateTo ?? '');
+
     const debouncedGlobalFilter = useDebounce(globalFilter, 500);
+
+    // sync with external filter value when provided
+    useEffect(() => {
+        if (typeof externalGlobalFilter === 'string' && externalGlobalFilter !== globalFilter) {
+            setGlobalFilter(externalGlobalFilter || '');
+        }
+    }, [externalGlobalFilter]);
 
     useEffect(() => {
         const sortParams = sorting[0] ? { SortColumn: sorting[0].id, SortDirection: sorting[0].desc ? 'DESC' : 'ASC' } : {};
@@ -411,8 +434,9 @@ const DataTable = ({
             pageSize: pagination.pageSize,
             SearchTerm: debouncedGlobalFilter,
             ...sortParams,
+            ...externalFilters,
         });
-    }, [pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter, sorting, fetchData]);
+    }, [pagination.pageIndex, pagination.pageSize, debouncedGlobalFilter, sorting, fetchData, JSON.stringify(externalFilters)]);
 
     const table = useReactTable({
         data,
@@ -445,16 +469,6 @@ const DataTable = ({
         <div className="bg-white shadow-xl rounded-xl p-6 transition-shadow duration-300">
             {/* Toolbar */}
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-                <div className="relative w-full md:w-1/3">
-                    <FaSearch className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
-                    <input
-                        type="text"
-                        value={globalFilter}
-                        onChange={e => setGlobalFilter(e.target.value)}
-                        placeholder="Search all farmers..."
-                        className="form-input pl-10 w-full rounded-md shadow-sm"
-                    />
-                </div>
                             <div className="flex items-center space-x-2">
                     {selectedRowCount > 0 ? (
                         <button onClick={() => onBulkDelete(table.getSelectedRowModel().rows.map(r => r.original.FarmerID))} className="px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md flex items-center space-x-2">
@@ -463,17 +477,142 @@ const DataTable = ({
                         </button>
                     ) : (
                         <>
-                            {canCreate && (
-                                <button onClick={onAdd} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-md flex items-center space-x-2">
-                                    <FaPlus />
-                                    <span>New Farmer</span>
-                                </button>
-                            )}
-                            <button onClick={onRefresh} className="p-2 rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-50" title="Refresh Data"><FaSync /></button>
+                            {/* New Farmer moved to page header */}
+                            {/*  */}
                         </>
                     )}
                 </div>
             </div>
+
+            {/* Pagination (moved to top) */}
+            <div className="flex justify-between items-center mt-4 flex-wrap gap-4">
+                <div className="text-sm text-gray-600">
+                    {selectedRowCount} of {totalRows} row(s) selected.
+                </div>
+                <div className="flex items-center space-x-2">
+                    <span className="text-sm">Rows per page:</span>
+                    <select
+                        value={table.getState().pagination.pageSize}
+                        onChange={e => table.setPageSize(Number(e.target.value))}
+                        className="form-select rounded-md shadow-sm text-sm"
+                    >
+                        {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+                    </select>
+                </div>
+                <div className="text-sm text-gray-600">
+                    Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                </div>
+                <div className="flex items-center space-x-2">
+                    <button
+                        onClick={() => { table.setPageIndex(0); }}
+                        disabled={table.getState().pagination.pageIndex === 0}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                    >First</button>
+                    <button
+                        onClick={() => { table.setPageIndex(Math.max(0, table.getState().pagination.pageIndex - 1)); }}
+                        disabled={table.getState().pagination.pageIndex === 0}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                    >Prev</button>
+                    <button
+                        onClick={() => { table.setPageIndex(Math.min(table.getState().pagination.pageIndex + 1, Math.max(0, table.getPageCount() - 1))); }}
+                        disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                    >Next</button>
+                    <button
+                        onClick={() => { table.setPageIndex(Math.max(0, table.getPageCount() - 1)); }}
+                        disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
+                    >Last</button>
+                </div>
+            </div>
+
+            {/* Search + Filters placed near pagination (table header area) */}
+            <div className="mb-4 flex items-center space-x-2">
+                <div className="relative w-full md:w-1/3">
+                    <input
+                        type="search"
+                        value={globalFilter}
+                        onChange={e => { setGlobalFilter(e.target.value); if (typeof onExternalGlobalFilterChange === 'function') onExternalGlobalFilterChange(e.target.value); }}
+                        onKeyDown={e => { if (e.key === 'Enter') { setPagination(p => ({ ...p, pageIndex: 0 })); fetchData({ pageIndex: 0, pageSize: pagination.pageSize, SearchTerm: globalFilter, Region: localRegion || null, Zone: localZone || null, Woreda: localWoreda || null, Kebele: localKebele || null, Village: localVillage || null, Gender: localGender || null, IsActive: localIsActive === 'All' ? null : (localIsActive === 'Active' ? 1 : 0), IncludeDeleted: localIncludeDeleted ? 1 : 0, CreatedDateFrom: localCreatedFrom || null, CreatedDateTo: localCreatedTo || null }); }} }
+                        placeholder="Search farmers by name, id, phone..."
+                        className="form-input w-full pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                    {globalFilter ? (
+                        <button type="button" onClick={() => { setGlobalFilter(''); if (typeof onExternalGlobalFilterChange === 'function') onExternalGlobalFilterChange(''); setPagination(p => ({ ...p, pageIndex: 0 })); fetchData({ pageIndex: 0, pageSize: pagination.pageSize }); }} title="Clear search" className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"><FaTimes /></button>
+                    ) : null}
+                    <button type="button" onClick={() => { setPagination(p => ({ ...p, pageIndex: 0 })); fetchData({ pageIndex: 0, pageSize: pagination.pageSize, SearchTerm: globalFilter, Region: localRegion || null, Zone: localZone || null, Woreda: localWoreda || null, Kebele: localKebele || null, Village: localVillage || null, Gender: localGender || null, IsActive: localIsActive === 'All' ? null : (localIsActive === 'Active' ? 1 : 0), IncludeDeleted: localIncludeDeleted ? 1 : 0, CreatedDateFrom: localCreatedFrom || null, CreatedDateTo: localCreatedTo || null }); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"><FaSearch /></button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setLocalShowFilters(s => !s)} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">Filters</button>
+                    <button onClick={() => { setPagination(p => ({ ...p, pageIndex: 0 })); fetchData({ pageIndex: 0, pageSize: pagination.pageSize, SearchTerm: globalFilter }); }} className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200" title="Refresh Data"><FaSync className="mr-2" /> Refresh</button>
+                </div>
+            </div>
+
+            {localShowFilters && (
+                <div className="mb-4 p-4 bg-white rounded-md border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className="text-sm text-gray-600">Region</label>
+                            <input value={localRegion} onChange={e => setLocalRegion(e.target.value)} placeholder="Region" className="mt-1 block w-full form-input" />
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Zone</label>
+                            <input value={localZone} onChange={e => setLocalZone(e.target.value)} placeholder="Zone" className="mt-1 block w-full form-input" />
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Woreda</label>
+                            <input value={localWoreda} onChange={e => setLocalWoreda(e.target.value)} placeholder="Woreda" className="mt-1 block w-full form-input" />
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Kebele</label>
+                            <input value={localKebele} onChange={e => setLocalKebele(e.target.value)} placeholder="Kebele" className="mt-1 block w-full form-input" />
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Village/City</label>
+                            <input value={localVillage} onChange={e => setLocalVillage(e.target.value)} placeholder="Village" className="mt-1 block w-full form-input" />
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Gender</label>
+                            <select value={localGender} onChange={e => setLocalGender(e.target.value)} className="mt-1 block w-full form-select">
+                                <option value="">Any</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Is Active</label>
+                            <select value={localIsActive} onChange={e => setLocalIsActive(e.target.value)} className="mt-1 block w-full form-select">
+                                <option value="All">All</option>
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Include Deleted</label>
+                            <div className="mt-1">
+                                <label className="inline-flex items-center">
+                                    <input type="checkbox" checked={localIncludeDeleted} onChange={e => setLocalIncludeDeleted(e.target.checked)} className="mr-2" /> Include deleted
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Created From</label>
+                            <input type="date" value={localCreatedFrom} onChange={e => setLocalCreatedFrom(e.target.value)} className="mt-1 block w-full form-input" />
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Created To</label>
+                            <input type="date" value={localCreatedTo} onChange={e => setLocalCreatedTo(e.target.value)} className="mt-1 block w-full form-input" />
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2">
+                        <button className="px-4 py-2 bg-indigo-600 text-white rounded" onClick={() => { setPagination(p => ({ ...p, pageIndex: 0 })); fetchData({ pageIndex: 0, pageSize: pagination.pageSize, SearchTerm: globalFilter, Region: localRegion || null, Zone: localZone || null, Woreda: localWoreda || null, Kebele: localKebele || null, Village: localVillage || null, Gender: localGender || null, IsActive: localIsActive === 'All' ? null : (localIsActive === 'Active' ? 1 : 0), IncludeDeleted: localIncludeDeleted ? 1 : 0, CreatedDateFrom: localCreatedFrom || null, CreatedDateTo: localCreatedTo || null }); setLocalShowFilters(false); }}>Apply</button>
+                        <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => { setLocalRegion(''); setLocalZone(''); setLocalWoreda(''); setLocalKebele(''); setLocalVillage(''); setLocalGender(''); setLocalIsActive('All'); setLocalIncludeDeleted(false); setLocalCreatedFrom(''); setLocalCreatedTo(''); setPagination(p => ({ ...p, pageIndex: 0 })); fetchData({ pageIndex: 0, pageSize: pagination.pageSize, SearchTerm: globalFilter }); }}>Clear</button>
+                    </div>
+                </div>
+            )}
 
             {/* Table */}
             <div className="overflow-x-auto">
@@ -525,63 +664,10 @@ const DataTable = ({
                 </table>
             </div>
 
-            {/* Pagination */}
-            <div className="flex justify-between items-center mt-4 flex-wrap gap-4">
-                <div className="text-sm text-gray-600">
-                    {selectedRowCount} of {totalRows} row(s) selected.
-                </div>
-                <div className="flex items-center space-x-2">
-                    <span className="text-sm">Rows per page:</span>
-                    <select
-                        value={table.getState().pagination.pageSize}
-                        onChange={e => table.setPageSize(Number(e.target.value))}
-                        className="form-select rounded-md shadow-sm text-sm"
-                    >
-                        {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
-                    </select>
-                </div>
-                <div className="text-sm text-gray-600">
-                    Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-                </div>
-                    <div className="flex items-center space-x-2">
-                        {
-                          // compute safe values
-                        }
-                        <button
-                            onClick={() => {
-                                console.log('Pagination First click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount() });
-                                setPagination(p => ({ ...p, pageIndex: 0 }));
-                            }}
-                            disabled={table.getState().pagination.pageIndex === 0}
-                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
-                        >First</button>
-                        <button
-                            onClick={() => {
-                                console.log('Pagination Prev click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount() });
-                                setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }));
-                            }}
-                            disabled={table.getState().pagination.pageIndex === 0}
-                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
-                        >Prev</button>
-                        <button
-                            onClick={() => {
-                                const next = Math.min(table.getState().pagination.pageIndex + 1, Math.max(0, table.getPageCount() - 1));
-                                console.log('Pagination Next click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount(), next });
-                                setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, table.getPageCount() - 1)) }));
-                            }}
-                            disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)}
-                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
-                        >Next</button>
-                        <button
-                            onClick={() => {
-                                console.log('Pagination Last click', { pageIndex: table.getState().pagination.pageIndex, pageCount: table.getPageCount() });
-                                setPagination(p => ({ ...p, pageIndex: Math.max(0, table.getPageCount() - 1) }));
-                            }}
-                            disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)}
-                            className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50"
-                        >Last</button>
-                    </div>
+            <div className="mt-3 flex items-center justify-end text-sm text-gray-600">
+                <span>Total farmers: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong></span>
             </div>
+            
         </div>
     );
 };
@@ -597,6 +683,20 @@ export default function Farmers() {
     const [totalRows, setTotalRows] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
+    // Search and advanced filters (mirror Farms.jsx behavior)
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [filterRegion, setFilterRegion] = useState('');
+    const [filterZone, setFilterZone] = useState('');
+    const [filterWoreda, setFilterWoreda] = useState('');
+    const [filterKebele, setFilterKebele] = useState('');
+    const [filterVillage, setFilterVillage] = useState('');
+    const [filterGender, setFilterGender] = useState('');
+    const [filterIsActive, setFilterIsActive] = useState('All');
+    const [filterIncludeDeleted, setFilterIncludeDeleted] = useState(false);
+    const [filterCreatedFrom, setFilterCreatedFrom] = useState('');
+    const [filterCreatedTo, setFilterCreatedTo] = useState('');
 
     const [isFormOpen, setFormOpen] = useState(false);
     const [editingFarmer, setEditingFarmer] = useState(null);
@@ -615,6 +715,12 @@ export default function Farmers() {
     
     const [isDeleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
+
+    // Bulk upload UI state (header)
+    const bulkInputRef = useRef(null);
+    const [selectedBulkFile, setSelectedBulkFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadResult, setUploadResult] = useState(null); // { status: 'success'|'error', message: '' }
 
     const fetchData = useCallback(async (params) => {
         setLoading(true);
@@ -767,13 +873,111 @@ export default function Farmers() {
 
     const columns = useMemo(() => getColumns(handleEdit, handleDelete, canEdit, canDelete), [data, canEdit, canDelete]);
 
+    // Bulk upload handlers
+    const downloadTemplate = () => {
+        const headers = ['FirstName','LastName','FatherName','Gender','PhoneNumber','AlternatePhoneNumber','Email','NationalID','Region','Zone','Woreda','Kebele','Village','HouseNumber','FarmingExperience','PrimaryLanguage','EducationLevel','MaritalStatus','FamilySize','Dependents','HouseholdIncome','PreferredContactMethod','CommunicationLanguage'];
+        const example = ['John','Doe','Abebe','Male','0912345678','','john@example.com','123456789','RegionA','ZoneA','WoredaA','KebeleA','VillageA','12','5','BSc','Married','5','2','1000','Phone','Amharic'];
+        const csv = [headers.join(','), example.join(',')].join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'farmers_import_template.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    };
+
+    const uploadSelectedFile = async () => {
+        if (!selectedBulkFile) return;
+        setUploading(true);
+        try {
+            const text = await selectedBulkFile.text();
+            const lines = text.split(/\r?\n/).filter(Boolean);
+            const rows = lines.map((l, idx) => {
+                if (idx === 0 && l.toLowerCase().includes('firstname')) return null;
+                const cols = l.split(',').map(c => c.trim());
+                return {
+                    FirstName: cols[0] || null,
+                    LastName: cols[1] || null,
+                    FatherName: cols[2] || null,
+                    Gender: cols[3] || null,
+                    PhoneNumber: cols[4] || null,
+                    AlternatePhoneNumber: cols[5] || null,
+                    Email: cols[6] || null,
+                    NationalID: cols[7] || null,
+                    Region: cols[8] || null,
+                    Zone: cols[9] || null,
+                    Woreda: cols[10] || null,
+                    Kebele: cols[11] || null,
+                    Village: cols[12] || null,
+                    HouseNumber: cols[13] || null,
+                    FarmingExperience: cols[14] ? Number(cols[14]) : null,
+                    PrimaryLanguage: cols[15] || null,
+                    EducationLevel: cols[16] || null,
+                    MaritalStatus: cols[17] || null,
+                    FamilySize: cols[18] ? Number(cols[18]) : null,
+                    Dependents: cols[19] ? Number(cols[19]) : null,
+                    HouseholdIncome: cols[20] ? Number(cols[20]) : null,
+                    PreferredContactMethod: cols[21] || null,
+                    CommunicationLanguage: cols[22] || null,
+                };
+            }).filter(Boolean);
+
+            if (rows.length === 0) {
+                setUploadResult({ status: 'error', message: 'No valid rows found in file.' });
+                return;
+            }
+
+            await fetchWithAuth({ url: '/farmers/bulk', method: 'post', data: { farmers: rows, CreatedBy: user?.UserID || user?.id } });
+            setUploadResult({ status: 'success', message: `Uploaded ${rows.length} farmers successfully.` });
+            setSelectedBulkFile(null);
+            // refresh list
+            fetchData({ pageIndex: 0, pageSize: 10 });
+        } catch (err) {
+            console.error('Bulk upload failed', err);
+            const msg = err?.message || (err?.response?.data && JSON.stringify(err.response.data)) || 'Bulk upload failed';
+            setUploadResult({ status: 'error', message: msg });
+        } finally {
+            setUploading(false);
+        }
+    };
+
     return (
         <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-3xl font-bold text-gray-800">Farmers</h1>
+                <div className="flex items-center space-x-2">
+                    <button onClick={handleAdd} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        <FaPlus className="mr-2" /> New Farmer
+                    </button>
+                    <input ref={bulkInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={e => setSelectedBulkFile(e.target.files?.[0] || null)} />
+                    <button onClick={() => bulkInputRef.current?.click()} className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-md shadow-md hover:bg-teal-700 flex items-center space-x-2">
+                        <FaFileCsv />
+                        <span>Bulk Upload</span>
+                    </button>
+                    <button onClick={downloadTemplate} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                        <FaDownload className="mr-2" /> Template
+                    </button>
+
+                    {selectedBulkFile && (
+                        <div className="flex items-center space-x-2 ml-4">
+                            <span className="text-sm text-gray-700">{selectedBulkFile.name}</span>
+                            <button onClick={uploadSelectedFile} disabled={uploading} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+                                {uploading ? 'Uploading...' : 'Upload'}
+                            </button>
+                            <button onClick={() => setSelectedBulkFile(null)} disabled={uploading} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {error && <AlertModal title="Error" message={error} onClose={() => setError(null)} />}
+            {uploadResult && (
+                <AlertModal
+                    title={uploadResult.status === 'success' ? 'Upload Successful' : 'Upload Failed'}
+                    message={uploadResult.message}
+                    onClose={() => setUploadResult(null)}
+                />
+            )}
+
+            {/* Search/Filters moved into table header to avoid duplication. */}
 
             <DataTable
                 columns={columns}
@@ -787,6 +991,74 @@ export default function Farmers() {
                 canDelete={canDelete}
                 onBulkDelete={handleBulkDelete}
                 onRefresh={() => fetchData({ pageIndex: 0, pageSize: 10 })}
+                externalGlobalFilter={searchQuery}
+                onExternalGlobalFilterChange={(v) => { setSearchQuery(v); }}
+                externalFilters={{
+                    Region: filterRegion || null,
+                    Zone: filterZone || null,
+                    Woreda: filterWoreda || null,
+                    Kebele: filterKebele || null,
+                    Village: filterVillage || null,
+                    Gender: filterGender || null,
+                    IsActive: filterIsActive === 'All' ? null : (filterIsActive === 'Active' ? 1 : 0),
+                    IncludeDeleted: filterIncludeDeleted ? 1 : 0,
+                    CreatedDateFrom: filterCreatedFrom || null,
+                    CreatedDateTo: filterCreatedTo || null,
+                }}
+                onBulkUpload={async (file) => {
+                    // parent handler will process file and send to backend
+                    if (!file) return;
+                    try {
+                        const text = await file.text();
+                        const lines = text.split(/\r?\n/).filter(Boolean);
+                        const rows = lines.map((l, idx) => {
+                            if (idx === 0 && l.toLowerCase().includes('firstname')) return null;
+                            const cols = l.split(',').map(c => c.trim());
+                            return {
+                                FirstName: cols[0] || null,
+                                LastName: cols[1] || null,
+                                FatherName: cols[2] || null,
+                                Gender: cols[3] || null,
+                                PhoneNumber: cols[4] || null,
+                                AlternatePhoneNumber: cols[5] || null,
+                                Email: cols[6] || null,
+                                NationalID: cols[7] || null,
+                                Region: cols[8] || null,
+                                Zone: cols[9] || null,
+                                Woreda: cols[10] || null,
+                                Kebele: cols[11] || null,
+                                Village: cols[12] || null,
+                                HouseNumber: cols[13] || null,
+                                FarmingExperience: cols[14] ? Number(cols[14]) : null,
+                                PrimaryLanguage: cols[15] || null,
+                                EducationLevel: cols[16] || null,
+                                MaritalStatus: cols[17] || null,
+                                FamilySize: cols[18] ? Number(cols[18]) : null,
+                                Dependents: cols[19] ? Number(cols[19]) : null,
+                                HouseholdIncome: cols[20] ? Number(cols[20]) : null,
+                                PreferredContactMethod: cols[21] || null,
+                                CommunicationLanguage: cols[22] || null,
+                            };
+                        }).filter(Boolean);
+
+                        if (rows.length === 0) return;
+                        await fetchWithAuth({ url: '/farmers/bulk', method: 'post', data: { farmers: rows, CreatedBy: user?.UserID || user?.id } });
+                        // refresh list
+                        fetchData({ pageIndex: 0, pageSize: 10 });
+                    } catch (err) {
+                        console.error('Bulk upload failed', err);
+                        throw err;
+                    }
+                }}
+                onDownloadTemplate={() => {
+                    const headers = ['FirstName','LastName','FatherName','Gender','PhoneNumber','AlternatePhoneNumber','Email','NationalID','Region','Zone','Woreda','Kebele','Village','HouseNumber','FarmingExperience','PrimaryLanguage','EducationLevel','MaritalStatus','FamilySize','Dependents','HouseholdIncome','PreferredContactMethod','CommunicationLanguage'];
+                    const example = ['John','Doe','Abebe','Male','0912345678','','john@example.com','123456789','RegionA','ZoneA','WoredaA','KebeleA','VillageA','12','5','BSc','Married','5','2','1000','Phone','Amharic'];
+                    const csv = [headers.join(','), example.join(',')].join('\r\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'farmers_import_template.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+                }}
             />
 
             {/* Modals would be rendered here, e.g., for adding/editing */}
@@ -909,7 +1181,7 @@ export default function Farmers() {
                                     <input name="Kebele" value={form.Kebele} onChange={handleFieldChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-600">Village</label>
+                                    <label className="text-sm font-medium text-gray-600">Village/City</label>
                                     <input name="Village" value={form.Village} onChange={handleFieldChange} className="form-input w-full h-12 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-300" />
                                 </div>
                                 <div className="space-y-1">

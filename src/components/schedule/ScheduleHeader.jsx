@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { format } from 'date-fns';
 import axios from 'axios';
 import { useAuth } from '../../auth/AuthProvider'
 import {
   FaPlus, FaSync, FaUpload, FaFileAlt, FaThLarge, FaTrash, FaBars, FaTimes,
   FaClipboardList, FaCheckCircle, FaTimesCircle, FaClipboardCheck, FaClock, FaExclamationTriangle
 } from 'react-icons/fa';
-import DateRangePicker from './DateRangePicker';
+// Date range picker moved to page-level (FarmVisitSchedule.jsx)
 
 import { baseURL as API_BASE } from '../../utils/api'
 
@@ -126,38 +125,7 @@ function useFetchStats(reloadKey) {
         </div>
         
         <div className={`${filtersOpen ? 'block' : 'hidden'} md:grid md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700`}>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Date Range</label>
-            <div className="relative">
-              <button onClick={() => onToggleDatePicker(true)} className="w-full p-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
-                {`${format(dateRange.startDate, 'MMM dd, yyyy')} - ${format(dateRange.endDate, 'MMM dd, yyyy')}`}
-              </button>
-              {showDatePicker && (
-                <DateRangePicker
-                  range={dateRange}
-                  onChange={onDateChange}
-                  onClose={() => onToggleDatePicker(false)}
-                />
-              )}
-            </div>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Farm Type</label>
-            <select value={farmType} onChange={(e) => onFarmTypeChange(e.target.value)} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
-              <option value="">All Types</option>
-              <option value="DAIRY">Dairy</option>
-              <option value="LAYER">Layer</option>
-              <option value="BROILER">Broiler</option>
-            </select>
-          </div>
-          <div className="flex items-end gap-2">
-            <button onClick={handleAction(onClear, () => onFilterChange({}))} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-              <FaTrash /> Clear Filters
-            </button>
-            <button onClick={handleAction(onReset)} className="px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-              Reset
-            </button>
-          </div>
+          {/* Date Range, Farm Type and Clear/Reset controls moved to the page component (FarmVisitSchedule.jsx) */}
         </div>
       </div>
     </div>

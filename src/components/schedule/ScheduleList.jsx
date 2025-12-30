@@ -98,6 +98,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
   const [advisorMap, setAdvisorMap] = useState({});
   const [latestMap, setLatestMap] = useState({});
   const [approvalFilter, setApprovalFilter] = useState('All');
+  const [visitStatusFilter, setVisitStatusFilter] = useState('All');
 
   useEffect(() => {
     const ids = (schedules || []).map(s => s.id ?? s.ScheduleID).filter(Boolean);
@@ -172,9 +173,40 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
     }
   });
 
+  // apply visit status filter client-side (in addition to approval filter)
+  const filteredByVisitStatus = filteredSchedules.filter(s => {
+    if (!visitStatusFilter || visitStatusFilter === 'All') return true;
+    const visitStatus = ((latestMap[s.id ?? s.ScheduleID]?.VisitStatus ?? s.VisitStatus) || '');
+    const v = String(visitStatus).toLowerCase();
+    switch (visitStatusFilter) {
+      case 'Scheduled':
+        return v === 'scheduled';
+      case 'Draft':
+        return v === 'draft' || v === 'd';
+      case 'Completed':
+        return v === 'completed' || v === 'complete';
+      case 'Cancelled':
+        return v === 'cancelled' || v === 'canceled' || v === 'cancel';
+      case 'None':
+        return !v || v.trim() === '';
+      default:
+        return true;
+    }
+  });
+
   return (
     <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow-md">
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-end gap-3">
+        <label className="text-sm text-gray-600 dark:text-gray-300">Visit Status:</label>
+        <select value={visitStatusFilter} onChange={e => setVisitStatusFilter(e.target.value)} className="form-select h-9 text-sm">
+          <option value="All">All</option>
+          <option value="Scheduled">Scheduled</option>
+          <option value="Draft">Draft</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+          <option value="None">None</option>
+        </select>
+
         <label className="text-sm text-gray-600 dark:text-gray-300">Approval:</label>
         <select value={approvalFilter} onChange={e => setApprovalFilter(e.target.value)} className="form-select h-9 text-sm">
           <option value="All">All</option>
@@ -197,7 +229,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-          {(filteredSchedules || []).map((schedule, _idx) => {
+          {(filteredByVisitStatus || []).map((schedule, _idx) => {
             const idx = (pageStartOffset || 0) + _idx + 1;
             const id = schedule.id ?? schedule.ScheduleID;
             const latest = latestMap[id] || {};

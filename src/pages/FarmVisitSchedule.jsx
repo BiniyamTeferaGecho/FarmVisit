@@ -4,12 +4,15 @@ import { useAuth } from '../auth/AuthProvider';
 import { showToast } from '../utils/toast';
 import { scheduleReducer, initialState } from '../reducers/scheduleReducer';
 import ScheduleHeader from '../components/schedule/ScheduleHeader';
+import DateRangePicker from '../components/schedule/DateRangePicker';
+import { format } from 'date-fns';
 import ScheduleList from '../components/schedule/ScheduleList';
 import ScheduleModals from '../components/schedule/ScheduleModals';
 import api from '../services/api';
 import apiClient from '../utils/api';
 import { validateCompleteRequirements } from '../utils/visitValidation';
 import { CalendarIcon } from '@heroicons/react/24/outline';
+import { FaTrash } from 'react-icons/fa';
 
 // Provide a local API_BASE derived from the shared axios client so
 // files constructing full URLs can reuse the centralized baseURL.
@@ -101,7 +104,7 @@ const FarmVisitSchedule = () => {
 
         await Promise.all([
           api.fetchStats(dispatch, auth.fetchWithAuth),
-          api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 }),
+          api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId }),
         ]);
       } catch (err) {
         console.error('refresh error', err);
@@ -166,8 +169,23 @@ const FarmVisitSchedule = () => {
       const dr = params.dateRange || {};
       const from = dr.startDate || dr.from || dr.start || dr.DateFrom || dr.dateFrom || null;
       const to = dr.endDate || dr.to || dr.end || dr.DateTo || dr.dateTo || null;
-      if (from) params.DateFrom = from;
-      if (to) params.DateTo = to;
+      // Normalize Date objects to ISO strings for consistent server-side parsing
+      try {
+        if (from) {
+          if (from instanceof Date) params.DateFrom = from.toISOString();
+          else if (typeof from === 'string') params.DateFrom = from;
+          else params.DateFrom = new Date(from).toISOString();
+        }
+        if (to) {
+          if (to instanceof Date) params.DateTo = to.toISOString();
+          else if (typeof to === 'string') params.DateTo = to;
+          else params.DateTo = new Date(to).toISOString();
+        }
+      } catch (e) {
+        // Fallback: pass raw values if normalization fails
+        if (from) params.DateFrom = from;
+        if (to) params.DateTo = to;
+      }
       delete params.dateRange;
     }
 
@@ -559,14 +577,14 @@ const FarmVisitSchedule = () => {
           dispatch({ type: 'SET_LIST', payload: updated });
         } catch (e) {
           // fallback to re-fetch if local update fails
-          await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 });
+          await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId });
         }
 
         dispatch({ type: 'SET_MESSAGE', payload: null });
         closeModal('schedule');
       } else {
         // fallback: trigger a refresh
-        await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 });
+        await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId });
         closeModal('schedule');
       }
     } catch (err) {
@@ -728,7 +746,7 @@ const FarmVisitSchedule = () => {
                         dispatch({ type: 'SET_LIST', payload: updated });
                       } catch (e) {
                         // fallback: refresh full list if local merge fails
-                        await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20 });
+                        await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId });
                       }
                     }
                   } catch (e) {
@@ -1043,6 +1061,44 @@ const FarmVisitSchedule = () => {
         showDatePicker={state.showDatePicker}
         onToggleDatePicker={() => dispatch({ type: 'TOGGLE_DATE_PICKER' })}
       />
+
+      {/* Moved filters: Date Range, Farm Type, Clear/Reset (previously in ScheduleHeader) */}
+      <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm space-y-4 mt-4"> 
+        <div className={`md:grid md:grid-cols-3 gap-4 pt-0 border-t-0`}>
+          <div>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Date Range</label>
+            <div className="relative">
+              <button onClick={() => dispatch({ type: 'TOGGLE_DATE_PICKER' })} className="w-full p-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
+                {state.dateRange && state.dateRange.startDate ? `${format(state.dateRange.startDate, 'MMM dd, yyyy')} - ${format(state.dateRange.endDate, 'MMM dd, yyyy')}` : 'Select date range'}
+              </button>
+              {state.showDatePicker && (
+                <DateRangePicker
+                  range={state.dateRange}
+                  onChange={handleDateChange}
+                  onClose={() => dispatch({ type: 'TOGGLE_DATE_PICKER' })}
+                />
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Farm Type</label>
+            <select value={state.farmType || ''} onChange={(e) => { const v = e.target ? e.target.value : e; dispatch({ type: 'SET_FARM_TYPE', payload: v }); try { console.debug('FarmType changed ->', v); } catch {} handleSearch({ farmType: v, PageNumber: 1, PageSize: state.schedulePageSize || 20 }); }} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+              <option value="">All Types</option>
+              <option value="DAIRY">Dairy</option>
+              <option value="LAYER">Layer</option>
+              <option value="BROILER">Broiler</option>
+            </select>
+          </div>
+          <div className="flex items-end gap-2">
+            <button onClick={() => { dispatch({ type: 'SET_DATE_RANGE', payload: initialState.dateRange }); dispatch({ type: 'SET_FARM_TYPE', payload: '' }); dispatch({ type: 'SET_SELECTED_FARM_ID', payload: null }); handleSearch({ dateRange: initialState.dateRange, farmType: '', selectedFarmId: null, PageNumber: 1 }); }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
+              <FaTrash /> Clear Filters
+            </button>
+            <button onClick={handleReset} className="px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
 
       {state.loading ? (
         <Spinner />

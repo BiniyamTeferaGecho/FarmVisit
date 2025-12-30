@@ -835,14 +835,15 @@ export default function LayerFarm() {
                 <th className="px-4 py-3">Breed</th>
                 <th className="px-4 py-3">Flock</th>
                 <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">Visit Status</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loadingVisits ? (
-                    <tr><td colSpan={9} className="p-6 text-center"><LoadingSpinner /></td></tr>
-              ) : visits.length === 0 ? (
-                    <tr><td colSpan={9} className="p-6 text-center text-gray-500">No visits found.</td></tr>
+                  <tr><td colSpan={10} className="p-6 text-center"><LoadingSpinner /></td></tr>
+                ) : visits.length === 0 ? (
+                  <tr><td colSpan={10} className="p-6 text-center text-gray-500">No visits found.</td></tr>
               ) : visits.map((v, idx) => (
                 <tr key={v.LayerVisitID || idx} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-3">{idx + 1}</td>
@@ -869,6 +870,29 @@ export default function LayerFarm() {
                   <td className="px-4 py-3">{v.Breed || ''}</td>
                   <td className="px-4 py-3">{v.FlockSize ?? ''}</td>
                   <td className="px-4 py-3">{v.CreatedAt ? new Date(v.CreatedAt).toLocaleString() : (v.CreatedDate ? new Date(v.CreatedDate).toLocaleString() : '')}</td>
+                  <td className="px-4 py-3">{(() => {
+                    const scheduleId = v.ScheduleID || v.scheduleId || null
+                    const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
+                    const raw = sched?.VisitStatus || sched?.VisitStatusName || v.VisitStatus || v.VisitStatusName || (v.IsVisitCompleted ? 'COMPLETED' : null)
+                    if (!raw) return ''
+                    const val = String(raw).trim().toUpperCase()
+                    let label = ''
+                    let cls = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium '
+                    if (val === 'INPROGRESS' || val === 'IN_PROGRESS' || val === 'IN PROGRESS') {
+                      label = 'In Progress'
+                      cls += 'bg-amber-100 text-amber-800'
+                    } else if (val === 'SCHEDULED') {
+                      label = 'Scheduled'
+                      cls += 'bg-blue-100 text-blue-800'
+                    } else if (val === 'COMPLETED' || val === 'COMPLETE') {
+                      label = 'Completed'
+                      cls += 'bg-green-100 text-green-800'
+                    } else {
+                      label = raw.toString().split(/_|\s+/).map(s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()).join(' ')
+                      cls += 'bg-gray-100 text-gray-700'
+                    }
+                    return <span className={cls}>{label}</span>
+                  })()}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
                       {(() => {

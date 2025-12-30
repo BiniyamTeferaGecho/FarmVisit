@@ -6,7 +6,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import EmployeeForm, { SelectField } from './EmployeeForm';
-import { FaUserPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUserCog, FaUndo, FaIdCard, FaVenusMars, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBuilding, FaUserTie } from 'react-icons/fa';
+import { FaUserPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUserCog, FaUndo, FaIdCard, FaVenusMars, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBuilding, FaUserTie, FaSearch, FaTimes } from 'react-icons/fa';
 
 const initialForm = {
     FirstName: '',
@@ -44,6 +44,9 @@ export default function Employee() {
 
     const [list, setList] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [totalRows, setTotalRows] = useState(0);
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
     const [form, setForm] = useState(initialForm);
     const [editingId, setEditingId] = useState(null);
     const [showForm, setShowForm] = useState(false);
@@ -61,7 +64,10 @@ export default function Employee() {
     const [touchedFields, setTouchedFields] = useState({});
     const [isFormValid, setIsFormValid] = useState(false);
 
-    useEffect(() => { fetchList() }, []);
+    // refetch when pagination changes
+    useEffect(() => {
+        fetchList(pagination.pageIndex, searchQuery, pagination.pageSize);
+    }, [pagination.pageIndex, pagination.pageSize]);
 
     const getErrorMessage = (err) => {
         try {
@@ -74,15 +80,34 @@ export default function Employee() {
         } catch (e) { return err?.message || 'Unknown error' }
     };
 
-    const fetchList = async (page = 1) => {
+    const fetchList = async (pageIndex = pagination.pageIndex, search = null, pageSize = pagination.pageSize) => {
         setLoading(true); setError(null);
         try {
-            const res = await fetchWithAuth({ url: `/advisor`, method: 'get' });
+            const pageNumber = (Number.isFinite(pageIndex) ? (pageIndex + 1) : 1);
+            const size = pageSize || pagination.pageSize || 10
+            let url = `/advisor?page=${pageNumber}&pageSize=${size}`
+            if (search && String(search).trim() !== '') url += `&search=${encodeURIComponent(String(search))}`
+            const res = await fetchWithAuth({ url, method: 'get' });
             const payload = res.data?.data || res.data;
-            if (Array.isArray(payload)) setList(payload);
-            else if (payload && payload.items) setList(payload.items);
-            else if (payload && Array.isArray(payload.recordset)) setList(payload.recordset);
-            else setList([]);
+            if (Array.isArray(payload)) {
+                setList(payload);
+                setTotalRows(payload.length || 0);
+            } else if (payload && payload.items) {
+                setList(payload.items);
+                setTotalRows(payload.total || payload.totalCount || payload.count || payload.items.length || 0);
+            } else if (payload && Array.isArray(payload.recordset)) {
+                setList(payload.recordset);
+                setTotalRows(payload.recordset.length || 0);
+            } else if (payload && payload.recordsets) {
+                // some backends return recordsets with items in first set and total in second
+                const items = (payload.recordsets && payload.recordsets[0]) || payload.recordset || []
+                setList(items);
+                const maybeTotal = (payload.recordsets[1] && payload.recordsets[1][0] && (payload.recordsets[1][0].TotalCount || payload.recordsets[1][0].TotalEmployees)) || null
+                setTotalRows(maybeTotal || items.length || 0);
+            } else {
+                setList([]);
+                setTotalRows(0);
+            }
         } catch (err) {
             const msg = getErrorMessage(err);
             setError(msg);
@@ -326,19 +351,45 @@ export default function Employee() {
                 <script>{/* placeholder to keep linter happy for the following useEffect */}</script>
                 {previewNumber && <div className="mb-4 p-4 bg-blue-100 text-blue-700 border border-blue-400 rounded-lg">Next Employee Number: <strong>{previewNumber}</strong></div>}
 
-                <div className="flex items-center space-x-2 mb-4">
-                    <button onClick={() => fetchList()} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-                        <FaSync className="mr-2" /> Refresh
-                    </button>
-                    <button onClick={() => fetchStats()} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-                        <FaChartBar className="mr-2" /> Stats
-                    </button>
-                    <button onClick={previewNext} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-                        Preview Next Number
-                    </button>
-                    <button onClick={generateReport} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-                        Generate Report
-                    </button>
+                {/* Search + Refresh (matches Farms.jsx layout) */}
+                <div className="mb-4 flex items-center space-x-2">
+                    <div className="relative w-full md:w-1/3">
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') { setPagination(p => ({ ...p, pageIndex: 0 })); fetchList(0, searchQuery); } }}
+                            placeholder="Search employees by name, id, phone..."
+                            className="form-input w-full pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                        {searchQuery ? (
+                            <button type="button" onClick={() => { setSearchQuery(''); setPagination(p => ({ ...p, pageIndex: 0 })); fetchList(0, null); }} title="Clear search" className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"><FaTimes /></button>
+                        ) : null}
+                        <button type="button" onClick={() => { setPagination(p => ({ ...p, pageIndex: 0 })); fetchList(0, searchQuery); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"><FaSearch /></button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => { setSearchQuery(''); setPagination(p => ({ ...p, pageIndex: 0 })); setTimeout(()=>fetchList(0, null),0); }} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" title="Refresh Data">
+                            <FaSync className="mr-2" /> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                {/* Pagination controls (Rows per page, page X of Y, navigation) */}
+                <div className="mt-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">Rows per page:</span>
+                        <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm">
+                            {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div className="text-sm text-gray-600">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
+                    <div className="flex items-center space-x-2">
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -386,6 +437,9 @@ export default function Employee() {
                             ))}
                         </tbody>
                     </table>
+                </div>
+                <div className="mt-3 flex items-center justify-end text-sm text-gray-600">
+                    <span>Total employees: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong></span>
                 </div>
             </div>
 

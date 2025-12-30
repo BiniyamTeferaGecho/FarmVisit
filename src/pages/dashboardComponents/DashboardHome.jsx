@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  FaUsers, FaFileAlt, FaClock, FaCalendarAlt, FaPlusCircle, FaChartBar,
-  FaExclamationTriangle, FaCheckCircle, FaTimesCircle, FaArchive, FaHistory, FaCalendarCheck
+  FaUsers, FaFileAlt, FaClock, FaExclamationTriangle, FaCheckCircle, FaTimesCircle, FaArchive, FaHistory, FaCalendarCheck
 } from 'react-icons/fa';
 import apiClient from '../../utils/api';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts'
 import FarmsStatsWidget from './FarmsStatsWidget';
 
 const getPieData = (stats = {}) => {
@@ -46,6 +46,7 @@ function PieChart({ stats = {}, size = 160 }) {
   if (!data || data.length === 0 || total === 0) {
     return <div className="text-sm text-gray-500 dark:text-gray-400">No distribution to show</div>;
   }
+  
 
   const handleEnter = (e, d) => {
     const rect = containerRef.current?.getBoundingClientRect() || { left: 0, top: 0 };
@@ -128,35 +129,51 @@ const StatCard = ({ icon, label, value, className = '', colorClass = 'bg-gray-10
   </div>
 );
 
-const RecentActivityItem = ({ icon, text, time }) => (
-  <div className="flex items-start space-x-4 py-4">
-    <div className="bg-gray-100 dark:bg-gray-700 rounded-full p-3">
-      {icon}
-    </div>
-    <div className="flex-1">
-      <p className="text-sm text-gray-700 dark:text-gray-300">{text}</p>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{time}</p>
-    </div>
-  </div>
-);
-
-const QuickActionButton = ({ icon, label }) => (
-  <button className="flex items-center justify-center w-full bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 font-medium py-3 px-4 rounded-lg transition-colors duration-300">
-    {icon}
-    <span className="ml-2 text-sm">{label}</span>
-  </button>
-);
+// Quick action and recent activity UI removed per request
 
 const DashboardHome = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [farmStats, setFarmStats] = useState(null);
   const [farmLoading, setFarmLoading] = useState(true);
+  const [visitsByStatus, setVisitsByStatus] = useState([])
+  const [visitsByStatusLoading, setVisitsByStatusLoading] = useState(true)
+  const [visitsByFarmType, setVisitsByFarmType] = useState([])
+  const [visitsByFarmTypeLoading, setVisitsByFarmTypeLoading] = useState(true)
+  const [monthlyTrends, setMonthlyTrends] = useState([])
+  const [monthlyTrendsLoading, setMonthlyTrendsLoading] = useState(true)
+  const [advisorPerf, setAdvisorPerf] = useState([])
+  const [advisorPerfLoading, setAdvisorPerfLoading] = useState(true)
+  const [advisorShowAll, setAdvisorShowAll] = useState(false)
+  const [advisorPage, setAdvisorPage] = useState(1)
+  const advisorPageSize = 10
 
   const computeTotal = (s) => {
     if (!s) return 0;
     return Object.values(s).reduce((acc, value) => acc + (Number(value) || 0), 0);
   };
+
+  // Format YearMonth values like 202501 -> 'Jan 2025'
+  const formatYearMonth = (ym) => {
+    if (!ym) return ''
+    const s = String(ym)
+    if (/^\d{6}$/.test(s)) {
+      const y = Number(s.slice(0,4))
+      const m = Number(s.slice(4,6))
+      try {
+        const d = new Date(y, m - 1, 1)
+        return d.toLocaleString(undefined, { month: 'short', year: 'numeric' })
+      } catch (e) {
+        return s
+      }
+    }
+    return s
+  }
+
+  const monthlyChartData = (monthlyTrends || []).slice(-12).map(r => ({
+    label: r.MonthName || (r.YearMonth ? formatYearMonth(r.YearMonth) : (r.YearMonthString || r.label || '')),
+    TotalVisits: Number(r.TotalVisits || r.Total || r.VisitCount || 0) || 0
+  }))
 
   useEffect(() => {
     const fetchDashboardStats = async () => {
@@ -171,7 +188,50 @@ const DashboardHome = () => {
       }
     };
     fetchDashboardStats();
+    // fetch reporting views and advisor performance
+    (async () => {
+      try {
+        setVisitsByStatusLoading(true)
+        const r1 = await apiClient.get('/farm-visit-schedule/stats/visits-by-status')
+        setVisitsByStatus(r1.data?.data || r1.data || [])
+      } catch (e) { console.debug('visits-by-status fetch failed', e) } finally { setVisitsByStatusLoading(false) }
+
+      try {
+        setVisitsByFarmTypeLoading(true)
+        const r2 = await apiClient.get('/farm-visit-schedule/stats/visits-by-farmtype')
+        setVisitsByFarmType(r2.data?.data || r2.data || [])
+      } catch (e) { console.debug('visits-by-farmtype fetch failed', e) } finally { setVisitsByFarmTypeLoading(false) }
+
+      try {
+        setMonthlyTrendsLoading(true)
+        const r3 = await apiClient.get('/farm-visit-schedule/stats/monthly-trends')
+        setMonthlyTrends(r3.data?.data || r3.data || [])
+      } catch (e) { console.debug('monthly-trends fetch failed', e) } finally { setMonthlyTrendsLoading(false) }
+
+      try {
+        setAdvisorPerfLoading(true)
+        const r4 = await apiClient.get('/farm-visit-schedule/stats/advisor-performance?top=10')
+        setAdvisorPerf(r4.data?.data || r4.data || [])
+      } catch (e) { console.debug('advisor-performance fetch failed', e) } finally { setAdvisorPerfLoading(false) }
+    })()
   }, []);
+
+  // Toggle handler: fetch top N or all advisors when user toggles
+  const toggleAdvisorShowAll = async () => {
+    try {
+      const wantAll = !advisorShowAll
+      setAdvisorShowAll(wantAll)
+      setAdvisorPerfLoading(true)
+      const url = wantAll ? '/farm-visit-schedule/stats/advisor-performance' : '/farm-visit-schedule/stats/advisor-performance?top=10'
+      const r = await apiClient.get(url)
+      setAdvisorPerf(r.data?.data || r.data || [])
+      setAdvisorPage(1)
+    } catch (e) {
+      console.debug('toggleAdvisorShowAll failed', e)
+    } finally {
+      setAdvisorPerfLoading(false)
+    }
+  }
 
   useEffect(() => {
     const fetchFarmStats = async () => {
@@ -200,7 +260,7 @@ const DashboardHome = () => {
         <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No visit data available.</div>
       ) : (
         <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-3 gap-6">
             <StatCard icon={<FaUsers size={24} />} colorClass="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" label="Total Visits" value={stats ? stats.TotalVisits : '...'} />
             <StatCard icon={<FaClock size={24} />} colorClass="bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400" label="Pending" value={stats ? stats.PendingApproval : '...'} />
             <StatCard icon={<FaFileAlt size={24} />} colorClass="bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" label="Completed" value={stats ? stats.Completed : '...'} />
@@ -212,15 +272,7 @@ const DashboardHome = () => {
             <StatCard icon={<FaCalendarCheck size={24} />} colorClass="bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400" label="Today's Visits" value={stats ? stats.TodayVisits : '...'} />
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex flex-col items-center justify-center">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Visit Distribution</h3>
-            <div className="w-full flex items-center justify-center">
-              <PieChart stats={stats} size={200} />
-            </div>
-            <div className="w-full mt-6">
-              <PieLegend stats={stats} />
-            </div>
-          </div>
+          
         </section>
       )}
 
@@ -231,28 +283,96 @@ const DashboardHome = () => {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <QuickActionButton icon={<FaPlusCircle size={18} />} label="New Farm Visit" />
-            <QuickActionButton icon={<FaCalendarAlt size={18} />} label="View Schedule" />
-            <QuickActionButton icon={<FaChartBar size={18} />} label="Analytics" />
+      <section>
+        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mt-8 mb-4">More Analytics</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">Visits By Status</h4>
+            {visitsByStatusLoading ? <div className="text-sm text-gray-500">Loading...</div> : (
+              visitsByStatus && visitsByStatus.length > 0 ? visitsByStatus.map(s => (
+                <div key={s.Status} className="flex items-center gap-4 mb-2">
+                  <div className="w-32 text-sm text-gray-700">{s.Status}</div>
+                  <div className="flex-1 bg-gray-100 rounded h-3 overflow-hidden">
+                    <div style={{ width: `${s.Percentage || 0}%` }} className="h-3 bg-blue-500" />
+                  </div>
+                  <div className="w-12 text-right text-sm font-semibold">{s.VisitCount}</div>
+                </div>
+              )) : <div className="text-sm text-gray-500">No data</div>
+            )}
           </div>
-        </section>
 
-        <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Recent Activity</h3>
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            <RecentActivityItem icon={<FaFileAlt size={20} className="text-blue-500" />} text="Dr. Smith submitted a new visit report for Green Valley Farm." time="2 hours ago" />
-            <RecentActivityItem icon={<FaClock size={20} className="text-yellow-500" />} text="A visit to Sunny Meadows Farm is pending approval." time="5 hours ago" />
-            <RecentActivityItem icon={<FaUsers size={20} className="text-green-500" />} text="You have a new visit scheduled for tomorrow at Oakwood Farm." time="1 day ago" />
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">Visits By Farm Type</h4>
+            {visitsByFarmTypeLoading ? <div className="text-sm text-gray-500">Loading...</div> : (
+              visitsByFarmType && visitsByFarmType.length > 0 ? visitsByFarmType.map(ft => (
+                <div key={ft.FarmType} className="flex items-center gap-3 mb-2">
+                  <div className="w-32 text-sm text-gray-700">{ft.FarmType || '—'}</div>
+                  <div className="flex-1 bg-gray-100 rounded h-3 overflow-hidden">
+                    <div style={{ width: `${ft.Percentage || 0}%` }} className="h-3 bg-green-500" />
+                  </div>
+                  <div className="w-12 text-right text-sm font-semibold">{ft.VisitCount}</div>
+                </div>
+              )) : <div className="text-sm text-gray-500">No data</div>
+            )}
           </div>
-          <button className="w-full text-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline mt-4">
-            View all activity
-          </button>
-        </section>
-      </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 lg:col-span-2">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">Monthly Visit Trends</h4>
+            {monthlyTrendsLoading ? <div className="text-sm text-gray-500">Loading...</div> : (
+              monthlyChartData && monthlyChartData.length > 0 ? (
+                <div className="w-full">
+                  <ResponsiveContainer width="100%" height={140}>
+                    <BarChart data={monthlyChartData} margin={{ top: 8, right: 8, left: 0, bottom: 48 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} angle={-30} textAnchor="end" height={48} />
+                      <YAxis allowDecimals={false} />
+                      <ReTooltip formatter={(value) => [value, 'Visits']} />
+                      <Bar dataKey="TotalVisits" fill="#2563eb" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : <div className="text-sm text-gray-500">No trend data</div>
+            )}
+          </div>
+
+          <div className="mt-6 lg:mt-0 bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 lg:col-span-4">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-3">Top Advisors (by Completed Visits)</h4>
+            {advisorPerfLoading ? <div className="text-sm text-gray-500">Loading...</div> : (
+              advisorPerf && advisorPerf.length > 0 ? (
+                <div>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={advisorPerf.slice((advisorPage-1)*advisorPageSize, (advisorPage)*advisorPageSize)} margin={{ top: 28, right: 12, left: 0, bottom: 48 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="AdvisorName" tick={{ fontSize: 12 }} interval={0} angle={-30} textAnchor="end" height={60} />
+                        <YAxis />
+                        <ReTooltip />
+                        <Legend verticalAlign="top" align="right" />
+                        <Bar dataKey="CompletedVisits" name="Completed" fill="#10b981" />
+                        <Bar dataKey="TotalVisitsAssigned" name="Assigned" fill="#3b82f6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-3">
+                    <div className="flex items-center gap-2">
+                      <button onClick={toggleAdvisorShowAll} className="px-3 py-1 bg-gray-100 rounded text-sm">{advisorShowAll ? 'Show Top 10' : 'Show All'}</button>
+                      {advisorShowAll && advisorPerf.length > advisorPageSize && (
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setAdvisorPage(p => Math.max(1, p-1))} disabled={advisorPage <= 1} className="px-2 py-1 bg-white border rounded text-sm">Prev</button>
+                          <div className="text-sm text-gray-600">Page {advisorPage} of {Math.ceil(advisorPerf.length / advisorPageSize)}</div>
+                          <button onClick={() => setAdvisorPage(p => Math.min(Math.ceil(advisorPerf.length / advisorPageSize), p+1))} disabled={advisorPage >= Math.ceil(advisorPerf.length / advisorPageSize)} className="px-2 py-1 bg-white border rounded text-sm">Next</button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">Showing {Math.min(advisorPage*advisorPageSize, advisorPerf.length)} of {advisorPerf.length}</div>
+                  </div>
+                </div>
+              ) : <div className="text-sm text-gray-500">No advisor performance data</div>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 };

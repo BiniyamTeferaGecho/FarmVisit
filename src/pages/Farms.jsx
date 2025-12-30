@@ -7,7 +7,7 @@ import FarmPrintForm from '../components/print/forms/FarmPrintForm'
 import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
-import { FaPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUndo, FaMapMarkerAlt, FaBuilding, FaUser, FaPhone, FaEnvelope, FaGlobe, FaInfoCircle } from 'react-icons/fa';
+import { FaPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUndo, FaMapMarkerAlt, FaBuilding, FaUser, FaPhone, FaEnvelope, FaGlobe, FaInfoCircle, FaSearch, FaTimes } from 'react-icons/fa';
 
 const initialForm = {
     FarmName: '',
@@ -59,8 +59,30 @@ export default function Farms() {
     const [error, setError] = useState(null);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+    const [filterRegion, setFilterRegion] = useState('');
+    const [filterZone, setFilterZone] = useState('');
+    const [filterWereda, setFilterWereda] = useState('');
+    const [filterCityTown, setFilterCityTown] = useState('');
+    const [filterFarmTypeID, setFilterFarmTypeID] = useState('');
+    const [filterFarmSizeMin, setFilterFarmSizeMin] = useState('');
+    const [filterFarmSizeMax, setFilterFarmSizeMax] = useState('');
+    const [filterCreatedFrom, setFilterCreatedFrom] = useState('');
+    const [filterCreatedTo, setFilterCreatedTo] = useState('');
+    const [filterIsActive, setFilterIsActive] = useState('All'); // 'All' | 'Active' | 'Inactive'
+    const [filterIncludeDeleted, setFilterIncludeDeleted] = useState(false);
 
     useEffect(() => { fetchList({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize }) }, [pagination.pageIndex, pagination.pageSize]);
+
+    // Debounced search: when searchQuery changes, reset to first page and fetch filtered list
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setPagination(p => ({ ...p, pageIndex: 0 }));
+            fetchList({ pageIndex: 0, pageSize: pagination.pageSize, search: searchQuery || null });
+        }, 300);
+        return () => clearTimeout(t);
+    }, [searchQuery, pagination.pageSize]);
 
     useEffect(() => { fetchFarmTypes() }, []);
 
@@ -257,16 +279,44 @@ export default function Farms() {
         return result;
     };
 
-    const fetchList = async ({ pageIndex = 0, pageSize = 10, search = null, sortColumn = null, sortDir = null } = {}) => {
+    const fetchList = async ({ pageIndex = 0, pageSize = 10, search = null, sortColumn = null, sortDir = null, filters = {} } = {}) => {
         setLoading(true); setError(null);
         try {
             const pageNumber = (typeof pageIndex === 'number') ? (pageIndex + 1) : 1;
             const qs = new URLSearchParams();
             qs.append('PageNumber', String(pageNumber));
             qs.append('PageSize', String(pageSize));
-            if (search) qs.append('SearchTerm', search);
+
+            // prefer explicit args, otherwise fall back to component state
+            const SearchTerm = (search !== null && search !== undefined) ? search : (filters.SearchTerm ?? searchQuery ?? null);
+            const FarmTypeID = (filters.FarmTypeID ?? filterFarmTypeID) || null;
+            const Region = (filters.Region ?? filterRegion) || null;
+            const Zone = (filters.Zone ?? filterZone) || null;
+            const Wereda = (filters.Wereda ?? filterWereda) || null;
+            const CityTown = (filters.CityTown ?? filterCityTown) || null;
+            const FarmSizeMin = (filters.FarmSizeMin !== undefined) ? filters.FarmSizeMin : (filterFarmSizeMin || null);
+            const FarmSizeMax = (filters.FarmSizeMax !== undefined) ? filters.FarmSizeMax : (filterFarmSizeMax || null);
+            const CreatedDateFrom = (filters.CreatedDateFrom ?? filterCreatedFrom) || null;
+            const CreatedDateTo = (filters.CreatedDateTo ?? filterCreatedTo) || null;
+            const IsActive = (filters.IsActive !== undefined && filters.IsActive !== null) ? filters.IsActive : (filterIsActive === 'All' ? null : (filterIsActive === 'Active' ? 1 : 0));
+            const IncludeDeleted = (filters.IncludeDeleted !== undefined) ? (filters.IncludeDeleted ? 1 : 0) : (filterIncludeDeleted ? 1 : 0);
+
+            if (SearchTerm) qs.append('SearchTerm', SearchTerm);
+            if (FarmTypeID) qs.append('FarmTypeID', FarmTypeID);
+            if (Region) qs.append('Region', Region);
+            if (Zone) qs.append('Zone', Zone);
+            if (Wereda) qs.append('Wereda', Wereda);
+            if (CityTown) qs.append('CityTown', CityTown);
+            if (FarmSizeMin) qs.append('FarmSizeMin', String(FarmSizeMin));
+            if (FarmSizeMax) qs.append('FarmSizeMax', String(FarmSizeMax));
+            if (CreatedDateFrom) qs.append('CreatedDateFrom', String(CreatedDateFrom));
+            if (CreatedDateTo) qs.append('CreatedDateTo', String(CreatedDateTo));
+            if (IsActive !== null) qs.append('IsActive', String(IsActive));
+            qs.append('IncludeDeleted', String(IncludeDeleted));
+
             if (sortColumn) qs.append('SortColumn', sortColumn);
             if (sortDir) qs.append('SortDirection', sortDir);
+
             const res = await fetchWithAuth({ url: `/farms?${qs.toString()}`, method: 'get' });
             const payload = res.data?.data || res.data;
             try { console.debug('fetchList response summary', { url: '/farms', payloadShape: Object.prototype.toString.call(payload), payloadSample: Array.isArray(payload) ? payload.length : (payload && typeof payload === 'object' ? Object.keys(payload).slice(0,5) : null) }); } catch(e) {}
@@ -647,10 +697,120 @@ export default function Farms() {
                 <AlertModal open={showErrorModal} title="Error" message={"An unexpected error occurred. Please try again or contact support."} details={error} onClose={() => { setShowErrorModal(false); setError(null); }} />
 
                 <div className="flex items-center space-x-2 mb-4">
-                    <button onClick={() => fetchList({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize })} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-                        <FaSync className="mr-2" /> Refresh
-                    </button>
+                    <div className="flex items-center w-full md:w-1/3 relative">
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    setPagination(p => ({ ...p, pageIndex: 0 }));
+                                    fetchList({ pageIndex: 0, pageSize: pagination.pageSize, search: searchQuery || null });
+                                }
+                            }}
+                            placeholder="Search farms by name, code, owner..."
+                            className="form-input w-full pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+                        />
+
+                        {/* Clear button (visible when there is text) */}
+                        {searchQuery ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setPagination(p => ({ ...p, pageIndex: 0 }));
+                                    fetchList({ pageIndex: 0, pageSize: pagination.pageSize, search: null });
+                                }}
+                                title="Clear search"
+                                className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+                            >
+                                <FaTimes />
+                            </button>
+                        ) : null}
+
+                        {/* Search button: triggers immediate search */}
+                        <button
+                            type="button"
+                            onClick={() => { setPagination(p => ({ ...p, pageIndex: 0 })); fetchList({ pageIndex: 0, pageSize: pagination.pageSize, search: searchQuery || null }); }}
+                            title="Search"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"
+                        >
+                            <FaSearch />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setShowFilters(s => !s)} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Filters</button>
+                        <button onClick={() => fetchList({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize, search: searchQuery || null })} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
+                            <FaSync className="mr-2" /> Refresh
+                        </button>
+                    </div>
                 </div>
+
+                {/* Advanced filters panel */}
+                {showFilters && (
+                    <div className="mb-4 p-4 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className="text-sm text-gray-600">Region</label>
+                                <input value={filterRegion} onChange={e => setFilterRegion(e.target.value)} placeholder="Region" className="mt-1 block w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Zone</label>
+                                <input value={filterZone} onChange={e => setFilterZone(e.target.value)} placeholder="Zone" className="mt-1 block w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Wereda</label>
+                                <input value={filterWereda} onChange={e => setFilterWereda(e.target.value)} placeholder="Wereda" className="mt-1 block w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">City / Town</label>
+                                <input value={filterCityTown} onChange={e => setFilterCityTown(e.target.value)} placeholder="City or Town" className="mt-1 block w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Farm Type</label>
+                                <select value={filterFarmTypeID} onChange={e => setFilterFarmTypeID(e.target.value)} className="mt-1 block w-full form-select">
+                                    <option value="">Any</option>
+                                    {farmTypes.map(ft => <option key={ft.FarmTypeID || ft.Id || ft.id} value={ft.FarmTypeID || ft.Id || ft.id}>{ft.TypeName || ft.Type || ft.Name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Is Active</label>
+                                <select value={filterIsActive} onChange={e => setFilterIsActive(e.target.value)} className="mt-1 block w-full form-select">
+                                    <option value="All">All</option>
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Farm Size Min</label>
+                                <input type="number" value={filterFarmSizeMin} onChange={e => setFilterFarmSizeMin(e.target.value)} placeholder="Min" className="mt-1 block w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Farm Size Max</label>
+                                <input type="number" value={filterFarmSizeMax} onChange={e => setFilterFarmSizeMax(e.target.value)} placeholder="Max" className="mt-1 block w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Created From</label>
+                                <input type="date" value={filterCreatedFrom} onChange={e => setFilterCreatedFrom(e.target.value)} className="mt-1 block w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-600">Created To</label>
+                                <input type="date" value={filterCreatedTo} onChange={e => setFilterCreatedTo(e.target.value)} className="mt-1 block w-full form-input" />
+                            </div>
+                            <div className="flex items-center space-x-2 md:col-span-3">
+                                <label className="inline-flex items-center">
+                                    <input type="checkbox" checked={filterIncludeDeleted} onChange={e => setFilterIncludeDeleted(e.target.checked)} className="mr-2" /> Include deleted
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 flex items-center gap-2">
+                            <button className="px-4 py-2 bg-indigo-600 text-white rounded" onClick={() => { setPagination(p => ({ ...p, pageIndex: 0 })); fetchList({ pageIndex: 0, pageSize: pagination.pageSize }); }}>Apply</button>
+                            <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => { setFilterRegion(''); setFilterZone(''); setFilterWereda(''); setFilterCityTown(''); setFilterFarmTypeID(''); setFilterFarmSizeMin(''); setFilterFarmSizeMax(''); setFilterCreatedFrom(''); setFilterCreatedTo(''); setFilterIsActive('All'); setFilterIncludeDeleted(false); setPagination(p => ({ ...p, pageIndex: 0 })); fetchList({ pageIndex: 0, pageSize: pagination.pageSize }); }}>Clear</button>
+                        </div>
+                    </div>
+                )}
                 {farmTypesLoadError ? (
                     <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded">
                         {farmTypesLoadError}
@@ -723,6 +883,9 @@ export default function Farms() {
                             )}
                         </tbody>
                     </table>
+                </div>
+                <div className="mt-3 flex items-center justify-end text-sm text-gray-600">
+                    <span>Total farms: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong></span>
                 </div>
             </div>
 

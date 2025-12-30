@@ -688,6 +688,30 @@ export default function DairyFarm() {
         }
       })
       setScheduleMap(map)
+      // If some schedule entries lack AdvisorName, try to fetch schedule details
+      // to populate richer display (VisitCode, FarmName, AdvisorName).
+      const missing = new Set()
+      rows.forEach(r => {
+        const sid = r.ScheduleID || r.scheduleId || null
+        if (sid) {
+          const entry = map[String(sid)]
+          if (!entry || !entry.AdvisorName) missing.add(String(sid))
+        }
+      })
+      if (missing.size > 0) {
+        // Limit concurrent fetches to avoid overload; process sequentially here.
+        for (const sid of Array.from(missing)) {
+          try {
+            const sres = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(sid)}`, method: 'get' })
+            const sd = sres?.data?.data || sres?.data || null
+            if (sd) {
+              setScheduleMap(prev => ({ ...(prev || {}), [String(sid)]: sd }))
+            }
+          } catch (err) {
+            // ignore failures for individual schedule fetches
+          }
+        }
+      }
     } catch (err) {
       console.error('fetchList dairy error', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to load visits' })
@@ -812,7 +836,8 @@ export default function DairyFarm() {
             <tr>
               <th className="px-4 py-3">#</th>
               <th className="px-4 py-3">Visit Code</th>
-              <th className="px-4 py-3">Farm</th>
+              <th className="px-4 py-3">Farm Name</th>
+              <th className="px-4 py-3">Farm Code</th>
               <th className="px-4 py-3">Location</th>
               <th className="px-4 py-3">Advisor</th>
               <th className="px-4 py-3">Avg Milk (L/day)</th>
@@ -823,9 +848,9 @@ export default function DairyFarm() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="p-6 text-center"><LoadingSpinner /></td></tr>
+              <tr><td colSpan={10} className="p-6 text-center"><LoadingSpinner /></td></tr>
             ) : list.length === 0 ? (
-              <tr><td colSpan={9} className="p-6 text-center text-gray-500">No dairy visits found.</td></tr>
+              <tr><td colSpan={10} className="p-6 text-center text-gray-500">No dairy visits found.</td></tr>
             ) : list.map((it, idx) => (
               <tr key={it.DairyFarmVisitId || idx} className="border-t hover:bg-gray-50">
                 <td className="px-4 py-3">{idx+1}</td>
@@ -839,6 +864,11 @@ export default function DairyFarm() {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   return sched?.FarmName || sched?.FarmCode || it.FarmName || it.FarmCode || (it.Farm && (it.Farm.FarmCode || it.Farm.FarmName || it.Farm.Name)) || ''
+                })()}</td>
+                <td className="px-4 py-3">{(() => {
+                  const scheduleId = it.ScheduleID || it.scheduleId || null
+                  const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
+                  return sched?.FarmCode || it.FarmCode || (it.Farm && it.Farm.FarmCode) || ''
                 })()}</td>
                 <td className="px-4 py-3">{(() => {
                   // Prefer explicit city or zone fields when available, then fall back to saved coordinate or location
