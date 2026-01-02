@@ -4,7 +4,6 @@ import { useAuth } from '../auth/AuthProvider';
 import { showToast } from '../utils/toast';
 import { scheduleReducer, initialState } from '../reducers/scheduleReducer';
 import ScheduleHeader from '../components/schedule/ScheduleHeader';
-import DateRangePicker from '../components/schedule/DateRangePicker';
 import { format } from 'date-fns';
 import ScheduleList from '../components/schedule/ScheduleList';
 import ScheduleModals from '../components/schedule/ScheduleModals';
@@ -12,7 +11,7 @@ import api from '../services/api';
 import apiClient from '../utils/api';
 import { validateCompleteRequirements } from '../utils/visitValidation';
 import { CalendarIcon } from '@heroicons/react/24/outline';
-import { FaTrash } from 'react-icons/fa';
+import { FaTrash, FaUndo } from 'react-icons/fa';
 
 // Provide a local API_BASE derived from the shared axios client so
 // files constructing full URLs can reuse the centralized baseURL.
@@ -46,7 +45,10 @@ const FarmVisitSchedule = () => {
 
   // Initial data loading: use the AuthProvider's fetchWithAuth for authenticated calls
   const [reloadKey, setReloadKey] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
   const [creatingScheduleLocked, setCreatingScheduleLocked] = useState(false);
+  const [visitStatusFilter, setVisitStatusFilter] = useState('');
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState('');
   const creatingScheduleLockRef = React.useRef(false);
   const location = useLocation();
 
@@ -78,9 +80,9 @@ const FarmVisitSchedule = () => {
         // Load lookups directly using fetchWithAuth
         try {
           const [employeesRes, farmsRes, managersRes] = await Promise.all([
-            auth.fetchWithAuth({ url: '/employees', method: 'GET', params: { pageSize: 1000 } }),
-            auth.fetchWithAuth({ url: '/farms/active', method: 'GET', params: { pageSize: 1000 } }),
-            auth.fetchWithAuth({ url: '/advisor/managers', method: 'GET' }),
+            apiClient({ url: '/employees', method: 'GET', params: { pageSize: 1000 } }),
+            apiClient({ url: '/farms/active', method: 'GET', params: { pageSize: 1000 } }),
+            apiClient({ url: '/advisor/managers', method: 'GET' }),
           ]);
           const extract = (r) => {
             if (!r) return [];
@@ -91,21 +93,29 @@ const FarmVisitSchedule = () => {
             if (body.data && Array.isArray(body.data.items)) return body.data.items;
             return [];
           };
-          const empItems = extract(employeesRes);
-          const farmItems = extract(farmsRes);
-          const mgrItems = extract(managersRes);
+            const empItems = extract(employeesRes);
+            const farmItems = extract(farmsRes);
+            const mgrItems = extract(managersRes);
           const mappedEmployees = empItems.map(it => ({ id: it.EmployeeID || it.EmployeeId || it.id || it.UserID || it.UserId, name: `${it.FirstName || ''} ${it.LastName || it.FatherName || ''}`.trim(), raw: it }));
           const mappedFarms = farmItems;
           const mappedManagers = mgrItems.map(it => ({ id: it.EmployeeID || it.EmployeeId || it.id, name: `${it.FirstName || ''} ${it.LastName || it.FatherName || ''}`.trim(), raw: it }));
           dispatch({ type: 'SET_LOOKUP_DATA', payload: { employees: mappedEmployees, farms: mappedFarms, managers: mappedManagers } });
+          // Fetch backend-provided filter options (FarmType, VisitStatus, ApprovalStatus, Regions, Zones, Weredas)
+          try {
+            // Centralized helper will dispatch SET_FILTER_OPTIONS for us
+            await api.fetchFilterOptions(dispatch, apiClient);
+          } catch (e) {
+            // ignore filter-options failures — non-fatal for schedule page
+          }
         } catch (e) {
           console.warn('refresh: failed to load lookups directly', e);
         }
 
-        await Promise.all([
-          api.fetchStats(dispatch, auth.fetchWithAuth),
-          api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId }),
-        ]);
+          await Promise.all([
+            api.fetchStats(dispatch, apiClient),
+            // Use handleSearch so we route to the proper backend endpoint (search vs filter)
+            (async () => handleSearch({ IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId }))(),
+          ]);
       } catch (err) {
         console.error('refresh error', err);
       }
@@ -129,7 +139,7 @@ const FarmVisitSchedule = () => {
     };
   }, []);
 
-  const handleSearch = (extraFilters = {}) => {
+  const handleSearch = async (extraFilters = {}) => {
     // Build options for paged list endpoint using current page/size and any provided filters
     const opts = {
       IncludeDeleted: extraFilters?.IncludeDeleted ?? 0,
@@ -140,10 +150,27 @@ const FarmVisitSchedule = () => {
 
     // Normalize frontend filter keys to the backend's expected parameter names
     const params = { ...opts };
-    // farmType -> FarmType
+    // Include page-level search term when present
+    if (!params.SearchTerm && !params.search && searchTerm) params.SearchTerm = searchTerm;
+    // farmType -> FarmType (accept both camel and Pascal keys)
     if (params.farmType !== undefined) {
       params.FarmType = params.farmType;
       delete params.farmType;
+    } else if (params.FarmType !== undefined) {
+      // already provided as FarmType — keep as-is
+    }
+    // Ensure plural alias is present for backends that accept `FarmTypes` (CSV)
+    if (params.FarmType !== undefined && params.FarmTypes === undefined) {
+      params.FarmTypes = params.FarmType;
+    }
+    // searchTerm -> SearchTerm (backend expects 'SearchTerm')
+    if (params.searchTerm !== undefined) {
+      params.SearchTerm = params.searchTerm;
+      delete params.searchTerm;
+    }
+    if (params.search !== undefined) {
+      params.SearchTerm = params.search;
+      delete params.search;
     }
     // selectedFarmId -> FarmID
     if (params.selectedFarmId !== undefined) {
@@ -172,14 +199,14 @@ const FarmVisitSchedule = () => {
       // Normalize Date objects to ISO strings for consistent server-side parsing
       try {
         if (from) {
-          if (from instanceof Date) params.DateFrom = from.toISOString();
-          else if (typeof from === 'string') params.DateFrom = from;
-          else params.DateFrom = new Date(from).toISOString();
+          if (from instanceof Date) params.ProposedDateFrom = from.toISOString();
+          else if (typeof from === 'string') params.ProposedDateFrom = from;
+          else params.ProposedDateFrom = new Date(from).toISOString();
         }
         if (to) {
-          if (to instanceof Date) params.DateTo = to.toISOString();
-          else if (typeof to === 'string') params.DateTo = to;
-          else params.DateTo = new Date(to).toISOString();
+          if (to instanceof Date) params.ProposedDateTo = to.toISOString();
+          else if (typeof to === 'string') params.ProposedDateTo = to;
+          else params.ProposedDateTo = new Date(to).toISOString();
         }
       } catch (e) {
         // Fallback: pass raw values if normalization fails
@@ -189,26 +216,47 @@ const FarmVisitSchedule = () => {
       delete params.dateRange;
     }
 
-    // Helpful debug in development to inspect outgoing filter params
+    // Helpful debug to inspect outgoing filter params (always log for easier dev troubleshooting)
     try {
-      if (import.meta.env && import.meta.env.MODE === 'development') {
-        // eslint-disable-next-line no-console
-        console.debug('fetchAllSchedules -> params', params);
-      }
+      // eslint-disable-next-line no-console
+      console.debug('fetchAllSchedules -> params', params);
     } catch (e) {
       // ignore
     }
 
     // Clear transient recently-filled flags when performing a fresh search
     setRecentlyFilled({});
-    api.fetchAllSchedules(dispatch, auth.fetchWithAuth, params);
+    // If a search term is present prefer the search endpoint which supports full-text/keyword search
+    const hasSearch = params.SearchTerm || params.Search || params.search || searchTerm;
+    if (hasSearch) {
+      // normalize key name for search endpoint
+      const searchParams = { ...params };
+      if (searchParams.SearchTerm === undefined && searchParams.search) searchParams.SearchTerm = searchParams.search;
+      // Backend now recognizes `SearchText`; include it for compatibility with new stored-proc
+      if (searchParams.SearchTerm !== undefined && !searchParams.SearchText) searchParams.SearchText = searchParams.SearchTerm;
+      if (!searchParams.SearchText && searchTerm) searchParams.SearchText = searchTerm;
+      try {
+        await api.fetchSchedules(dispatch, searchParams, apiClient);
+      } catch (e) {
+        // fallback to filter endpoint if search fails
+        await api.fetchFilteredSchedules(dispatch, params, apiClient);
+      }
+    } else {
+      await api.fetchFilteredSchedules(dispatch, params, apiClient);
+    }
   };
 
   const handleReset = () => {
+    // Clear reducer-backed filters
     dispatch({ type: 'SET_DATE_RANGE', payload: initialState.dateRange });
     dispatch({ type: 'SET_FARM_TYPE', payload: '' });
     dispatch({ type: 'SET_SELECTED_FARM_ID', payload: null });
-    handleSearch({ dateRange: initialState.dateRange, farmType: '', selectedFarmId: null, PageNumber: 1 });
+    // Clear local UI filters
+    setSearchTerm('');
+    try { setApprovalStatusFilter(''); } catch (e) { /* ignore */ }
+    try { setVisitStatusFilter(''); } catch (e) { /* ignore */ }
+    // Trigger a fresh search with cleared filters
+    handleSearch({ dateRange: initialState.dateRange, farmType: '', selectedFarmId: null, SearchTerm: '', PageNumber: 1 });
   };
 
   const handleInputChange = (e) => {
@@ -290,8 +338,8 @@ const FarmVisitSchedule = () => {
             // async fetch the farm record and set the local fill data when available
             (async () => {
               try {
-                if (auth && typeof auth.fetchWithAuth === 'function' && targetId) {
-                  const res = await auth.fetchWithAuth({ url: `/farms/${encodeURIComponent(targetId)}`, method: 'GET' });
+                if (typeof apiClient === 'function' && targetId) {
+                    const res = await apiClient({ url: `/farms/${encodeURIComponent(targetId)}`, method: 'GET' });
                   const body = res?.data?.data || res?.data || res;
                   const rec = Array.isArray(body) ? body[0] : (body && body.recordset ? body.recordset[0] : body);
                   const name = rec?.FarmName || rec?.Name || rec?.name || '';
@@ -358,7 +406,7 @@ const FarmVisitSchedule = () => {
       if ((op === 'edit' || op === 'view') && sid) {
         (async () => {
           try {
-            const res = await auth.fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(sid)}`, method: 'get' });
+              const res = await apiClient({ url: `/farm-visit-schedule/${encodeURIComponent(sid)}`, method: 'get' });
             const body = res?.data?.data || res?.data || res;
             const rec = Array.isArray(body) ? body[0] : (body && body.recordset ? body.recordset[0] : body);
             openModal('schedule', rec);
@@ -440,8 +488,8 @@ const FarmVisitSchedule = () => {
 
         // If not found in local lookups, try fetching employees from the API and search there
         try {
-          if (typeof auth.fetchWithAuth === 'function') {
-            const res = await auth.fetchWithAuth({ url: '/employees', method: 'GET', params: { pageSize: 2000 } });
+          if (typeof apiClient === 'function') {
+            const res = await apiClient({ url: '/employees', method: 'GET', params: { pageSize: 2000 } });
             const body = res && res.data !== undefined ? res.data : res;
             const items = Array.isArray(body) ? body : (Array.isArray(body.data) ? body.data : (body.data && Array.isArray(body.data.items) ? body.data.items : []));
             if (Array.isArray(items) && items.length) {
@@ -485,7 +533,7 @@ const FarmVisitSchedule = () => {
 
       if (formData.id || formData.ScheduleID) {
         const payload = { ...formData, UpdatedBy: userEmployeeId }
-        await api.updateSchedule(dispatch, payload, auth.fetchWithAuth);
+        await api.updateSchedule(dispatch, payload, apiClient);
       } else {
         const payload = { ...formData, CreatedBy: userEmployeeId }
         // Mark create as in-progress so modal shows "Creating..." and other
@@ -493,7 +541,7 @@ const FarmVisitSchedule = () => {
         creatingScheduleLockRef.current = true;
         setCreatingScheduleLocked(true);
         try {
-          await api.createSchedule(dispatch, payload, auth.fetchWithAuth);
+          await api.createSchedule(dispatch, payload, apiClient);
         } catch (createErr) {
           // Clear transient locks so user can retry after a failed request
           creatingScheduleLockRef.current = false;
@@ -560,7 +608,7 @@ const FarmVisitSchedule = () => {
       const payload = { ...formData, UpdatedBy: userEmployeeId };
 
       // Call PATCH directly to retrieve the updated row for optimistic update
-      const res = await api.callWithAuthOrApi(auth.fetchWithAuth, { url: `/farm-visit-schedule/${id}`, method: 'PATCH', data: payload });
+      const res = await api.callWithAuthOrApi(apiClient, { url: `/farm-visit-schedule/${id}`, method: 'PATCH', data: payload });
       const returned = res && res.data ? (res.data.data || res.data) : res;
 
       if (returned) {
@@ -577,14 +625,14 @@ const FarmVisitSchedule = () => {
           dispatch({ type: 'SET_LIST', payload: updated });
         } catch (e) {
           // fallback to re-fetch if local update fails
-          await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId });
+          await api.fetchSchedules(dispatch, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, FarmType: state.farmType, FarmID: state.selectedFarmId }, apiClient);
         }
 
         dispatch({ type: 'SET_MESSAGE', payload: null });
         closeModal('schedule');
       } else {
         // fallback: trigger a refresh
-        await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId });
+        await api.fetchSchedules(dispatch, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, FarmType: state.farmType, FarmID: state.selectedFarmId }, apiClient);
         closeModal('schedule');
       }
     } catch (err) {
@@ -595,7 +643,7 @@ const FarmVisitSchedule = () => {
 
   const onDeleteConfirm = async () => {
     if (!selectedSchedule) return;
-    await api.deleteSchedule(dispatch, selectedSchedule.id ?? selectedSchedule.ScheduleID ?? selectedSchedule.ScheduleID, auth.fetchWithAuth);
+    await api.deleteSchedule(dispatch, selectedSchedule.id ?? selectedSchedule.ScheduleID ?? selectedSchedule.ScheduleID, apiClient);
     closeModal('delete');
     handleSearch();
   };
@@ -665,7 +713,7 @@ const FarmVisitSchedule = () => {
             if (!scheduleHasLocation && visitProvidesLocation) {
               try {
                 const patchPayload = { ScheduleID: scheduleId, Location: data.Location || data.location, UpdatedBy: startedBy };
-                const patchedRes = await api.callWithAuthOrApi(auth.fetchWithAuth, { url: `/farm-visit-schedule/${scheduleId}`, method: 'PATCH', data: patchPayload });
+                const patchedRes = await api.callWithAuthOrApi(apiClient, { url: `/farm-visit-schedule/${scheduleId}`, method: 'PATCH', data: patchPayload });
                 const patched = patchedRes && patchedRes.data ? (patchedRes.data.data || patchedRes.data) : patchedRes;
                 if (patched) {
                   // update local selected schedule so subsequent logic sees the Location
@@ -677,7 +725,7 @@ const FarmVisitSchedule = () => {
               }
             }
 
-            const started = await api.startFarmVisit(dispatch, scheduleId, startedBy, auth.fetchWithAuth);
+            const started = await api.startFarmVisit(dispatch, scheduleId, startedBy, apiClient);
             if (started) {
               // Update selected schedule locally
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: started });
@@ -704,7 +752,7 @@ const FarmVisitSchedule = () => {
 
       // clear previous external errors for the form
       setExternalErrors({});
-      await api.fillVisit(dispatch, data, auth.fetchWithAuth);
+      await api.fillVisit(dispatch, data, apiClient);
       // mark this schedule as recently filled so UI disables relevant actions immediately
       try {
         const sid = data.ScheduleID || data.ScheduleId || data.scheduleId || (selectedSchedule && (selectedSchedule.ScheduleID || selectedSchedule.ScheduleId || selectedSchedule.id));
@@ -720,7 +768,7 @@ const FarmVisitSchedule = () => {
             let confirmed = false;
             for (let i = 0; i < maxAttempts; i++) {
               try {
-                const payload = await api.getFilledFormByScheduleId(dispatch, sid, auth.fetchWithAuth).catch(() => null);
+                const payload = await api.getFilledFormByScheduleId(dispatch, sid, apiClient).catch(() => null);
                 const normalized = extractFillForm(payload);
                 if (payload && (normalized.form && Object.keys(normalized.form).length > 0 || normalized.schedule)) {
                   // Consider confirmed if server returned a filled form or schedule row
@@ -730,7 +778,7 @@ const FarmVisitSchedule = () => {
                   setRecentlyFilled(prev => { const copy = { ...(prev || {}) }; delete copy[sid]; return copy; });
                   // Refresh the authoritative schedule row and update local list/state
                   try {
-                    const schedRes = await api.callWithAuthOrApi(auth.fetchWithAuth, { url: `/farm-visit-schedule/${sid}`, method: 'GET' });
+                    const schedRes = await api.callWithAuthOrApi(apiClient, { url: `/farm-visit-schedule/${sid}`, method: 'GET' });
                     const returned = schedRes && schedRes.data ? (schedRes.data.data || schedRes.data) : schedRes;
                     if (returned) {
                       // update selected schedule and list optimistically from server response
@@ -746,7 +794,7 @@ const FarmVisitSchedule = () => {
                         dispatch({ type: 'SET_LIST', payload: updated });
                       } catch (e) {
                         // fallback: refresh full list if local merge fails
-                        await api.fetchAllSchedules(dispatch, auth.fetchWithAuth, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, farmType: state.farmType, selectedFarmId: state.selectedFarmId });
+                        await api.fetchSchedules(dispatch, { IncludeDeleted: false, PageNumber: state.schedulePage || 1, PageSize: state.schedulePageSize || 20, FarmType: state.farmType, FarmID: state.selectedFarmId }, apiClient);
                       }
                     }
                   } catch (e) {
@@ -816,7 +864,7 @@ const FarmVisitSchedule = () => {
 
   const onSubmitApproval = async () => {
     if (!selectedSchedule) return;
-    await api.submitForApproval(dispatch, selectedSchedule.id ?? selectedSchedule.ScheduleID ?? selectedSchedule.ScheduleID, localApprovalData.managerId, auth.fetchWithAuth);
+    await api.submitForApproval(dispatch, selectedSchedule.id ?? selectedSchedule.ScheduleID ?? selectedSchedule.ScheduleID, localApprovalData.managerId, apiClient);
     closeModal('submit');
     handleSearch();
   };
@@ -878,7 +926,7 @@ const FarmVisitSchedule = () => {
         AdditionalComments: localProcessData.comments || null
       }
 
-      const result = await api.processApproval(dispatch, selectedSchedule.id ?? selectedSchedule.ScheduleID ?? selectedSchedule.ScheduleID, payload, auth.fetchWithAuth)
+      const result = await api.processApproval(dispatch, selectedSchedule.id ?? selectedSchedule.ScheduleID ?? selectedSchedule.ScheduleID, payload, apiClient)
       // `api.processApproval` returns `res.data` from the server which has shape { success, data }
       // Normalize returned payload so we can update local state regardless of exact shape
       let returned = null
@@ -901,17 +949,17 @@ const FarmVisitSchedule = () => {
           dispatch({ type: 'SET_LIST', payload: updated })
         } catch (e) {
           // fallback: re-fetch list and stats if local update fails
-          await api.fetchSchedules(dispatch, {}, auth.fetchWithAuth)
+          await api.fetchSchedules(dispatch, {}, apiClient)
         }
         // refresh stats independently
-        try { await api.fetchStats(dispatch, auth.fetchWithAuth) } catch (e) { /* ignore */ }
+        try { await api.fetchStats(dispatch, apiClient) } catch (e) { /* ignore */ }
         if (action === 'Approve') dispatch({ type: 'SET_MESSAGE', payload: 'Schedule approved.' })
         else if (action === 'Reject') dispatch({ type: 'SET_MESSAGE', payload: 'Schedule rejected.' })
         else if (action === 'Postpone') dispatch({ type: 'SET_MESSAGE', payload: 'Schedule postponed.' })
         else dispatch({ type: 'SET_MESSAGE', payload: 'Approval processed successfully.' })
       } else {
         // If no returned data, fall back to a full refresh
-        await api.fetchSchedules(dispatch, {}, auth.fetchWithAuth)
+        await api.fetchSchedules(dispatch, {}, apiClient)
       }
     } catch (err) {
       console.error('onProcessApproval error', err);
@@ -973,7 +1021,7 @@ const FarmVisitSchedule = () => {
 
       // Fetch latest schedule from server to avoid races and validate required fields
       try {
-        const latestRes = await api.callWithAuthOrApi(auth.fetchWithAuth, { url: `/farm-visit-schedule/${id}`, method: 'GET' });
+        const latestRes = await api.callWithAuthOrApi(apiClient, { url: `/farm-visit-schedule/${id}`, method: 'GET' });
         const latest = latestRes && latestRes.data ? (latestRes.data.data || latestRes.data) : null;
         if (latest) {
           const statusRawLatest = latest.VisitStatus || latest.Status || latest.visitStatus || latest.status || '';
@@ -1010,7 +1058,7 @@ const FarmVisitSchedule = () => {
         FollowUpNote: localCompleteData.followUpNotes || localCompleteData.FollowUpNote || null,
       };
 
-      await api.completeVisit(dispatch, id, payload, auth.fetchWithAuth);
+      await api.completeVisit(dispatch, id, payload, apiClient);
     } catch (err) {
       console.error('onCompleteVisit error', err);
       showToast(err?.response?.data?.message || err.message || 'Failed to complete visit', 'error')
@@ -1021,7 +1069,7 @@ const FarmVisitSchedule = () => {
   };
 
   const onBulkUpload = async (file) => {
-    await api.uploadBulk(dispatch, file, auth.fetchWithAuth);
+    await api.uploadBulk(dispatch, file, apiClient);
     closeModal('bulkUpload');
     handleSearch();
   };
@@ -1050,7 +1098,7 @@ const FarmVisitSchedule = () => {
         onRefresh={() => handleSearch()}
         onNew={() => openModal('schedule')}
         newDisabled={creatingScheduleLocked}
-        onShowDrafts={() => api.fetchDrafts(dispatch, auth.fetchWithAuth).then(() => dispatch({ type: 'OPEN_DRAFTS_MODAL' }))}
+        onShowDrafts={() => api.fetchDrafts(dispatch, apiClient).then(() => dispatch({ type: 'OPEN_DRAFTS_MODAL' }))}
         onBulkUpload={() => openModal('bulkUpload')}
         onDownloadTemplate={api.downloadCsvTemplate}
         farmType={state.farmType}
@@ -1064,40 +1112,124 @@ const FarmVisitSchedule = () => {
 
       {/* Moved filters: Date Range, Farm Type, Clear/Reset (previously in ScheduleHeader) */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm space-y-4 mt-4"> 
-        <div className={`md:grid md:grid-cols-3 gap-4 pt-0 border-t-0`}>
+        <div className="flex flex-wrap items-end gap-4 pt-0 border-t-0">
           <div>
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Date Range</label>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">From</label>
+            <input
+              type="date"
+              value={state.dateRange && state.dateRange.startDate ? new Date(state.dateRange.startDate).toISOString().slice(0,10) : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                const newStart = v ? new Date(v) : null;
+                const nextRange = { startDate: newStart, endDate: state.dateRange ? state.dateRange.endDate : null };
+                dispatch({ type: 'SET_DATE_RANGE', payload: nextRange });
+                handleSearch({ dateRange: nextRange });
+              }}
+              className="w-40 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">To</label>
+            <input
+              type="date"
+              value={state.dateRange && state.dateRange.endDate ? new Date(state.dateRange.endDate).toISOString().slice(0,10) : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                const newEnd = v ? new Date(v) : null;
+                const nextRange = { startDate: state.dateRange ? state.dateRange.startDate : null, endDate: newEnd };
+                dispatch({ type: 'SET_DATE_RANGE', payload: nextRange });
+                handleSearch({ dateRange: nextRange });
+              }}
+              className="w-40 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Search</label>
             <div className="relative">
-              <button onClick={() => dispatch({ type: 'TOGGLE_DATE_PICKER' })} className="w-full p-2 text-left bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
-                {state.dateRange && state.dateRange.startDate ? `${format(state.dateRange.startDate, 'MMM dd, yyyy')} - ${format(state.dateRange.endDate, 'MMM dd, yyyy')}` : 'Select date range'}
-              </button>
-              {state.showDatePicker && (
-                <DateRangePicker
-                  range={state.dateRange}
-                  onChange={handleDateChange}
-                  onClose={() => dispatch({ type: 'TOGGLE_DATE_PICKER' })}
-                />
-              )}
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { handleSearch({ SearchTerm: e.target.value, PageNumber: 1 }); } }}
+                placeholder="Search (farm, advisor, visit code...)"
+                className="w-96 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+              />
+              {searchTerm ? (
+                <button type="button" onClick={() => { setSearchTerm(''); handleSearch({ SearchTerm: '', PageNumber: 1 }); }} title="Clear search" className="absolute right-10 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1">✕</button>
+              ) : null}
+              <button type="button" onClick={() => { handleSearch({ SearchTerm: searchTerm, PageNumber: 1 }); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700">🔍</button>
             </div>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Farm Type</label>
-            <select value={state.farmType || ''} onChange={(e) => { const v = e.target ? e.target.value : e; dispatch({ type: 'SET_FARM_TYPE', payload: v }); try { console.debug('FarmType changed ->', v); } catch {} handleSearch({ farmType: v, PageNumber: 1, PageSize: state.schedulePageSize || 20 }); }} className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
-              <option value="">All Types</option>
-              <option value="DAIRY">Dairy</option>
-              <option value="LAYER">Layer</option>
-              <option value="BROILER">Broiler</option>
-            </select>
+            {(() => {
+              // Prefer backend-provided filter options when available
+              const fo = state.filterOptions || {};
+              const farmTypeList = fo.FarmType || fo.farmType || fo['FarmType'] || fo['farmType'] || null;
+              const normalized = Array.isArray(farmTypeList) && farmTypeList.length > 0 ? farmTypeList : null;
+              const fallback = [
+                { value: '', label: 'All Types' },
+                { value: 'DAIRY', label: 'Dairy' },
+                { value: 'LAYER', label: 'Layer' },
+                { value: 'BROILER', label: 'Broiler' },
+              ];
+              const options = normalized ? normalized.map(o => ({ value: o.value ?? o.Value ?? o.Id ?? o.id ?? o.key ?? o.Key ?? '', label: o.label ?? o.Label ?? o.Name ?? o.name ?? String(o) })) : fallback;
+              return (
+                <select value={state.farmType || ''} onChange={(e) => { const v = e.target ? e.target.value : e; dispatch({ type: 'SET_FARM_TYPE', payload: v }); try { console.debug('FarmType changed ->', v); } catch {} handleSearch({ farmType: v, PageNumber: 1, PageSize: state.schedulePageSize || 20 }); }} className="w-40 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                  {options.map((opt, idx) => (
+                    <option key={idx} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              );
+            })()}
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Visit Status</label>
+            {(() => {
+              const fo = state.filterOptions || {};
+              const list = fo.VisitStatus || fo.visitStatus || null;
+              const opts = Array.isArray(list) && list.length > 0 ? list : [{ value: '', label: 'All' }, { value: 'Scheduled', label: 'Scheduled' }, { value: 'InProgress', label: 'In Progress' }, { value: 'Completed', label: 'Completed' }];
+              return (
+                <select value={visitStatusFilter || ''} onChange={(e) => { const v = e.target.value; setVisitStatusFilter(v); handleSearch({ visitStatus: v, PageNumber: 1 }); }} className="w-36 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                  {opts.map((opt, i) => <option key={String(i)} value={opt.value ?? opt.Value ?? opt.Id ?? opt.id ?? opt}>{opt.label ?? opt.Label ?? opt.Name ?? opt.name ?? String(opt)}</option>)}
+                </select>
+              );
+            })()}
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">Approval Status</label>
+            {(() => {
+              const fo = state.filterOptions || {};
+              const list = fo.ApprovalStatus || fo.approvalStatus || null;
+              const opts = Array.isArray(list) && list.length > 0 ? list : [{ value: '', label: 'All' }, { value: 'Approved', label: 'Approved' }, { value: 'Rejected', label: 'Rejected' }, { value: 'Pending', label: 'Pending' }];
+              return (
+                <select value={approvalStatusFilter || ''} onChange={(e) => { const v = e.target.value; setApprovalStatusFilter(v); handleSearch({ approvalStatus: v, PageNumber: 1 }); }} className="w-36 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                  {opts.map((opt, i) => <option key={String(i)} value={opt.value ?? opt.Value ?? opt.Id ?? opt.id ?? opt}>{opt.label ?? opt.Label ?? opt.Name ?? opt.name ?? String(opt)}</option>)}
+                </select>
+              );
+            })()}
           </div>
           <div className="flex items-end gap-2">
-            <button onClick={() => { dispatch({ type: 'SET_DATE_RANGE', payload: initialState.dateRange }); dispatch({ type: 'SET_FARM_TYPE', payload: '' }); dispatch({ type: 'SET_SELECTED_FARM_ID', payload: null }); handleSearch({ dateRange: initialState.dateRange, farmType: '', selectedFarmId: null, PageNumber: 1 }); }} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-              <FaTrash /> Clear Filters
+            <button
+              onClick={() => { dispatch({ type: 'SET_DATE_RANGE', payload: initialState.dateRange }); dispatch({ type: 'SET_FARM_TYPE', payload: '' }); dispatch({ type: 'SET_SELECTED_FARM_ID', payload: null }); handleSearch({ dateRange: initialState.dateRange, farmType: '', selectedFarmId: null, PageNumber: 1 }); }}
+              className="p-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600"
+              title="Clear filters"
+              aria-label="Clear filters"
+            >
+              <FaTrash className="h-4 w-4" />
             </button>
-            <button onClick={handleReset} className="px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
-              Reset
+
+            <button
+              onClick={handleReset}
+              className="p-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600"
+              title="Reset filters"
+              aria-label="Reset filters"
+            >
+              <FaUndo className="h-4 w-4" />
             </button>
           </div>
         </div>
+        {/* Geographic filters removed per request */}
       </div>
 
       {state.loading ? (
@@ -1112,9 +1244,10 @@ const FarmVisitSchedule = () => {
         <div className="mt-6">
           <ScheduleList
             schedules={schedules}
-            fetchWithAuth={auth.fetchWithAuth}
+            fetchWithAuth={apiClient}
             recentlyFilled={recentlyFilled}
             confirmedFilled={confirmedFilled}
+            pageStartOffset={((state.schedulePage || 1) - 1) * (state.schedulePageSize || 20)}
             onEdit={(schedule) => {
               dispatch({ type: 'SET_FORM_DATA', payload: schedule });
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
@@ -1161,7 +1294,7 @@ const FarmVisitSchedule = () => {
 
                 if (isCompleted) {
                   try {
-                    const payload = await api.getFilledFormByScheduleId(dispatch, id, auth.fetchWithAuth);
+                    const payload = await api.getFilledFormByScheduleId(dispatch, id, apiClient);
                     const serverSchedule = payload?.schedule || schedule;
                     const form = payload?.form || {};
                     const farmType = (serverSchedule.FarmType || serverSchedule.FarmTypeCode || '').toString().toUpperCase();
@@ -1189,15 +1322,35 @@ const FarmVisitSchedule = () => {
               })();
             }}
             onView={(schedule) => {
-              // Open the Visit Schedule modal in read-only mode with the selected schedule's data
-              try {
-                dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
-                // mark schedule modal as read-only before opening
-                dispatch({ type: 'SET_SCHEDULE_READ_ONLY', payload: true });
-                openModal('schedule', schedule);
-              } catch (err) {
-                console.warn('onView: failed to open schedule modal', err);
-              }
+              // Open the Visit Schedule modal in read-only mode with the selected schedule's full data.
+              (async () => {
+                try {
+                  const id = schedule?.id || schedule?.ScheduleID || schedule?.ScheduleId || null;
+                  let serverSchedule = schedule;
+                  if (id) {
+                    try {
+                      const res = await apiClient({ url: `/farm-visit-schedule/${encodeURIComponent(id)}`, method: 'get' });
+                      const body = res?.data?.data || res?.data || res;
+                      // support multiple shapes: direct row, { recordset: [...] }, or wrapped payload
+                      if (Array.isArray(body)) serverSchedule = body[0] || serverSchedule;
+                      else if (body && body.recordset && Array.isArray(body.recordset)) serverSchedule = body.recordset[0] || serverSchedule;
+                      else if (body && body.schedule) serverSchedule = body.schedule || serverSchedule;
+                      else if (body && typeof body === 'object') serverSchedule = body;
+                    } catch (e) {
+                      // if fetch fails, fall back to the lightweight schedule from the list
+                      console.debug('onView: failed to fetch full schedule, falling back to provided row', e);
+                    }
+                  }
+
+                  dispatch({ type: 'SET_FORM_DATA', payload: serverSchedule });
+                  dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: serverSchedule });
+                  // mark schedule modal as read-only before opening
+                  dispatch({ type: 'SET_SCHEDULE_READ_ONLY', payload: true });
+                  openModal('schedule', serverSchedule);
+                } catch (err) {
+                  console.warn('onView: failed to open schedule modal', err);
+                }
+              })();
             }}
             onComplete={(schedule) => {
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
@@ -1211,6 +1364,8 @@ const FarmVisitSchedule = () => {
               <button
                 onClick={() => {
                   const prev = Math.max(1, (state.schedulePage || 1) - 1);
+                  // Optimistic update so UI reflects new page immediately
+                  dispatch({ type: 'SET_PAGINATION', payload: { currentPage: prev, pageSize: state.schedulePageSize || 20, totalCount: state.scheduleTotalCount || 0, totalPages: state.scheduleTotalPages || 1 } });
                   handleSearch({ PageNumber: prev });
                 }}
                 disabled={(state.schedulePage || 1) <= 1}
@@ -1220,6 +1375,8 @@ const FarmVisitSchedule = () => {
               <button
                 onClick={() => {
                   const next = Math.min((state.scheduleTotalPages || 1), (state.schedulePage || 1) + 1);
+                  // Optimistic update so UI reflects new page immediately
+                  dispatch({ type: 'SET_PAGINATION', payload: { currentPage: next, pageSize: state.schedulePageSize || 20, totalCount: state.scheduleTotalCount || 0, totalPages: state.scheduleTotalPages || 1 } });
                   handleSearch({ PageNumber: next });
                 }}
                 disabled={(state.schedulePage || 1) >= (state.scheduleTotalPages || 1)}
@@ -1233,7 +1390,7 @@ const FarmVisitSchedule = () => {
       <ScheduleModals
         state={state}
         dispatch={dispatch}
-        fetchWithAuth={auth.fetchWithAuth}
+        fetchWithAuth={apiClient}
         isAdvisor={auth?.user && (auth.user.roles || []).includes('ROLE_ADVISOR')}
         currentUserId={auth?.user?.UserID || auth?.user?.userId || auth?.user?.id}
         closeModal={closeModal}

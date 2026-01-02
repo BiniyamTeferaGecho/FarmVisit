@@ -311,7 +311,7 @@ const FarmerModal = ({ isOpen, onClose, farmer, onSave }) => {
 
 // --- Columns Definition ---
 
-const getColumns = (openEdit, confirmDelete, canEdit = true, canDelete = true) => [
+const getColumns = (openEdit, confirmDelete, canEdit = true, canDelete = true, advisorMap = {}) => [
     {
         id: 'select',
         header: ({ table }) => (
@@ -353,6 +353,19 @@ const getColumns = (openEdit, confirmDelete, canEdit = true, canDelete = true) =
         header: 'Farm Name',
         accessorFn: row => row?.farm?.name ?? row?.FarmName ?? '',
         cell: info => info.getValue(),
+    },
+    {
+        id: 'createdBy',
+        header: 'Created By',
+        accessorFn: row => row?.CreatedBy || row?.createdBy || '',
+        cell: ({ row }) => {
+            try {
+                const key = String(row.original?.CreatedBy || row.original?.createdBy || '');
+                const name = advisorMap && advisorMap[key];
+                if (name) return name;
+                return key || '';
+            } catch (e) { return ''; }
+        }
     },
     {
         accessorKey: 'Region',
@@ -704,6 +717,9 @@ export default function Farmers() {
         UserID: '', FirstName: '', LastName: '', FatherName: '', Gender: '', PhoneNumber: '', AlternatePhoneNumber: '', GeoLocation: '', Email: '', NationalID: '', ProfilePicture: '', Region: '', Zone: '', Woreda: '', Kebele: '', Village: '', HouseNumber: '', FarmingExperience: '', PrimaryLanguage: '', EducationLevel: '', MaritalStatus: '', FamilySize: '', Dependents: '', HouseholdIncome: '', PreferredContactMethod: '', CommunicationLanguage: ''
     });
     const [formSubmitting, setFormSubmitting] = useState(false);
+    const [showFarmerSaveConfirm, setShowFarmerSaveConfirm] = useState(false);
+    const [pendingFarmerPayload, setPendingFarmerPayload] = useState(null);
+    const [pendingFarmerIsEdit, setPendingFarmerIsEdit] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
 
     const handleFieldChange = (e) => {
@@ -721,6 +737,7 @@ export default function Farmers() {
     const [selectedBulkFile, setSelectedBulkFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState(null); // { status: 'success'|'error', message: '' }
+    const [advisorMap, setAdvisorMap] = useState({});
 
     const fetchData = useCallback(async (params) => {
         setLoading(true);
@@ -775,90 +792,78 @@ export default function Farmers() {
     };
 
     // Accept optional payload (from FarmerModal) else use local `form` state
+    const mapServerErrors = (resp) => {
+        const errs = {};
+        if (!resp) return errs;
+        if (resp.errors && typeof resp.errors === 'object') Object.assign(errs, resp.errors);
+        if (Array.isArray(resp.validationErrors)) {
+            resp.validationErrors.forEach(v => { if (v && v.field) errs[v.field] = v.message || v.msg || String(v); });
+        }
+        if (resp.data && typeof resp.data === 'object' && resp.data.errors) Object.assign(errs, resp.data.errors);
+        return errs;
+    }
+
     const handleFormSubmit = async (payloadFromModal) => {
+        // Prepare payload and show confirm modal instead of sending directly
+        setFieldErrors({});
+        setError(null);
+        const payload = payloadFromModal ? { ...payloadFromModal } : { ...form };
+        if (editingFarmer && editingFarmer.FarmerID) {
+            setPendingFarmerPayload({ ...payload, UpdatedBy: user?.UserID || user?.id });
+            setPendingFarmerIsEdit(true);
+        } else {
+            setPendingFarmerPayload({ ...payload, CreatedBy: user?.UserID || user?.id });
+            setPendingFarmerIsEdit(false);
+        }
+        setShowFarmerSaveConfirm(true);
+    }
+
+    const doFarmerSaveConfirmed = async () => {
+        if (!pendingFarmerPayload) return;
+        setShowFarmerSaveConfirm(false);
         setFormSubmitting(true);
         setFieldErrors({});
         setError(null);
-        const mapServerErrors = (resp) => {
-            const errs = {};
-            if (!resp) return errs;
-            // common shapes: { errors: { Field: 'msg' } } or { validationErrors: [{ field, message }] }
-            if (resp.errors && typeof resp.errors === 'object') Object.assign(errs, resp.errors);
-            if (Array.isArray(resp.validationErrors)) {
-                resp.validationErrors.forEach(v => { if (v && v.field) errs[v.field] = v.message || v.msg || String(v); });
-            }
-            // Some controllers return { data: { ... } } with success:false at top-level
-            if (resp.data && typeof resp.data === 'object' && resp.data.errors) Object.assign(errs, resp.data.errors);
-            return errs;
-        }
-
         try {
-            const payload = payloadFromModal ? { ...payloadFromModal } : { ...form };
-            if (editingFarmer && editingFarmer.FarmerID) {
-                // update
-                const res = await fetchWithAuth({ url: `/farmers/${editingFarmer.FarmerID}`, method: 'put', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
+            if (pendingFarmerIsEdit && editingFarmer && editingFarmer.FarmerID) {
+                const res = await fetchWithAuth({ url: `/farmers/${editingFarmer.FarmerID}`, method: 'put', data: pendingFarmerPayload });
                 if (res && (res.success === false || res.success === 'false')) {
                     const errs = mapServerErrors(res);
-                    if (Object.keys(errs).length) {
-                        setFieldErrors(errs);
-                        const first = Object.keys(errs)[0];
-                        const el = document.querySelector(`[name="${first}"]`);
-                        if (el && typeof el.focus === 'function') el.focus();
-                        return;
-                    }
-                    setError(res.message || 'Save failed');
-                    return;
+                    if (Object.keys(errs).length) { setFieldErrors(errs); return; }
+                    setError(res.message || 'Save failed'); return;
                 }
             } else {
-                // create
-                payload.CreatedBy = user?.UserID || user?.id;
-                const res = await fetchWithAuth({ url: `/farmers`, method: 'post', data: payload });
-                // If server indicates failure shape
+                const res = await fetchWithAuth({ url: `/farmers`, method: 'post', data: pendingFarmerPayload });
                 if (res && (res.success === false || res.success === 'false')) {
                     const errs = mapServerErrors(res);
-                    if (Object.keys(errs).length) {
-                        setFieldErrors(errs);
-                        const first = Object.keys(errs)[0];
-                        const el = document.querySelector(`[name="${first}"]`);
-                        if (el && typeof el.focus === 'function') el.focus();
-                        return;
-                    }
-                    setError(res.message || 'Save failed');
-                    return;
+                    if (Object.keys(errs).length) { setFieldErrors(errs); return; }
+                    setError(res.message || 'Save failed'); return;
                 }
-
                 const newId = res?.data?.data?.FarmerID || res?.data?.FarmerID || res?.FarmerID || null;
                 if (newId) {
                     try {
                         const r2 = await fetchWithAuth({ url: `/farmers/${newId}`, method: 'get' });
                         const created = r2?.data?.data || r2?.data;
                         if (created) setData(prev => [created, ...prev]);
-                    } catch (e) {
-                        // ignore, will refresh list
-                    }
+                    } catch (e) { /* ignore */ }
                 }
             }
             setFormOpen(false);
-            // refresh current view
             fetchData({ pageIndex: 0, pageSize: 10 });
         } catch (err) {
             console.error('Save error', err);
             const resp = err?.response?.data || err?.data || null;
             if (resp) {
                 const errs = mapServerErrors(resp);
-                if (Object.keys(errs).length) {
-                    setFieldErrors(errs);
-                    const first = Object.keys(errs)[0];
-                    const el = document.querySelector(`[name="${first}"]`);
-                    if (el && typeof el.focus === 'function') el.focus();
-                    return;
-                }
+                if (Object.keys(errs).length) { setFieldErrors(errs); return; }
                 setError(resp.message || resp.error || JSON.stringify(resp));
             } else {
                 setError(err.message || 'Save failed');
             }
         } finally {
             setFormSubmitting(false);
+            setPendingFarmerPayload(null);
+            setPendingFarmerIsEdit(false);
         }
     }
 
@@ -871,7 +876,40 @@ export default function Farmers() {
     const canEdit = (hasFormPermission && hasFormPermission('farmers', 'CanEdit')) || isAdmin || isSuperAdmin || isAdvisor;
     const canDelete = (hasFormPermission && hasFormPermission('farmers', 'CanDelete')) || isAdmin || isSuperAdmin || isAdvisor;
 
-    const columns = useMemo(() => getColumns(handleEdit, handleDelete, canEdit, canDelete), [data, canEdit, canDelete]);
+    const columns = useMemo(() => getColumns(handleEdit, handleDelete, canEdit, canDelete, advisorMap), [data, canEdit, canDelete, advisorMap]);
+
+    // Resolve CreatedBy -> advisor display names for rows shown in the table
+    useEffect(() => {
+        if (!data || !Array.isArray(data) || data.length === 0) return;
+        const ids = new Set();
+        data.forEach(d => {
+            const id = d?.CreatedBy || d?.createdBy || d?.CreatedByID || d?.CreatedById || null;
+            if (id) ids.add(String(id));
+        });
+        const missing = [...ids].filter(id => !advisorMap[id]);
+        if (missing.length === 0) return;
+
+        const fetchAll = async () => {
+            try {
+                await Promise.all(missing.map(async (id) => {
+                    try {
+                        const res = await fetchWithAuth({ url: `/users/advisor-by-createdby/${encodeURIComponent(id)}`, method: 'get' });
+                        const rows = res?.data?.data || res?.data || [];
+                        const row = Array.isArray(rows) ? rows[0] : rows;
+                        const first = row?.AdvisorFirstName || row?.FirstName || row?.AdvisorName || '';
+                        const father = row?.AdvisorFatherName || row?.FatherName || '';
+                        const name = [first, father].filter(Boolean).join(' ') || id;
+                        setAdvisorMap(prev => ({ ...(prev || {}), [id]: name }));
+                    } catch (err) {
+                        setAdvisorMap(prev => ({ ...(prev || {}), [id]: id }));
+                    }
+                }));
+            } catch (e) {
+                // ignore
+            }
+        };
+        fetchAll();
+    }, [data, fetchWithAuth, advisorMap]);
 
     // Bulk upload handlers
     const downloadTemplate = () => {
@@ -1273,6 +1311,18 @@ export default function Farmers() {
                         setDeleteConfirmOpen(false);
                     }}
                     onCancel={() => setDeleteConfirmOpen(false)}
+                />
+            )}
+            {showFarmerSaveConfirm && (
+                <ConfirmModal
+                    open={showFarmerSaveConfirm}
+                    title={pendingFarmerIsEdit ? 'Confirm Update' : 'Confirm Create'}
+                    message={pendingFarmerIsEdit ? `Update farmer "${form.FirstName} ${form.LastName}"?` : `Create farmer "${form.FirstName} ${form.LastName}"?`}
+                    onCancel={() => setShowFarmerSaveConfirm(false)}
+                    onConfirm={doFarmerSaveConfirmed}
+                    confirmLabel={pendingFarmerIsEdit ? 'Update' : 'Create'}
+                    cancelLabel="Cancel"
+                    loading={formSubmitting}
                 />
             )}
         </div>

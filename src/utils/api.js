@@ -80,6 +80,29 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// Request interceptor: auto-attach Authorization header when a token is available
+api.interceptors.request.use((config) => {
+  try {
+    // If Authorization already present, do not override
+    if (config && config.headers && (config.headers.Authorization || config.headers.authorization)) return config;
+    let token = null;
+    if (typeof window !== 'undefined') {
+      token = window.__AUTH_TOKEN__ || window.__AUTH__ && window.__AUTH__.token || null;
+      if (!token && window.localStorage) {
+        token = window.localStorage.getItem('AUTH_TOKEN') || window.localStorage.getItem('access_token') || window.localStorage.getItem('id_token');
+      }
+    }
+    if (token) {
+      const headerVal = token.startsWith && token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      if (!config.headers) config.headers = {};
+      config.headers.Authorization = headerVal;
+    }
+  } catch (e) {
+    // ignore token attach errors
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 // Support runtime-specified fallback API bases. Useful when deployed frontend
 // accidentally points at an unreachable/same-origin API; set VITE_API_FALLBACKS
 // (comma-separated) at build time or window.__API_FALLBACKS__ / localStorage at runtime.
@@ -110,11 +133,12 @@ let lastUsedFallback = null;
 api.interceptors.response.use(
   res => res,
   async (error) => {
+    // Handle fallback retry and token refresh logic
+    const origReq = error.config;
     try {
-      const origReq = error.config;
-      if (!origReq || origReq.__retried) return Promise.reject(error);
       const status = error.response && error.response.status;
-      if ((status && status === 404) || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+      // First: existing fallback logic for network/404
+      if (origReq && !origReq.__retried && ((status && status === 404) || error.code === 'ERR_NETWORK' || error.message?.includes('Network Error'))) {
         if (!fallbackBases || fallbackBases.length === 0) return Promise.reject(error);
         const next = fallbackBases.shift();
         if (!next) return Promise.reject(error);
@@ -130,8 +154,31 @@ api.interceptors.response.use(
           api.defaults.baseURL = prevBase;
         }
       }
+
+      // Token refresh flow: if 401 and request not retried, attempt refresh using HttpOnly refresh cookie
+      if (origReq && !origReq.__isRetry && status === 401) {
+        // mark to avoid loops
+        origReq.__isRetry = true;
+        try {
+          // Call refresh endpoint which should use HttpOnly refresh cookie and return new accessToken
+          const refreshResp = await api.post('/auth/refresh', null, { withCredentials: true });
+          const newToken = refreshResp && (refreshResp.data?.accessToken || refreshResp.data?.token || refreshResp.data?.access_token);
+          if (newToken) {
+            // set token on client so subsequent requests include it
+            try { setAuthToken(newToken); } catch (e) { /* ignore */ }
+            // attach header and retry original request
+            if (!origReq.headers) origReq.headers = {};
+            origReq.headers.Authorization = `Bearer ${newToken}`;
+            return api.request(origReq);
+          }
+        } catch (refreshErr) {
+          // Refresh failed: clear token and propagate original error
+          try { setAuthToken(null); } catch (e) { /* ignore */ }
+          return Promise.reject(error);
+        }
+      }
     } catch (e) {
-      /* swallow */
+      // swallow errors during error handling
     }
     return Promise.reject(error);
   }
@@ -172,8 +219,13 @@ function setActiveApiBase(u) {
 }
 
 export function setAuthToken(token) {
-  if (token) api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  else delete api.defaults.headers.common['Authorization'];
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    try { if (typeof window !== 'undefined') window.__AUTH_TOKEN__ = token; } catch (e) { /* ignore */ }
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+    try { if (typeof window !== 'undefined') window.__AUTH_TOKEN__ = null; } catch (e) { /* ignore */ }
+  }
 }
 
 export default api;

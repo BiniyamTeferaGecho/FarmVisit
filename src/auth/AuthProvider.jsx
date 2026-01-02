@@ -259,3 +259,7 @@ export function AuthProvider({ children }) {
 
   return <AuthContext.Provider value={{ user, token, accessToken: token, login, logout, setAuth, fetchWithAuth, loading, isAuthenticated: !!token && !!user, hasFormPermission }}>{children}</AuthContext.Provider>;
 }
+
+// Provide a default export for compatibility with different import styles
+// and to keep module export shape stable across HMR updates.
+export default AuthProvider;

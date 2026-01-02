@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 // ConfirmModal now accepts an optional `changes` prop (array).
 // If `changes` is provided and non-empty, the modal will render a compact
@@ -6,10 +7,10 @@ import React from 'react';
 export default function ConfirmModal({ open, title, message, changes = [], children, onCancel, onConfirm, confirmLabel = 'Confirm', cancelLabel = 'Cancel', loading = false }) {
   if (!open) return null;
   const hasChanges = Array.isArray(changes) && changes.length > 0;
-  return (
-    <div className="text-left fixed inset-0 z-50 flex items-center justify-center">
+  const content = (
+    <div className="text-left fixed inset-0 z-60 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full p-6 z-10">
+      <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full p-6 z-50">
         <h3 className="text-lg font-semibold">{title}</h3>
         {message && <p className="mt-2 text-sm text-gray-600">{message}</p>}
 
@@ -18,7 +19,6 @@ export default function ConfirmModal({ open, title, message, changes = [], child
             <h4 className="text-sm font-medium text-gray-700">Updated fields</h4>
             <ul className="mt-2 max-h-60 overflow-auto divide-y divide-gray-100 rounded border border-gray-50">
               {changes.map((c, idx) => {
-                // support string entries or objects like { key, label, oldValue, newValue }
                 if (typeof c === 'string') {
                   return (
                     <li key={idx} className="px-3 py-2 text-sm text-gray-700">
@@ -53,4 +53,6 @@ export default function ConfirmModal({ open, title, message, changes = [], child
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

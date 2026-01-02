@@ -8,6 +8,8 @@ import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Plus, RefreshCw, Edit, Trash2, Check, Eye, Printer } from 'lucide-react'
+import { FaSearch, FaTimes, FaSync, FaColumns } from 'react-icons/fa'
+import ColumnSelector from '../components/ColumnSelector'
 
 
 export default function LayerFarm() {
@@ -33,7 +35,45 @@ export default function LayerFarm() {
   const [visits, setVisits] = useState([])
   const [scheduleMap, setScheduleMap] = useState({});
   const [farmMap, setFarmMap] = useState({});
+  const [advisorMap, setAdvisorMap] = useState({});
+  const defaultColumnVisibility = {
+    index: true,
+    visitCode: true,
+    farmName: true,
+    farmCode: true,
+    createdBy: true,
+    location: true,
+    breed: true,
+    flock: true,
+    createdAt: true,
+    visitStatus: true,
+    visitProximity: false,
+    visitStatusCategory: false,
+    durationCategory: false,
+    daysDifference: false,
+    actions: true,
+  };
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    try {
+      const raw = localStorage.getItem('layer.columnVisibility');
+      return raw ? JSON.parse(raw) : defaultColumnVisibility;
+    } catch (e) { return defaultColumnVisibility }
+  });
+
+  const toggleColumn = (key) => {
+    setColumnVisibility(prev => {
+      const next = { ...(prev || defaultColumnVisibility), [key]: !prev[key] };
+      try { localStorage.setItem('layer.columnVisibility', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  }
   const [loadingVisits, setLoadingVisits] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [pageNumber, setPageNumber] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [summary, setSummary] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [viewMode, setViewMode] = useState(false)
@@ -317,7 +357,7 @@ export default function LayerFarm() {
         setShowModal(false)
         resetForm()
       }
-      await fetchVisits()
+      await fetchVisits({ page: pageNumber, size: pageSize })
 
       // Do not navigate away after saving a Layer visit — stay on Layer visits UI
       // (Previously navigated to schedule details here; removed per UX request)
@@ -332,11 +372,110 @@ export default function LayerFarm() {
   const fetchVisits = async () => {
     setLoadingVisits(true)
     try {
+      // If user entered a search term or custom paging, use the schedule search stored-proc
+      if (searchTerm && String(searchTerm).trim() !== '') {
+        const params = { SearchTerm: searchTerm, FarmType: 'LAYER', PageNumber: pageNumber, PageSize: pageSize }
+        const res = await fetchWithAuth({ url: '/farm-visit-schedule/search', method: 'get', params })
+        const rows = res?.data?.data || []
+        const summ = res?.data?.summary || null
+        setSummary(summ)
+        // map schedule rows to display shape compatible with existing table
+        const mapped = Array.isArray(rows) ? rows.map(r => ({
+          LayerVisitID: r.LayerVisitID || null,
+          ScheduleID: r.ScheduleID || r.ScheduleId || null,
+          VisitCode: r.VisitCode || r.VisitCodeName || r.Code || r.VisitID || r.VisitId || null,
+          FarmID: r.FarmID || r.FarmId || (r.Farm && (r.Farm.FarmID || r.Farm.farmId || r.Farm.id)) || null,
+          FarmName: r.FarmName || (r.Farm && (r.Farm.FarmName || r.Farm.Name)) || r.Farm || null,
+          FarmCode: r.FarmCode || (r.Farm && (r.Farm.FarmCode || r.Farm.Code)) || null,
+          CreatedBy: r.CreatedBy || r.CreatedByUserID || r.CreatedById || r.AdvisorID || r.Advisor || null,
+          AdvisorName: r.AdvisorFullName || r.AdvisorName || r.CreatedByName || r.CreatorName || null,
+          Location: r.Location || r.FarmLocation || null,
+          Breed: r.Breed || null,
+          FlockSize: r.FlockSize || null,
+          CreatedAt: r.CreatedDate || r.CreatedAt || null,
+          VisitProximity: r.VisitProximity || r.VisitProximityName || null,
+          VisitStatusCategory: r.VisitStatusCategory || null,
+          DurationCategory: r.DurationCategory || null,
+          DaysDifference: r.DaysDifference !== undefined && r.DaysDifference !== null ? r.DaysDifference : null,
+          VisitStatus: r.VisitStatus || r.Status || null,
+        })) : []
+        setVisits(mapped)
+        // pagination from summary when available
+        const total = summ && (summ.TotalVisits || summ.TotalCount || summ.totalCount) ? (summ.TotalVisits || summ.TotalCount || summ.totalCount) : mapped.length
+        const tp = summ && (summ.TotalPages || summ.totalPages) ? (summ.TotalPages || summ.totalPages) : (pageSize ? Math.ceil(total / pageSize) : 1)
+        setTotalCount(total)
+        setTotalPages(tp)
+
+        // populate scheduleMap and farmMap similar to previous logic for richer display
+        try {
+          const ids = mapped.map(d => d.ScheduleID).filter(Boolean)
+          const uniq = Array.from(new Set(ids.map(String)))
+          if (uniq.length > 0) {
+            const map = {}
+            await Promise.all(uniq.map(async (id) => {
+              try {
+                const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(id)}`, method: 'get' })
+                const sd = r?.data?.data || r?.data || null
+                if (sd) map[String(id)] = sd
+              } catch (e) { /* ignore */ }
+            }))
+            setScheduleMap(prev => ({ ...(prev || {}), ...map }))
+          }
+          const farmIds = mapped.map(d => d.FarmID).filter(Boolean)
+          const uniqFarms = Array.from(new Set(farmIds.map(String)))
+          if (uniqFarms.length > 0) {
+            const fmap = {}
+            try {
+              const fr = await fetchWithAuth({ url: '/farms', method: 'get' })
+              const farmsData = fr?.data?.data || fr?.data || []
+              if (Array.isArray(farmsData) && farmsData.length > 0) {
+                farmsData.forEach(f => { const id = String(f.FarmID || f.farmId || f.id || f.FarmId || f.Id || f.ID); fmap[id] = f })
+              } else {
+                await Promise.all(uniqFarms.map(async (id) => {
+                  try {
+                    const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
+                    const ff = r?.data?.data || r?.data || null
+                    if (ff) fmap[id] = ff
+                  } catch (e) { /* ignore */ }
+                }))
+              }
+            } catch (e) {
+              await Promise.all(uniqFarms.map(async (id) => {
+                try {
+                  const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
+                  const ff = r?.data?.data || r?.data || null
+                  if (ff) fmap[id] = ff
+                } catch (err) { /* ignore */ }
+              }))
+            }
+            if (Object.keys(fmap).length > 0) setFarmMap(prev => ({ ...prev, ...fmap }))
+          }
+          // advisor map
+          try {
+            const createdSet = new Set()
+            mapped.forEach(r => { if (r.CreatedBy) createdSet.add(String(r.CreatedBy)) })
+            if (createdSet.size > 0) {
+              const amap = {}
+              await Promise.all(Array.from(createdSet).map(async (id) => {
+                try {
+                  const r = await fetchWithAuth({ url: `/users/advisor-by-createdby/${encodeURIComponent(id)}`, method: 'get' })
+                  const rr = r?.data?.data || r?.data || []
+                  if (Array.isArray(rr) && rr.length > 0) { const first = rr[0]; amap[id] = `${first.AdvisorFirstName || first.FirstName || ''} ${first.AdvisorFatherName || first.FatherName || ''}`.trim() } else amap[id] = null
+                } catch (e) { amap[id] = null }
+              }))
+              setAdvisorMap(prev => ({ ...(prev || {}), ...amap }))
+            }
+          } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore */ }
+        return
+      }
+
+      // default: fetch layer-farm visits (existing behavior)
       const res = await fetchWithAuth({ url: '/layer-farm', method: 'get' })
       const data = res?.data?.data || res?.data || []
       if (Array.isArray(data)) setVisits(data)
       else setVisits([])
-      // populate schedule map for VisitCode display
+      // populate scheduleMap for VisitCode display
       try {
         const ids = (Array.isArray(data) ? data : []).map(d => d.ScheduleID || d.scheduleId || null).filter(Boolean);
         const uniq = Array.from(new Set(ids.map(String)));
@@ -347,53 +486,12 @@ export default function LayerFarm() {
                 const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(id)}`, method: 'get' });
                 const sd = r?.data?.data || r?.data || null;
                 if (sd) {
-                  // store the full schedule object for richer display (VisitCode, Farm, Advisor)
                   map[String(id)] = sd;
                 }
               } catch (e) { /* ignore per-row failures */ }
             }))
             setScheduleMap(prev => ({ ...prev, ...map }));
-          // populate farm map so the Farm columns can show FarmName and FarmCode instead of raw IDs
-          try {
-            const farmIds = (Array.isArray(data) ? data : []).map(d => d.FarmID || d.farmId || d.Farm || null).filter(Boolean)
-            const uniqFarms = Array.from(new Set(farmIds.map(String)))
-            if (uniqFarms.length > 0) {
-              const fmap = {}
-              // Try bulk fetch first
-              try {
-                const fr = await fetchWithAuth({ url: '/farms', method: 'get' })
-                const farmsData = fr?.data?.data || fr?.data || []
-                if (Array.isArray(farmsData) && farmsData.length > 0) {
-                  farmsData.forEach(f => {
-                    const id = String(f.FarmID || f.farmId || f.id || f.FarmId || f.Id || f.ID)
-                    // store full farm object so we can render both name and code
-                    fmap[id] = f
-                  })
-                } else {
-                  // fallback to per-id fetch
-                  await Promise.all(uniqFarms.map(async (id) => {
-                    try {
-                      const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
-                      const ff = r?.data?.data || r?.data || null
-                      if (ff) fmap[id] = ff
-                    } catch (e) { /* ignore per-farm failures */ }
-                  }))
-                }
-              } catch (e) {
-                // If bulk fetch failed, try per-id fetch
-                await Promise.all(uniqFarms.map(async (id) => {
-                  try {
-                    const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
-                    const ff = r?.data?.data || r?.data || null
-                    if (ff) fmap[id] = ff
-                  } catch (err) { /* ignore */ }
-                }))
-              }
-
-              if (Object.keys(fmap).length > 0) setFarmMap(prev => ({ ...prev, ...fmap }))
-            }
-          } catch (e) { /* ignore farm-map populate errors */ }
-        }
+          }
       } catch (e) { /* ignore schedule-map populate errors */ }
     } catch (err) {
       console.error('fetch visits error', err)
@@ -404,6 +502,48 @@ export default function LayerFarm() {
   useEffect(() => { fetchVisits() }, [])
 
   useEffect(() => { if (!showModal) setModalTab('form') }, [showModal])
+
+  // Debounced search like Farms.jsx: when searchTerm changes, reset to page 1 and refetch after 300ms
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPageNumber(1)
+      fetchVisits({ page: 1, size: pageSize })
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchTerm, pageSize])
+
+  const handleSearch = async () => {
+    try {
+      const next = 1
+      setPageNumber(next)
+      await fetchVisits({ page: next, size: pageSize })
+    } catch (e) { /* ignore */ }
+  }
+
+  const clearSearch = async () => {
+    try {
+      setSearchTerm('')
+      setPageNumber(1)
+      setPageSize(25)
+      setTotalPages(1)
+      setTotalCount(0)
+      setSummary(null)
+      await fetchVisits({ page: 1, size: 25 })
+    } catch (e) { /* ignore */ }
+  }
+
+  const changePage = async (delta) => {
+    const next = Math.max(1, Math.min(totalPages || 1, pageNumber + delta))
+    setPageNumber(next)
+    await fetchVisits({ page: next, size: pageSize })
+  }
+
+  const onPageSizeChange = async (e) => {
+    const s = Number(e.target.value) || 25
+    setPageSize(s)
+    setPageNumber(1)
+    await fetchVisits({ page: 1, size: s })
+  }
 
   // Prefill ScheduleID from query string or navigation state when present
   useEffect(() => {
@@ -625,7 +765,7 @@ export default function LayerFarm() {
     try {
       await fetchWithAuth({ url: `/layer-farm/${deleteTarget}`, method: 'delete' })
       setShowDelete(false); setDeleteTarget(null); setMessage({ type: 'success', text: 'Layer visit deleted' })
-      await fetchVisits()
+      await fetchVisits({ page: pageNumber, size: pageSize })
     } catch (err) {
       console.error('delete error', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to delete' })
@@ -685,7 +825,7 @@ export default function LayerFarm() {
       // Now mark the layer visit as completed
       await fetchWithAuth({ url: `/layer-farm/${encodeURIComponent(layerVisitId)}/complete`, method: 'put', data: { IsVisitCompleted: true, UpdatedBy: actorId } })
       setMessage({ type: 'success', text: 'Visit marked as completed' })
-      await fetchVisits()
+      await fetchVisits({ page: pageNumber, size: pageSize })
       // After marking the visit completed, attempt to complete the parent schedule if it's in-progress
       try {
         if (scheduleId) {
@@ -739,7 +879,7 @@ export default function LayerFarm() {
       const res = await fetchWithAuth({ url: '/layer-farm/cleanup', method: 'post', data: { OlderThanDays: 30, DryRun: false } })
       const data = res.data?.data || res.data || res
       setMessage({ type: 'success', text: `Cleanup result: ${JSON.stringify(data)}` })
-      fetchVisits()
+      fetchVisits({ page: pageNumber, size: pageSize })
     } catch (err) {
       console.error('cleanup failed', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Cleanup failed' })
@@ -755,7 +895,7 @@ export default function LayerFarm() {
       if (ids.length === 0) return setMessage({ type: 'error', text: 'No visits to update' })
       await fetchWithAuth({ url: '/layer-farm/bulk-update-completion', method: 'post', data: { VisitIDs: ids.join(','), IsVisitCompleted: true, UpdatedBy: actorId } })
       setMessage({ type: 'success', text: 'Visits updated' })
-      fetchVisits()
+      fetchVisits({ page: pageNumber, size: pageSize })
     } catch (err) {
       console.error('bulk complete failed', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Bulk update failed' })
@@ -801,7 +941,7 @@ export default function LayerFarm() {
             ) : <Plus size={16} />} 
             <span>{saving ? 'Saving...' : 'New Visit'}</span>
           </button>
-          <button onClick={() => fetchVisits()} className="flex items-center gap-2 px-3 py-2 bg-white border rounded">
+          <button onClick={() => fetchVisits({ page: pageNumber, size: pageSize })} className="flex items-center gap-2 px-3 py-2 bg-white border rounded">
             {loadingVisits ? (
               <svg className="animate-spin h-4 w-4 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -809,6 +949,7 @@ export default function LayerFarm() {
               </svg>
             ) : <RefreshCw size={14} />} <span>Refresh</span>
           </button>
+          
           <button onClick={doBulkComplete} className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded">
             Bulk Complete
           </button>
@@ -820,57 +961,137 @@ export default function LayerFarm() {
           </button>
         </div>
       </div>
+
+      {/* Search row: Employee-style (left-aligned) */}
+      <div className="mb-4 flex items-center space-x-2">
+        <div className="relative w-full md:w-1/3">
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { setPageNumber(1); fetchVisits({ page: 1, size: pageSize }); } }}
+            placeholder="Search (visit code, farm, advisor...)"
+            className="form-input w-full pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
+          {searchTerm ? (
+            <button type="button" onClick={() => { setSearchTerm(''); setPageNumber(1); fetchVisits({ page: 1, size: pageSize }); }} title="Clear search" className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"><FaTimes /></button>
+          ) : null}
+          <button type="button" onClick={() => { setPageNumber(1); fetchVisits({ page: 1, size: pageSize }); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"><FaSearch /></button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setSearchTerm(''); setPageNumber(1); setTimeout(()=>fetchVisits({ page: 1, size: pageSize }),0); }} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" title="Refresh Data">
+            <FaSync className="mr-2" /> Refresh
+          </button>
+        </div>
+      </div>
+
       {message && <div className={`mb-4 p-3 rounded ${message.type==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{message.text}</div>}
 
       <div className="bg-white p-6 rounded-lg shadow-sm">
         <div className="bg-white rounded-lg shadow overflow-auto">
+          <div className="flex items-center justify-end mb-2">
+            <ColumnSelector
+              columns={Object.keys(defaultColumnVisibility).map(key => ({ key, label: key === 'index' ? '#' : key.charAt(0).toUpperCase() + key.slice(1) }))}
+              visibilityMap={columnVisibility}
+              onChange={(m) => setColumnVisibility(m)}
+              localStorageKey={'layer.columnVisibility'}
+              trigger={<FaColumns />}
+            />
+          </div>
+
           <table className="min-w-full text-sm text-left text-gray-700">
             <thead className="bg-gray-100 border-b">
               <tr>
-                <th className="px-4 py-3">#</th>
-                <th className="px-4 py-3">Visit Code</th>
-                <th className="px-4 py-3">Farm Name</th>
-                <th className="px-4 py-3">Farm Code</th>
-                <th className="px-4 py-3">Location</th>
-                <th className="px-4 py-3">Breed</th>
-                <th className="px-4 py-3">Flock</th>
-                <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3">Visit Status</th>
-                <th className="px-4 py-3 text-center">Actions</th>
+                {columnVisibility.index && <th className="px-4 py-3">#</th>}
+                  {columnVisibility.visitCode && <th className="px-4 py-3">Visit Code</th>}
+                {columnVisibility.farmName && <th className="px-4 py-3">Farm Name</th>}
+                {columnVisibility.farmCode && <th className="px-4 py-3">Farm Code</th>}
+                {columnVisibility.createdBy && <th className="px-4 py-3">Created By</th>}
+                {columnVisibility.location && <th className="px-4 py-3">Location</th>}
+                {columnVisibility.breed && <th className="px-4 py-3">Breed</th>}
+                {columnVisibility.flock && <th className="px-4 py-3">Flock</th>}
+                {columnVisibility.createdAt && <th className="px-4 py-3">Created</th>}
+                {columnVisibility.visitProximity && <th className="px-4 py-3">Proximity</th>}
+                {columnVisibility.visitStatusCategory && <th className="px-4 py-3">Status Category</th>}
+                {columnVisibility.durationCategory && <th className="px-4 py-3">Duration</th>}
+                {columnVisibility.daysDifference && <th className="px-4 py-3">Days Diff</th>}
+                {columnVisibility.visitStatus && <th className="px-4 py-3">Visit Status</th>}
+                {columnVisibility.actions && <th className="px-4 py-3 text-center">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {loadingVisits ? (
-                  <tr><td colSpan={10} className="p-6 text-center"><LoadingSpinner /></td></tr>
+                  <tr><td colSpan={11} className="p-6 text-center"><LoadingSpinner /></td></tr>
                 ) : visits.length === 0 ? (
-                  <tr><td colSpan={10} className="p-6 text-center text-gray-500">No visits found.</td></tr>
+                  <tr><td colSpan={11} className="p-6 text-center text-gray-500">No visits found.</td></tr>
               ) : visits.map((v, idx) => (
                 <tr key={v.LayerVisitID || idx} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3">{idx + 1}</td>
-                  <td className="px-4 py-3">{(() => {
+                  {columnVisibility.index && <td className="px-4 py-3">{idx + 1}</td>}
+                  {columnVisibility.visitCode && <td className="px-4 py-3">{(() => {
                     const scheduleId = v.ScheduleID || v.scheduleId || null;
                     const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null;
                     const code = sched ? (sched.VisitCode || sched.VisitCodeName || sched.Code || sched.VisitID || sched.VisitId) : null;
                     return code || v.VisitCode || v.LayerVisitID || v.VisitId || '';
-                  })()}</td>
+                  })()}</td>}
                   
                   {(() => {
-                    const fid = v.FarmID || v.farmId || v.Farm || null
+                    const scheduleId = v.ScheduleID || v.scheduleId || null
+                    const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
+                    const fid = v.FarmID || v.farmId || (v.Farm && (v.Farm.FarmID || v.Farm.farmId || v.Farm.id)) || sched?.FarmID || sched?.FarmId || (sched && sched.Farm && (sched.Farm.FarmID || sched.Farm.id)) || null
                     const fm = fid ? farmMap[String(fid)] : null
-                    const name = fm ? (fm.FarmName || fm.Name || fm.farmName || fm.FarmCode || '') : (v.FarmName || '')
-                    const code = fm ? (fm.FarmCode || fm.Code || fm.code || '') : (v.FarmCode || '')
+                    const name = sched?.FarmName || (sched && sched.Farm && (sched.Farm.FarmName || sched.Farm.Name || sched.Farm.farmName)) || sched?.Farm || (fm ? (fm.FarmName || fm.Name || fm.farmName || (fm.Farm && (fm.Farm.FarmName || fm.Farm.Name))) : '') || (v.FarmName || '')
+                    const code = sched?.FarmCode || (sched && sched.Farm && (sched.Farm.FarmCode || sched.Farm.Code || sched.Farm.Farm_Code)) || (fm ? (fm.FarmCode || fm.Code || fm.code || (fm.Farm && (fm.Farm.FarmCode || fm.Farm.Code || fm.Farm.Farm_Code))) : '') || (v.FarmCode || (v.Farm && (v.Farm.FarmCode || v.Farm.Code || v.Farm.Farm_Code)) || '')
                     return (
                       <>
-                        <td className="px-4 py-3">{name}</td>
-                        <td className="px-4 py-3">{code}</td>
+                        {columnVisibility.farmName && <td className="px-4 py-3">{name}</td>}
+                        {columnVisibility.farmCode && <td className="px-4 py-3">{code}</td>}
                       </>
                     )
                   })()}
-                  <td className="px-4 py-3">{v.Location || v.FarmLocation || ''}</td>
-                  <td className="px-4 py-3">{v.Breed || ''}</td>
-                  <td className="px-4 py-3">{v.FlockSize ?? ''}</td>
-                  <td className="px-4 py-3">{v.CreatedAt ? new Date(v.CreatedAt).toLocaleString() : (v.CreatedDate ? new Date(v.CreatedDate).toLocaleString() : '')}</td>
-                  <td className="px-4 py-3">{(() => {
+                  {/* Created By column: try advisorMap by CreatedBy GUID, fallback to schedule/advisor fields or raw CreatedBy */}
+                  {columnVisibility.createdBy && <td className="px-4 py-3">{(() => {
+                    try {
+                      const scheduleId = v.ScheduleID || v.scheduleId || null
+                      const schedule = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
+                      const createdBy = v.CreatedBy || v.CreatedByUserID || v.CreatedByID || v.CreatedById || v.CreatedByUser || v.createdBy || (schedule && (schedule.CreatedBy || schedule.CreatedByUserID || schedule.CreatedById)) || null
+                      if (!createdBy) return ''
+                      const key = String(createdBy)
+                      const nameFromMap = advisorMap[key]
+                      if (nameFromMap) return nameFromMap
+                      // Prefer created-by full name from schedule when available
+                      const cFirst = schedule?.CreatedByFirstName || schedule?.CreatedByFirstName || null
+                      const cFather = schedule?.CreatedByFatherName || schedule?.CreatedByFatherName || null
+                      if (cFirst || cFather) return [cFirst, cFather].filter(Boolean).join(' ')
+                      // fallback to any advisor fields present on schedule/visit
+                      return schedule?.AdvisorFullName || schedule?.AdvisorName || v.AdvisorName || v.CreatedByName || key
+                    } catch (e) { return '' }
+                  })()}</td>}
+                  {columnVisibility.location && <td className="px-4 py-3">{v.Location || v.FarmLocation || ''}</td>}
+                  {columnVisibility.breed && <td className="px-4 py-3">{v.Breed || ''}</td>}
+                  {columnVisibility.flock && <td className="px-4 py-3">{v.FlockSize ?? ''}</td>}
+                  {columnVisibility.createdAt && <td className="px-4 py-3">{v.CreatedAt ? new Date(v.CreatedAt).toLocaleString() : (v.CreatedDate ? new Date(v.CreatedDate).toLocaleString() : '')}</td>}
+                  {columnVisibility.visitProximity && <td className="px-4 py-3">{(() => {
+                    const scheduleId = v.ScheduleID || v.scheduleId || null
+                    const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
+                    return sched?.VisitProximity || sched?.VisitProximityName || ''
+                  })()}</td>}
+                  {columnVisibility.visitStatusCategory && <td className="px-4 py-3">{(() => {
+                    const scheduleId = v.ScheduleID || v.scheduleId || null
+                    const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
+                    return sched?.VisitStatusCategory || ''
+                  })()}</td>}
+                  {columnVisibility.durationCategory && <td className="px-4 py-3">{(() => {
+                    const scheduleId = v.ScheduleID || v.scheduleId || null
+                    const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
+                    return sched?.DurationCategory || ''
+                  })()}</td>}
+                  {columnVisibility.daysDifference && <td className="px-4 py-3">{(() => {
+                    const scheduleId = v.ScheduleID || v.scheduleId || null
+                    const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
+                    return (sched && (sched.DaysDifference !== undefined && sched.DaysDifference !== null)) ? String(sched.DaysDifference) : (v.DaysDifference !== undefined && v.DaysDifference !== null ? String(v.DaysDifference) : '')
+                  })()}</td>}
+                  {columnVisibility.visitStatus && <td className="px-4 py-3">{(() => {
                     const scheduleId = v.ScheduleID || v.scheduleId || null
                     const sched = scheduleId ? (scheduleMap[String(scheduleId)] || null) : null
                     const raw = sched?.VisitStatus || sched?.VisitStatusName || v.VisitStatus || v.VisitStatusName || (v.IsVisitCompleted ? 'COMPLETED' : null)
@@ -892,8 +1113,8 @@ export default function LayerFarm() {
                       cls += 'bg-gray-100 text-gray-700'
                     }
                     return <span className={cls}>{label}</span>
-                  })()}</td>
-                  <td className="px-4 py-3 text-center">
+                  })()}</td>}
+                  {columnVisibility.actions && <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
                       {(() => {
                         const isCompleted = Boolean(
@@ -907,18 +1128,36 @@ export default function LayerFarm() {
                               {completingId === (v.LayerVisitID || v.LayerVisitId || v.id) ? <SmallSpinner /> : <Check size={16} />}
                             </button>
                             <button onClick={() => handleView(v.LayerVisitID || v.LayerVisitId || v.id)} className="p-2 text-sky-600 rounded-full hover:text-white hover:bg-sky-600" title="View Visit"><Eye size={16} /></button>
-                            <button onClick={() => handlePrint(v)} className="p-2 text-indigo-600 rounded-full hover:text-white hover:bg-indigo-600" title="Print Visit" aria-label="Print Visit"><Printer size={16} /></button>
+                            {/* Print button removed from actions column per request */}
                             <button onClick={() => !isCompleted && handleEdit(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
                             <button onClick={() => !isCompleted && handleDelete(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                           </>
                         )
                       })()}
                     </div>
-                  </td>
+                  </td>}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex items-center justify-between mt-3">
+          <div className="text-sm text-gray-600">{summary ? `Total: ${totalCount} visits` : `${visits.length} items`}</div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm">Per page:</label>
+            <select value={pageSize} onChange={onPageSizeChange} className="px-2 py-1 border rounded bg-white text-sm">
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <button onClick={async () => { const next = 1; setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber <= 1} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
+            <button onClick={async () => { const next = Math.max(1, pageNumber - 1); setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber <= 1} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
+            <span className="text-sm">Page {pageNumber} / {totalPages || 1}</span>
+            <button onClick={async () => { const next = Math.min(totalPages || 1, pageNumber + 1); setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber >= (totalPages || 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
+            <button onClick={async () => { const next = totalPages || 1; setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber >= (totalPages || 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+          </div>
         </div>
 
         {/* Inline form moved to modal - new visit is created via popup */}

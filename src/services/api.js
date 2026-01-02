@@ -18,17 +18,7 @@ const callWithAuthOrApi = async (fetchWithAuth, config) => {
   return await apiClient(fallbackConfig);
 };
 
-export const fetchSchedules = async (dispatch, filters, fetchWithAuth) => {
-  dispatch({ type: 'SET_LOADING', payload: true });
-  try {
-    // Backend expects GET /farm-visit-schedule/search on the API base
-    const res = await callWithAuthOrApi(fetchWithAuth, { url: '/farm-visit-schedule/search', method: 'GET', params: filters });
-    const payload = res.data && res.data.data ? res.data.data : (res.data || []);
-    dispatch({ type: 'SET_LIST', payload });
-  } catch (error) {
-    handleError(dispatch, error);
-  }
-};
+
 
 export const fetchAllSchedules = async (dispatch, fetchWithAuth, options = {}) => {
   dispatch({ type: 'SET_LOADING', payload: true });
@@ -56,16 +46,25 @@ export const fetchAllSchedules = async (dispatch, fetchWithAuth, options = {}) =
     dispatch({ type: 'SET_LOADING', payload: false });
   }
 };
-
-export const fetchDrafts = async (dispatch, fetchWithAuth, params = {}) => {
+// Backend expects GET /farm-visit-schedule/search and returns { data: rows, summary }
+export const fetchSchedules = async (dispatch, filters, fetchWithAuth) => {
   dispatch({ type: 'SET_LOADING', payload: true });
   try {
-    const res = await callWithAuthOrApi(fetchWithAuth, { url: '/farm-visit-schedule/drafts', method: 'GET', params });
-    // New backend response shape: { success: true, data: { items: [...], pagination: { totalCount, currentPage, pageSize, totalPages } } }
-    const wrapper = res.data && res.data.data ? res.data.data : (res.data || {});
-    const items = Array.isArray(wrapper.items) ? wrapper.items : (Array.isArray(wrapper) ? wrapper : []);
-    const pagination = wrapper.pagination || { totalCount: items.length, currentPage: params.PageNumber || 1, pageSize: params.PageSize || items.length, totalPages: 1 };
-    dispatch({ type: 'SET_DRAFTS', payload: { items, pagination } });
+    const res = await callWithAuthOrApi(fetchWithAuth, { url: '/farm-visit-schedule/search', method: 'GET', params: filters });
+    const rows = res && res.data ? (res.data.data || res.data || []) : [];
+    const summary = res && res.data ? (res.data.summary || null) : null;
+    const items = Array.isArray(rows) ? rows : [];
+    dispatch({ type: 'SET_LIST', payload: items });
+    // derive pagination from summary when available
+    try {
+      const total = summary && (summary.TotalVisits || summary.TotalCount || summary.totalCount) ? (summary.TotalVisits || summary.TotalCount || summary.totalCount) : items.length;
+      const pageSize = (filters && (filters.PageSize || filters.pageSize)) ? Number(filters.PageSize || filters.pageSize) : (20);
+      const currentPage = (filters && (filters.PageNumber || filters.pageNumber)) ? Number(filters.PageNumber || filters.pageNumber) : 1;
+      const totalPages = summary && (summary.TotalPages || summary.totalPages) ? (summary.TotalPages || summary.totalPages) : (pageSize ? Math.max(1, Math.ceil(total / pageSize)) : 1);
+      dispatch({ type: 'SET_PAGINATION', payload: { currentPage, pageSize, totalCount: total, totalPages } });
+    } catch (e) {
+      // ignore pagination compute errors
+    }
   } catch (error) {
     handleError(dispatch, error);
   } finally {
@@ -107,6 +106,125 @@ export const fetchStatistics = async (dispatch, params = {}, fetchWithAuth) => {
     dispatch({ type: 'SET_STATISTICS', payload });
   } catch (error) {
     handleError(dispatch, error);
+  }
+};
+
+// Fetch filtered schedules (uses newer /filter endpoint which returns rows + summary)
+export const fetchFilteredSchedules = async (dispatch, filters = {}, fetchWithAuth) => {
+  dispatch({ type: 'SET_LOADING', payload: true });
+  try {
+    const res = await callWithAuthOrApi(fetchWithAuth, { url: '/farm-visit-schedule/filter', method: 'GET', params: filters });
+    const rows = res && res.data ? (res.data.data || res.data || []) : [];
+    const summary = res && res.data ? (res.data.summary || null) : null;
+    const items = Array.isArray(rows) ? rows : [];
+    dispatch({ type: 'SET_LIST', payload: items });
+    // derive pagination
+    try {
+      let total = 0;
+      if (summary && (summary.TotalRecords || summary.totalRecords || summary.TotalCount)) {
+        total = summary.TotalRecords || summary.totalCount || summary.TotalCount;
+      } else if (items && items.length > 0 && items[0].TotalRecords !== undefined) {
+        total = Number(items[0].TotalRecords) || items.length;
+      } else {
+        total = items.length;
+      }
+      const pageSize = (filters && (filters.PageSize || filters.pageSize)) ? Number(filters.PageSize || filters.pageSize) : 50;
+      const currentPage = (filters && (filters.PageNumber || filters.pageNumber)) ? Number(filters.PageNumber || filters.pageNumber) : 1;
+      const totalPages = pageSize ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+      dispatch({ type: 'SET_PAGINATION', payload: { currentPage, pageSize, totalCount: total, totalPages } });
+    } catch (e) {
+      // ignore
+    }
+    return { items, summary };
+  } catch (error) {
+    handleError(dispatch, error);
+    return { items: [], summary: null };
+  } finally {
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }
+};
+
+// Fetch draft schedules for advisor/admin - paginated
+export const fetchDrafts = async (dispatch, fetchWithAuth, options = {}) => {
+  dispatch({ type: 'SET_LOADING', payload: true });
+  try {
+    const params = {};
+    if (options.PageNumber) params.PageNumber = options.PageNumber;
+    if (options.PageSize) params.PageSize = options.PageSize;
+    const res = await callWithAuthOrApi(fetchWithAuth, { url: '/farm-visit-schedule/drafts', method: 'GET', params });
+    const wrapper = res && res.data ? (res.data.data || res.data || {}) : {};
+    // Expecting { items, pagination }
+    const items = Array.isArray(wrapper.items) ? wrapper.items : (Array.isArray(wrapper) ? wrapper : []);
+    const pagination = wrapper.pagination || { totalCount: items.length, currentPage: options.PageNumber || 1, pageSize: options.PageSize || items.length, totalPages: 1 };
+    dispatch({ type: 'SET_DRAFTS', payload: { items, pagination } });
+    return { items, pagination };
+  } catch (error) {
+    handleError(dispatch, error);
+    return { items: [], pagination: { totalCount: 0, currentPage: 1, pageSize: options.PageSize || 0, totalPages: 0 } };
+  } finally {
+    dispatch({ type: 'SET_LOADING', payload: false });
+  }
+};
+
+// Fetch backend-provided filter options used to populate dropdowns on the schedule page
+export const fetchFilterOptions = async (dispatch, fetchWithAuth) => {
+  try {
+    const res = await callWithAuthOrApi(fetchWithAuth, { url: '/farm-visit-schedule/filter-options', method: 'GET' });
+    const body = res && res.data ? (res.data.data || res.data) : res;
+
+    // Helper: normalize a raw option entry into { value, label }
+    const normOption = (o) => {
+      if (o == null) return { value: '', label: '' };
+      if (typeof o === 'string' || typeof o === 'number') return { value: String(o), label: String(o) };
+      const value = o.value ?? o.Value ?? o.Id ?? o.id ?? o.key ?? o.Key ?? '';
+      const label = o.label ?? o.Label ?? o.Name ?? o.name ?? o.Text ?? String(value);
+      return { value: value == null ? '' : String(value), label: label == null ? String(value) : String(label) };
+    };
+
+    // Build a raw grouped map from either explicit grouped payload or flat rows
+    let rawGrouped = {};
+    if (body && body.grouped && typeof body.grouped === 'object') {
+      rawGrouped = body.grouped;
+    } else {
+      const rows = Array.isArray(body) ? body : (body && Array.isArray(body.rows) ? body.rows : []);
+      rows.forEach(r => {
+        const t = r.OptionType || r.optionType || r.type || r.Group || r.group || 'default';
+        if (!rawGrouped[t]) rawGrouped[t] = [];
+        rawGrouped[t].push(r);
+      });
+    }
+
+    // Map rawGrouped keys to canonical group names and normalize items
+    const canonicalizeKey = (k) => {
+      if (!k) return 'default';
+      const s = String(k).toLowerCase();
+      if (s.includes('farm') && s.includes('type')) return 'FarmType';
+      if (s.includes('visit') && s.includes('status')) return 'VisitStatus';
+      if (s.includes('approval')) return 'ApprovalStatus';
+      if (s.includes('region')) return 'Region';
+      if (s.includes('zone')) return 'Zone';
+      if (s.includes('wer') || s.includes('wore') || s.includes('wereda')) return 'Wereda';
+      return String(k);
+    };
+
+    const groupedNormalized = {};
+    Object.keys(rawGrouped).forEach(k => {
+      const canon = canonicalizeKey(k);
+      const items = Array.isArray(rawGrouped[k]) ? rawGrouped[k].map(normOption) : [];
+      // ensure there's an "All" option at the top for filters
+      const withAll = (items.length === 0 || items[0]?.value !== '') ? [{ value: '', label: 'All' }, ...items] : items;
+      // assign under canonical key
+      groupedNormalized[canon] = withAll;
+      // also add lowercase variant for convenience (so components can read fo.FarmType or fo.farmType)
+      groupedNormalized[canon.charAt(0).toLowerCase() + canon.slice(1)] = withAll;
+    });
+
+    dispatch({ type: 'SET_FILTER_OPTIONS', payload: groupedNormalized || {} });
+    return { grouped: groupedNormalized, raw: body };
+  } catch (error) {
+    // Do not set global error for dropdown failures — handle silently but return empty
+    dispatch({ type: 'SET_FILTER_OPTIONS', payload: {} });
+    return { grouped: {}, raw: null };
   }
 };
 
@@ -299,11 +417,13 @@ export const uploadBulk = async (dispatch, file, fetchWithAuth) => {
 const api = {
   callWithAuthOrApi,
   fetchSchedules,
+  fetchFilteredSchedules,
   fetchAllSchedules,
   fetchDrafts,
   fetchLookups,
   fetchStats,
   fetchStatistics,
+  fetchFilterOptions,
   fetchDashboardQuick,
   createSchedule,
   updateSchedule,

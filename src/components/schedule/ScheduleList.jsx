@@ -101,6 +101,17 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
   const [visitStatusFilter, setVisitStatusFilter] = useState('All');
 
   useEffect(() => {
+    try {
+      // Helpful debug when schedules do not render: log count and sample
+      // This can be removed once the root cause is identified.
+      // eslint-disable-next-line no-console
+      console.debug('[ScheduleList] incoming schedules', Array.isArray(schedules) ? schedules.length : typeof schedules, schedules && schedules[0]);
+    } catch (e) {
+      // ignore logging errors
+    }
+  }, [schedules]);
+
+  useEffect(() => {
     const ids = (schedules || []).map(s => s.id ?? s.ScheduleID).filter(Boolean);
     if (ids.length === 0) return;
 
@@ -196,27 +207,6 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
 
   return (
     <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow-md">
-      <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 flex items-center justify-end gap-3">
-        <label className="text-sm text-gray-600 dark:text-gray-300">Visit Status:</label>
-        <select value={visitStatusFilter} onChange={e => setVisitStatusFilter(e.target.value)} className="form-select h-9 text-sm">
-          <option value="All">All</option>
-          <option value="Scheduled">Scheduled</option>
-          <option value="Draft">Draft</option>
-          <option value="Completed">Completed</option>
-          <option value="Cancelled">Cancelled</option>
-          <option value="None">None</option>
-        </select>
-
-        <label className="text-sm text-gray-600 dark:text-gray-300">Approval:</label>
-        <select value={approvalFilter} onChange={e => setApprovalFilter(e.target.value)} className="form-select h-9 text-sm">
-          <option value="All">All</option>
-          <option value="Approved">Approved</option>
-          <option value="Pending">Pending</option>
-          <option value="Submitted">Submitted</option>
-          <option value="Rejected">Rejected</option>
-          <option value="None">None</option>
-        </select>
-      </div>
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-700">
           <tr>

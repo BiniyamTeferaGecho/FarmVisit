@@ -3,6 +3,7 @@ import api from '../../services/api';
 import { validateCompleteRequirements } from '../../utils/visitValidation';
 import FillVisitModal from './FillVisitModal'; 
 import Modal from '../Modal';
+import ConfirmModal from '../common/ConfirmModal';
 import { FilePlus, Trash2, Send, CheckCircle, XCircle, Clock, Upload, Calendar, User, Building, Clipboard, Clock4, StickyNote, AlertTriangle } from 'lucide-react';
 
 const InputField = ({ label, name, value, onChange, placeholder, type = 'text', icon, readOnly = false, disabled = false }) => (
@@ -128,6 +129,7 @@ const ScheduleModals = ({
     farms = [],
     managers = [],
     advisors = [],
+    filterOptions = {},
     deleteTarget,
     submitTarget,
     approvalTarget,
@@ -154,10 +156,20 @@ const ScheduleModals = ({
     let mounted = true;
     const extractItems = (body) => {
       if (!body) return [];
+      // If we were handed the raw array, return it
       if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
+      // axios response wrapper (res): res.data may be the payload or the array itself
+      // payload shape used across the API: { success: true, data: [...] }
+      if (body && body.data) {
+        // res.data === array case
+        if (Array.isArray(body.data)) return body.data;
+        // res.data.data (API wrapper) -> actual items
+        if (body.data && Array.isArray(body.data.data)) return body.data.data;
+        // res.data.items (alternative wrapper)
+        if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      }
+      // fallback: top-level items
+      if (body && Array.isArray(body.items)) return body.items;
       return [];
     };
 
@@ -284,7 +296,7 @@ const ScheduleModals = ({
     return () => { mounted = false };
   }, [fetchWithAuth]);
 
-  // Visit type options (for Visit Purpose dropdown) - load from lookup: "Visit Type"
+  // Visit type options (for Visit Purpose dropdown) - attempt multiple lookup type names
   const [visitTypes, setVisitTypes] = useState([]);
   useEffect(() => {
     let mounted = true;
@@ -299,16 +311,43 @@ const ScheduleModals = ({
 
     const loadVisitTypes = async () => {
       try {
-        let res = null;
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: '/lookups/by-type-name/Visit Type', method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent('Visit Type')}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
+        const tryNames = ['Visit Type', 'Visit Purpose', 'VisitPurpose', 'Visit_Purpose'];
+        let items = [];
+        const base = window.location.origin;
+        for (const name of tryNames) {
+          try {
+            let res = null;
+            if (typeof fetchWithAuth === 'function') {
+              res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(name)}`, method: 'GET' });
+            } else {
+              const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(name)}`, { credentials: 'include' });
+              if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+              res = await r.json();
+            }
+            const extracted = extractItems(res) || [];
+            if (extracted && extracted.length > 0) {
+              items = extracted;
+              break;
+            }
+          } catch (e) {
+            // try next name
+            continue;
+          }
         }
-        const items = extractItems(res) || [];
+
+        // Ensure the currently-selected VisitPurpose is present in options so the select shows its value
+        try {
+          const current = formData && (formData.VisitPurpose || formData.VisitType || formData.visitPurpose || formData.visitType);
+          if (current && items && !items.find(it => {
+            const val = it.LookupValue || it.Value || it.LookupCode || it.code || it.value || it.Name || it.name || it;
+            return String(val) === String(current);
+          })) {
+            // prepend a synthetic item representing the existing value
+            const synthetic = { LookupValue: current, Value: current, Name: String(current), value: current, name: String(current) };
+            items = [synthetic, ...items];
+          }
+        } catch (e) { /* ignore */ }
+
         if (mounted) setVisitTypes(items);
       } catch (err) {
         console.debug('loadVisitTypes error', err);
@@ -316,12 +355,16 @@ const ScheduleModals = ({
     };
     loadVisitTypes();
     return () => { mounted = false };
-  }, [fetchWithAuth]);
+  }, [fetchWithAuth, formData && formData.VisitPurpose]);
 
   // Use shared validation helper for completion requirements
   const { ready: readyToComplete, reasons: completeReasons } = validateCompleteRequirements(selectedSchedule || {}, completeData || {});
 
   const isEditing = Boolean((formData && (formData.id || formData.ScheduleID || formData.ScheduleId)));
+
+  // Confirmation modal state for save/update and other actions
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [confirmCfg, setConfirmCfg] = React.useState({ title: '', message: '', onConfirm: null, loading: false });
 
   // Debug: log fill modal inputs when opened (development only)
   useEffect(() => {
@@ -347,6 +390,7 @@ const ScheduleModals = ({
             value={formData.AdvisorID}
             onChange={handleFormChange}
             icon={<User size={16} className="text-gray-400" />}
+            readOnly={isScheduleReadOnly}
           >
                       <>
                         <option value="">Select Advisor</option>
@@ -389,19 +433,26 @@ const ScheduleModals = ({
             icon={<Building size={16} className="text-gray-400" />}
             readOnly={isScheduleReadOnly}
           >
-            <option value="">Select Farm Type</option>
-            {farmTypesList && farmTypesList.length > 0 ? (
-              farmTypesList.map((it, i) => {
-                const val = it.LookupValue || it.Value || it.Name || it.name || it.LookupCode || it.code || String(i);
-                const label = it.LookupValue || it.Value || it.Name || it.name || String(val);
-                return <option key={String(val || i)} value={val}>{label}</option>
-              })
-            ) : (
-              <>
+            {(() => {
+              // prefer centralized filter options when available
+              const fo = filterOptions || {};
+              const foList = fo.FarmType || fo.farmType || fo['FarmType'] || fo['farmType'] || null;
+              if (Array.isArray(foList) && foList.length > 0) {
+                return foList.map((it, i) => <option key={String(it.value || it.Value || i)} value={it.value || it.Value || it.Id || it.id || ''}>{it.label || it.Label || it.Name || it.name || String(it.value || it.Value || '')}</option>);
+              }
+              if (farmTypesList && farmTypesList.length > 0) {
+                return farmTypesList.map((it, i) => {
+                  const val = it.LookupValue || it.Value || it.Name || it.name || it.LookupCode || it.code || String(i);
+                  const label = it.LookupValue || it.Value || it.Name || it.name || String(val);
+                  return <option key={String(val || i)} value={val}>{label}</option>
+                })
+              }
+              return (<>
+                <option value="">Select Farm Type</option>
                 <option value="DAIRY">Dairy</option>
                 <option value="LAYER">Layer</option>
-              </>
-            )}
+              </>);
+            })()}
           </SelectField>
           <SelectField
             label="Manager"
@@ -545,7 +596,22 @@ const ScheduleModals = ({
         <div className="mt-6 flex justify-end gap-3">
           <ActionButton onClick={() => closeModal('schedule')} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Cancel</ActionButton>
           <ActionButton
-            onClick={isEditing ? (typeof onUpdate === 'function' ? onUpdate : onSave) : onSave}
+            onClick={() => {
+              if (isScheduleReadOnly) return;
+              const action = isEditing ? (typeof onUpdate === 'function' ? onUpdate : onSave) : onSave;
+              const title = isEditing ? 'Confirm Update' : 'Confirm Create';
+              const message = isEditing ? 'Are you sure you want to update this schedule?' : 'Are you sure you want to create this schedule?';
+              setConfirmCfg({ title, message, onConfirm: async () => {
+                try {
+                  setConfirmCfg(c => ({ ...c, loading: true }));
+                  await action();
+                } finally {
+                  setConfirmCfg(c => ({ ...c, loading: false }));
+                  setConfirmOpen(false);
+                }
+              }, loading: false });
+              setConfirmOpen(true);
+            }}
             className={`${isEditing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} ${isScheduleReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
             disabled={isScheduleReadOnly || (!isEditing && createLocked)}
           >
@@ -553,6 +619,17 @@ const ScheduleModals = ({
           </ActionButton>
         </div>
       </Modal>
+
+        <ConfirmModal
+          open={confirmOpen}
+          title={confirmCfg.title}
+          message={confirmCfg.message}
+          loading={confirmCfg.loading}
+          confirmLabel="Yes"
+          cancelLabel="No"
+          onConfirm={confirmCfg.onConfirm}
+          onCancel={() => setConfirmOpen(false)}
+        />
 
       <Modal open={isDeleteModalOpen} title="Confirm Deletion" onClose={() => closeModal('delete')}>
         <div className="flex items-center">

@@ -72,6 +72,7 @@ export const initialState = {
   stats: {},
   dashboardQuick: {},
   statistics: null,
+  filterOptions: {},
 };
 
 export const scheduleReducer = (state, action) => {
@@ -92,6 +93,8 @@ export const scheduleReducer = (state, action) => {
       return { ...state, schedulePage: action.payload.currentPage || action.payload.current || state.schedulePage, schedulePageSize: action.payload.pageSize || action.payload.pageSize || state.schedulePageSize, scheduleTotalCount: action.payload.totalCount || action.payload.total || state.scheduleTotalCount, scheduleTotalPages: action.payload.totalPages || state.scheduleTotalPages };
     case 'SET_LOOKUP_DATA':
       return { ...state, employees: action.payload.employees, farms: action.payload.farms, managers: action.payload.managers || state.managers, advisors: action.payload.advisors || state.advisors };
+    case 'SET_FILTER_OPTIONS':
+      return { ...state, filterOptions: action.payload || {} };
     case 'SET_DATE_RANGE':
       return { ...state, dateRange: action.payload };
     case 'SET_FARM_TYPE':
@@ -101,20 +104,72 @@ export const scheduleReducer = (state, action) => {
     case 'TOGGLE_DATE_PICKER':
         return { ...state, showDatePicker: !state.showDatePicker };
     case 'OPEN_FORM':
-      return {
-        ...state,
-        showForm: true,
-        editingId: action.payload ? action.payload.ScheduleID : null,
-        form: action.payload ? { ...initialState.form, ...action.payload, ProposedDate: action.payload.ProposedDate ? format(new Date(action.payload.ProposedDate), "yyyy-MM-dd'T'HH:mm") : '' } : initialState.form,
-        // respect explicit read-only flag if set by caller
-        scheduleReadOnly: action.payload && action.payload.__readOnly === true ? true : state.scheduleReadOnly,
-      };
+      {
+        const payload = action.payload || null;
+        let formattedProposed = '';
+        let formattedNext = '';
+        try {
+          if (payload) {
+            const pd = payload.ProposedDate || payload.proposedDate || null;
+            const nf = payload.NextFollowUpDate || payload.nextFollowUpDate || null;
+            if (pd) {
+              const d = new Date(pd);
+              if (!isNaN(d.getTime())) formattedProposed = format(d, "yyyy-MM-dd'T'HH:mm");
+            }
+            if (nf) {
+              const n = new Date(nf);
+              if (!isNaN(n.getTime())) formattedNext = format(n, "yyyy-MM-dd'T'HH:mm");
+            }
+          }
+        } catch (e) {
+          // fall back to empty strings on parse errors
+          formattedProposed = '';
+          formattedNext = '';
+        }
+
+        // Normalize common alternate property names into the canonical `form` shape
+        const normalizedPayload = payload ? {
+          ...payload,
+          VisitPurpose: payload.VisitPurpose || payload.VisitType || payload.visitPurpose || payload.visitType || payload.VisitPurpose || '',
+        } : payload;
+
+        return {
+          ...state,
+          showForm: true,
+          editingId: payload ? payload.ScheduleID : null,
+          form: payload ? { ...initialState.form, ...normalizedPayload, ProposedDate: formattedProposed, NextFollowUpDate: formattedNext || (payload && (payload.NextFollowUpDate || payload.nextFollowUpDate) ? (payload.NextFollowUpDate || payload.nextFollowUpDate) : '') } : initialState.form,
+          // respect explicit read-only flag if set by caller
+          scheduleReadOnly: payload && payload.__readOnly === true ? true : state.scheduleReadOnly,
+        };
+      }
     case 'CLOSE_FORM':
       return { ...state, showForm: false, editingId: null, form: initialState.form, scheduleReadOnly: false };
     case 'SET_SCHEDULE_READ_ONLY':
       return { ...state, scheduleReadOnly: action.payload === true };
     case 'SET_FORM_DATA':
-      return { ...state, form: action.payload };
+      {
+        const payload = action.payload || {};
+        // normalize VisitPurpose from alternative property names
+        let visitPurpose = payload.VisitPurpose || payload.VisitType || payload.visitPurpose || payload.visitType || '';
+        // format ProposedDate and NextFollowUpDate for datetime-local inputs
+        let formattedProposed = '';
+        let formattedNext = '';
+        try {
+          const pd = payload.ProposedDate || payload.proposedDate || null;
+          const nf = payload.NextFollowUpDate || payload.nextFollowUpDate || null;
+          if (pd) {
+            const d = new Date(pd);
+            if (!isNaN(d.getTime())) formattedProposed = format(d, "yyyy-MM-dd'T'HH:mm");
+          }
+          if (nf) {
+            const n = new Date(nf);
+            if (!isNaN(n.getTime())) formattedNext = format(n, "yyyy-MM-dd'T'HH:mm");
+          }
+        } catch (e) {
+          // ignore
+        }
+        return { ...state, form: { ...initialState.form, ...payload, VisitPurpose: visitPurpose, ProposedDate: formattedProposed || (payload.ProposedDate || payload.proposedDate || ''), NextFollowUpDate: formattedNext || (payload.NextFollowUpDate || payload.nextFollowUpDate || '') } };
+      }
     case 'UPDATE_FORM':
       return { ...state, form: { ...state.form, [action.payload.name]: action.payload.value } };
     case 'OPEN_DELETE_MODAL':

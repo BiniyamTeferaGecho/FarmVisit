@@ -32,6 +32,9 @@ export default function Permission() {
 
   const [form, setForm] = useState({ PermissionCode: '', PermissionName: '', PermissionDescription: '', Module: '', SubModule: '', IsActive: true })
   const [saving, setSaving] = useState(false)
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
+  const [pendingSavePayload, setPendingSavePayload] = useState(null)
+  const [pendingSaveIsEdit, setPendingSaveIsEdit] = useState(false)
 
   const [editModal, setEditModal] = useState({ open: false, id: null, form: null, saving: false })
   const [viewModal, setViewModal] = useState({ open: false, id: null, data: null })
@@ -87,10 +90,10 @@ export default function Permission() {
     if (!form.PermissionCode || !form.PermissionName || !form.Module) { setMessage({ type: 'error', text: 'Code, Name and Module are required' }); return }
     const createdBy = getUserId(user)
     if (!createdBy) { setMessage({ type: 'error', text: 'You must be signed in to create permissions.' }); return }
-    setSaving(true)
+    // prepare payload and show confirm
     try {
       const exists = await checkCodeExists(form.PermissionCode)
-      if (exists) { setMessage({ type: 'error', text: 'Permission code already exists' }); setSaving(false); return }
+      if (exists) { setMessage({ type: 'error', text: 'Permission code already exists' }); return }
       const payload = {
         PermissionCode: form.PermissionCode.trim(),
         PermissionName: form.PermissionName.trim(),
@@ -100,15 +103,12 @@ export default function Permission() {
         IsActive: form.IsActive ? 1 : 0,
         CreatedBy: createdBy,
       }
-      await fetchWithAuth({ url: '/permissions', method: 'post', data: payload })
-      setMessage({ type: 'success', text: 'Permission created' })
-      resetForm()
-      await fetchPermissions(1)
+      setPendingSavePayload(payload)
+      setPendingSaveIsEdit(false)
+      setShowSaveConfirm(true)
     } catch (err) {
-      console.error('createPermission error', err)
-      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to create permission' })
-    } finally {
-      setSaving(false)
+      console.error('createPermission check error', err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to prepare create' })
     }
   }
 
@@ -122,22 +122,47 @@ export default function Permission() {
     if (!id || !isGuid(id)) { setMessage({ type: 'error', text: 'Invalid PermissionID for update' }); return }
     const updatedBy = getUserId(user)
     if (!updatedBy) { setMessage({ type: 'error', text: 'You must be signed in to update permissions.' }); return }
-    setEditModal(s => ({ ...s, saving: true }))
+    // prepare payload and show confirm
     try {
-      // if code changed, check exists
       if (f.PermissionCode) {
         const exists = await checkCodeExists(f.PermissionCode, id)
-        if (exists) { setMessage({ type: 'error', text: 'Permission code already exists' }); setEditModal(s => ({ ...s, saving: false })); return }
+        if (exists) { setMessage({ type: 'error', text: 'Permission code already exists' }); return }
       }
       const payload = { PermissionCode: f.PermissionCode ? f.PermissionCode.trim() : undefined, PermissionName: f.PermissionName.trim(), PermissionDescription: f.PermissionDescription || null, Module: f.Module || null, SubModule: f.SubModule || null, IsActive: f.IsActive ? 1 : 0, UpdatedBy: updatedBy }
-      await fetchWithAuth({ url: `/permissions/${id}`, method: 'patch', data: payload })
-      setMessage({ type: 'success', text: 'Permission updated' })
-      setEditModal({ open: false, id: null, form: null, saving: false })
+      setPendingSavePayload({ ...payload, __permId: id })
+      setPendingSaveIsEdit(true)
+      setShowSaveConfirm(true)
+    } catch (err) {
+      console.error('prepare update error', err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to prepare update' })
+    }
+  }
+
+  const doSaveConfirmed = async () => {
+    if (!pendingSavePayload) return
+    setShowSaveConfirm(false)
+    setSaving(true)
+    try {
+      if (pendingSaveIsEdit) {
+        const id = pendingSavePayload.__permId
+        const payload = { ...pendingSavePayload }
+        delete payload.__permId
+        await fetchWithAuth({ url: `/permissions/${id}`, method: 'patch', data: payload })
+        setMessage({ type: 'success', text: 'Permission updated' })
+        setEditModal({ open: false, id: null, form: null, saving: false })
+      } else {
+        await fetchWithAuth({ url: '/permissions', method: 'post', data: pendingSavePayload })
+        setMessage({ type: 'success', text: 'Permission created' })
+        resetForm()
+      }
       await fetchPermissions(pagination.currentPage)
     } catch (err) {
-      console.error('updatePermission error', err)
-      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to update permission' })
-      setEditModal(s => ({ ...s, saving: false }))
+      console.error('savePermission error', err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to save permission' })
+    } finally {
+      setPendingSavePayload(null)
+      setPendingSaveIsEdit(false)
+      setSaving(false)
     }
   }
 

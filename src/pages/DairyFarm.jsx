@@ -8,6 +8,8 @@ import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Plus, RefreshCw, Edit, Trash2, Check, Eye, Printer } from 'lucide-react'
+import { FaSearch, FaTimes, FaSync, FaColumns } from 'react-icons/fa'
+import ColumnSelector from '../components/ColumnSelector'
 
 const initialForm = {
   DairyFarmVisitId: '',
@@ -87,11 +89,36 @@ export default function DairyFarm() {
   const [list, setList] = useState([])
   // scheduleMap: cache schedule rows (by ScheduleID) so we can show VisitCode, Farm and Advisor names
   const [scheduleMap, setScheduleMap] = useState({});
+  const [advisorMap, setAdvisorMap] = useState({});
+  const defaultColumnVisibility = {
+    index: true,
+    visitCode: true,
+    farmName: true,
+    farmCode: true,
+    createdBy: true,
+    location: true,
+    advisor: true,
+    avgMilk: true,
+    totalMilk: true,
+    visitStatus: true,
+    actions: true,
+  };
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    try { const raw = localStorage.getItem('dairy.columnVisibility'); return raw ? JSON.parse(raw) : defaultColumnVisibility; } catch (e) { return defaultColumnVisibility }
+  });
+  const toggleColumn = (key) => {
+    setColumnVisibility(prev => {
+      const next = { ...(prev || defaultColumnVisibility), [key]: !prev[key] };
+      try { localStorage.setItem('dairy.columnVisibility', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  }
   const [savedLocationMap, setSavedLocationMap] = useState(() => {
     try { return JSON.parse(localStorage.getItem('dairy.savedLocationMap') || '{}') } catch (e) { return {} }
   });
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -672,10 +699,12 @@ export default function DairyFarm() {
   }
 
   // Fetch list of dairy visits and build a small schedule map for display fallbacks
-  async function fetchList() {
+  async function fetchList(search = null) {
     setLoading(true); setMessage(null)
     try {
-      const res = await fetchWithAuth({ url: '/dairy-farm', method: 'get' })
+      let url = '/dairy-farm'
+      if (search && String(search).trim() !== '') url += `?search=${encodeURIComponent(String(search))}`
+      const res = await fetchWithAuth({ url, method: 'get' })
       const data = res.data?.data || res.data || []
       const rows = Array.isArray(data) ? data : (data.rows || [])
       setList(rows)
@@ -712,6 +741,32 @@ export default function DairyFarm() {
           }
         }
       }
+      // Populate advisorMap: resolve CreatedBy GUIDs present on visits (or schedules) and fetch advisor names
+      try {
+        const createdSet = new Set()
+        rows.forEach(r => {
+          const sid = r.ScheduleID || r.scheduleId || null
+          const schedule = sid ? (scheduleMap[String(sid)] || null) : null
+          const cb = r.CreatedBy || r.CreatedByUserID || r.CreatedByID || r.CreatedById || r.createdBy || (schedule && (schedule.CreatedBy || schedule.CreatedByUserID || schedule.CreatedById)) || null
+          if (cb) createdSet.add(String(cb))
+        })
+        if (createdSet.size > 0) {
+          const amap = {}
+          await Promise.all(Array.from(createdSet).map(async (id) => {
+            try {
+              const r = await fetchWithAuth({ url: `/users/advisor-by-createdby/${encodeURIComponent(id)}`, method: 'get' })
+              const rr = r?.data?.data || r?.data || []
+              if (Array.isArray(rr) && rr.length > 0) {
+                const first = rr[0]
+                amap[id] = `${first.AdvisorFirstName || first.FirstName || ''} ${first.AdvisorFatherName || first.FatherName || ''}`.trim()
+              } else {
+                amap[id] = null
+              }
+            } catch (e) { amap[id] = null }
+          }))
+          setAdvisorMap(prev => ({ ...(prev || {}), ...amap }))
+        }
+      } catch (e) { /* ignore advisor-map populate errors */ }
     } catch (err) {
       console.error('fetchList dairy error', err)
       setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to load visits' })
@@ -828,60 +883,111 @@ export default function DairyFarm() {
         </div>
       </div>
 
+      {/* Search row: left-aligned like other list pages (Employee-style) */}
+      <div className="mb-4 flex items-center space-x-2">
+        <div className="relative w-full md:w-1/3">
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { fetchList(searchTerm); } }}
+            placeholder="Search (visit code, farm, advisor...)"
+            className="form-input w-full pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
+          {searchTerm ? (
+            <button type="button" onClick={() => { setSearchTerm(''); fetchList(); }} title="Clear search" className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"><FaTimes /></button>
+          ) : null}
+          <button type="button" onClick={() => { fetchList(searchTerm); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"><FaSearch /></button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setSearchTerm(''); setTimeout(()=>fetchList(),0); }} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" title="Refresh Data">
+            <FaSync className="mr-2" /> Refresh
+          </button>
+        </div>
+      </div>
+
       {message && <div className={`mb-4 p-3 rounded ${message.type==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{message.text}</div>}
 
       <div className="bg-white rounded-lg shadow overflow-auto">
+        <div className="flex items-center justify-end mb-2">
+          <ColumnSelector
+            columns={Object.keys(defaultColumnVisibility).map(key => ({ key, label: key === 'index' ? '#' : key.charAt(0).toUpperCase() + key.slice(1) }))}
+            visibilityMap={columnVisibility}
+            onChange={(m) => setColumnVisibility(m)}
+            localStorageKey={'dairy.columnVisibility'}
+            trigger={<FaColumns />}
+          />
+        </div>
         <table className="min-w-full text-sm text-left text-gray-700">
           <thead className="bg-gray-100 border-b">
             <tr>
-              <th className="px-4 py-3">#</th>
-              <th className="px-4 py-3">Visit Code</th>
-              <th className="px-4 py-3">Farm Name</th>
-              <th className="px-4 py-3">Farm Code</th>
-              <th className="px-4 py-3">Location</th>
-              <th className="px-4 py-3">Advisor</th>
-              <th className="px-4 py-3">Avg Milk (L/day)</th>
-              <th className="px-4 py-3">Total Milk (L/day)</th>
-              <th className="px-4 py-3">Visit Status</th>
-              <th className="px-4 py-3 text-center">Actions</th>
+              {columnVisibility.index && <th className="px-4 py-3">#</th>}
+              {columnVisibility.visitCode && <th className="px-4 py-3">Visit Code</th>}
+              {columnVisibility.farmName && <th className="px-4 py-3">Farm Name</th>}
+              {columnVisibility.farmCode && <th className="px-4 py-3">Farm Code</th>}
+              {columnVisibility.createdBy && <th className="px-4 py-3">Created By</th>}
+              {columnVisibility.location && <th className="px-4 py-3">Location</th>}
+              {columnVisibility.advisor && <th className="px-4 py-3">Advisor</th>}
+              {columnVisibility.avgMilk && <th className="px-4 py-3">Avg Milk (L/day)</th>}
+              {columnVisibility.totalMilk && <th className="px-4 py-3">Total Milk (L/day)</th>}
+              {columnVisibility.visitStatus && <th className="px-4 py-3">Visit Status</th>}
+              {columnVisibility.actions && <th className="px-4 py-3 text-center">Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="p-6 text-center"><LoadingSpinner /></td></tr>
+              <tr><td colSpan={11} className="p-6 text-center"><LoadingSpinner /></td></tr>
             ) : list.length === 0 ? (
-              <tr><td colSpan={10} className="p-6 text-center text-gray-500">No dairy visits found.</td></tr>
+              <tr><td colSpan={11} className="p-6 text-center text-gray-500">No dairy visits found.</td></tr>
             ) : list.map((it, idx) => (
               <tr key={it.DairyFarmVisitId || idx} className="border-t hover:bg-gray-50">
-                <td className="px-4 py-3">{idx+1}</td>
-                <td className="px-4 py-3">{(() => {
+                {columnVisibility.index && <td className="px-4 py-3">{idx+1}</td>}
+                {columnVisibility.visitCode && <td className="px-4 py-3">{(() => {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   const code = sched?.VisitCode || sched?.VisitCodeName || sched?.Code || it.VisitCode || null
                   return code || it.DairyFarmVisitId || ''
-                })()}</td>
-                <td className="px-4 py-3">{(() => {
+                })()}</td>}
+                {columnVisibility.farmName && <td className="px-4 py-3">{(() => {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   return sched?.FarmName || sched?.FarmCode || it.FarmName || it.FarmCode || (it.Farm && (it.Farm.FarmCode || it.Farm.FarmName || it.Farm.Name)) || ''
-                })()}</td>
-                <td className="px-4 py-3">{(() => {
+                })()}</td>}
+                {columnVisibility.farmCode && <td className="px-4 py-3">{(() => {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   return sched?.FarmCode || it.FarmCode || (it.Farm && it.Farm.FarmCode) || ''
-                })()}</td>
-                <td className="px-4 py-3">{(() => {
+                })()}</td>}
+                {columnVisibility.createdBy && <td className="px-4 py-3">{(() => {
+                  try {
+                    const scheduleId = it.ScheduleID || it.scheduleId || null
+                    const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
+                    const createdBy = it.CreatedBy || it.CreatedByUserID || it.CreatedByID || it.CreatedById || it.createdBy || (sched && (sched.CreatedBy || sched.CreatedByUserID || sched.CreatedById)) || null
+                    if (!createdBy) return ''
+                    const key = String(createdBy)
+                    const nameFromMap = advisorMap[key]
+                    if (nameFromMap) return nameFromMap
+                    // prefer explicit created-by name parts when present
+                    const first = sched?.CreatedByFirstName || it.CreatedByFirstName || null
+                    const father = sched?.CreatedByFatherName || it.CreatedByFatherName || null
+                    if (first || father) return [first, father].filter(Boolean).join(' ')
+                    // fallback to advisor fields or raw key
+                    return sched?.AdvisorFullName || sched?.AdvisorName || it.AdvisorName || it.CreatedByName || key
+                  } catch (e) { return '' }
+                })()}</td>}
+                {columnVisibility.location && <td className="px-4 py-3">{(() => {
                   // Prefer explicit city or zone fields when available, then fall back to saved coordinate or location
                   return it.CityTown || it.City || it.Zone || it.Wereda || savedLocationMap[String(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)] || it.Location || it.FarmLocation || ''
-                })()}</td>
-                <td className="px-4 py-3">{(() => {
+                })()}</td>}
+                {columnVisibility.advisor && <td className="px-4 py-3">{(() => {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   return sched?.AdvisorName || it.AdvisorName || (sched && sched.Advisor && (sched.Advisor.Name || sched.AdvisorName)) || (it.Advisor && (it.Advisor.Name || it.AdvisorName)) || it.AdvisorID || it.AdvisorId || it.AssignTo || it.AssignedTo || it.DoctorName || it.Doctor || ''
-                })()}</td>
-                <td className="px-4 py-3">{it.AvgMilkProductionPerDayPerCow ?? it.AvgMilkProductionPerDay ?? ''}</td>
-                <td className="px-4 py-3">{it.TotalMilkPerDay ?? ''}</td>
-                <td className="px-4 py-3">{(() => {
+                })()}</td>}
+                {columnVisibility.avgMilk && <td className="px-4 py-3">{it.AvgMilkProductionPerDayPerCow ?? it.AvgMilkProductionPerDay ?? ''}</td>}
+                {columnVisibility.totalMilk && <td className="px-4 py-3">{it.TotalMilkPerDay ?? ''}</td>}
+                {columnVisibility.visitStatus && <td className="px-4 py-3">{(() => {
                   const scheduleId = it.ScheduleID || it.scheduleId || null
                   const sched = scheduleId ? scheduleMap[String(scheduleId)] || null : null
                   const raw = sched?.VisitStatus || sched?.VisitStatusName || it.VisitStatus || it.VisitStatusName || (it.IsVisitCompleted ? 'COMPLETED' : null)
@@ -904,8 +1010,8 @@ export default function DairyFarm() {
                     cls += 'bg-gray-100 text-gray-700'
                   }
                   return <span className={cls}>{label}</span>
-                })()}</td>
-                <td className="px-4 py-3 text-center">
+                })()}</td>}
+                {columnVisibility.actions && <td className="px-4 py-3 text-center">
                   <div className="flex items-center justify-center gap-1">
                     {(() => {
                       // Treat several representations of a completed flag as truthy
@@ -927,7 +1033,7 @@ export default function DairyFarm() {
                       )
                     })()}
                   </div>
-                </td>
+                </td>}
               </tr>
             ))}
           </tbody>

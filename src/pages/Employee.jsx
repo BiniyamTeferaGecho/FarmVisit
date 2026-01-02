@@ -50,6 +50,9 @@ export default function Employee() {
     const [form, setForm] = useState(initialForm);
     const [editingId, setEditingId] = useState(null);
     const [showForm, setShowForm] = useState(false);
+    const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+    const [pendingSavePayload, setPendingSavePayload] = useState(null);
+    const [pendingSaveIsEdit, setPendingSaveIsEdit] = useState(false);
     const [showDelete, setShowDelete] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [bulkFile, setBulkFile] = useState(null);
@@ -183,19 +186,33 @@ export default function Employee() {
         e.preventDefault(); setFieldErrors({}); setError(null);
         const errs = validateForm(form);
         if (Object.keys(errs).length) { setFieldErrors(errs); return }
+
+        const payload = { ...form, CreatedBy: user?.UserID || user?.id };
+        if (editingId) {
+            setPendingSavePayload({ ...payload, UpdatedBy: user?.UserID || user?.id });
+            setPendingSaveIsEdit(true);
+        } else {
+            setPendingSavePayload(payload);
+            setPendingSaveIsEdit(false);
+        }
+        setShowSaveConfirm(true);
+    };
+
+    const doSaveConfirmed = async () => {
+        if (!pendingSavePayload) return;
+        setShowSaveConfirm(false);
         setLoading(true);
         try {
-            const payload = { ...form, CreatedBy: user?.UserID || user?.id };
-            if (editingId) {
-                await fetchWithAuth({ url: `/advisor/${editingId}`, method: 'patch', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
+            if (pendingSaveIsEdit && editingId) {
+                await fetchWithAuth({ url: `/advisor/${editingId}`, method: 'patch', data: pendingSavePayload });
             } else {
-                await fetchWithAuth({ url: `/advisor`, method: 'post', data: payload });
+                await fetchWithAuth({ url: `/advisor`, method: 'post', data: pendingSavePayload });
             }
             setShowForm(false); fetchList();
         } catch (err) {
             setError(getErrorMessage(err) || 'Save failed');
             if (err?.response?.status === 401) navigate('/login');
-        } finally { setLoading(false) }
+        } finally { setLoading(false); setPendingSavePayload(null); setPendingSaveIsEdit(false); }
     };
 
     const confirmDelete = (it) => { setDeleteTarget(it); setShowDelete(true) };
@@ -471,6 +488,18 @@ export default function Employee() {
             <ConfirmModal open={showDelete} title="Confirm Deletion" onClose={() => setShowDelete(false)} onConfirm={doDelete}>
                 Are you sure you want to delete employee {deleteTarget?.FirstName} {deleteTarget?.FatherName}? This action cannot be undone.
             </ConfirmModal>
+            {showSaveConfirm && (
+                <ConfirmModal
+                    open={showSaveConfirm}
+                    title={pendingSaveIsEdit ? 'Confirm Update' : 'Confirm Create'}
+                    message={pendingSaveIsEdit ? `Update employee "${form.FirstName || ''} ${form.FatherName || ''}"?` : `Create employee "${form.FirstName || ''} ${form.FatherName || ''}"?`}
+                    onCancel={() => setShowSaveConfirm(false)}
+                    onConfirm={doSaveConfirmed}
+                    confirmLabel={pendingSaveIsEdit ? 'Update' : 'Create'}
+                    cancelLabel="Cancel"
+                    loading={loading}
+                />
+            )}
         </main>
     );
 }

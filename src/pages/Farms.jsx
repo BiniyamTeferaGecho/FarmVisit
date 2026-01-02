@@ -46,11 +46,15 @@ export default function Farms() {
     const [farmTypes, setFarmTypes] = useState([]);
     const [farmTypesLoadError, setFarmTypesLoadError] = useState(null);
     const [farmTypeNameCache, setFarmTypeNameCache] = useState({});
+    const [advisorMap, setAdvisorMap] = useState({});
     const [editingId, setEditingId] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [modalTab, setModalTab] = useState('form');
     const [showDelete, setShowDelete] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+    const [pendingSavePayload, setPendingSavePayload] = useState(null);
+    const [pendingSaveIsEdit, setPendingSaveIsEdit] = useState(false);
     const [bulkFile, setBulkFile] = useState(null);
     const [gpsModalOpen, setGpsModalOpen] = useState(false);
     const [gpsFor, setGpsFor] = useState(null);
@@ -398,6 +402,38 @@ export default function Farms() {
         return () => { cancelled = true; };
     }, [list]);
 
+    // Resolve CreatedBy -> advisor names for farms listing
+    useEffect(() => {
+        if (!Array.isArray(list) || list.length === 0) return;
+        const ids = new Set();
+        for (const f of list) {
+            const id = f?.CreatedBy || f?.createdBy || f?.CreatedById || f?.CreatedByID || null;
+            if (id) ids.add(String(id));
+        }
+        const toResolve = Array.from(ids).filter(id => id && !advisorMap[id]);
+        if (toResolve.length === 0) return;
+
+        let cancelled = false;
+        (async () => {
+            const updates = {};
+            await Promise.all(toResolve.map(async (id) => {
+                try {
+                    const r = await fetchWithAuth({ url: `/users/advisor-by-createdby/${encodeURIComponent(id)}`, method: 'get' });
+                    const payload = r?.data?.data || r?.data || r;
+                    const rec = Array.isArray(payload) ? payload[0] : payload;
+                    const first = rec?.AdvisorFirstName || rec?.FirstName || rec?.AdvisorName || '';
+                    const father = rec?.AdvisorFatherName || rec?.FatherName || '';
+                    const name = [first, father].filter(Boolean).join(' ') || id;
+                    updates[id] = name;
+                } catch (e) {
+                    updates[id] = id;
+                }
+            }));
+            if (!cancelled) setAdvisorMap(prev => ({ ...(prev || {}), ...updates }));
+        })();
+        return () => { cancelled = true; };
+    }, [list, fetchWithAuth, advisorMap]);
+
     // adjust pageIndex if totalRows shrinks or pageSize changes
     useEffect(() => {
         const pageCount = Math.max(1, Math.ceil(totalRows / pagination.pageSize));
@@ -507,27 +543,34 @@ export default function Farms() {
         e.preventDefault(); setFieldErrors({}); setError(null);
         const errs = validateForm(form);
         if (Object.keys(errs).length) { setFieldErrors(errs); return }
-        setLoading(true);
+
+        // Prepare payload but do not send yet — show confirm modal first
+        const payload = { ...form, FarmTypeID: form.FarmTypeID || null, CreatedBy: user?.UserID || user?.id };
+        if (payload.FarmStatus !== undefined && payload.FarmStatus !== null) {
+            try {
+                const s = String(payload.FarmStatus).trim().toLowerCase();
+                if (s === 'inactive' || s === '0' || s === 'false') payload.IsActive = false;
+                else if (s === 'active' || s === '1' || s === 'true') payload.IsActive = true;
+            } catch (e) { /* ignore */ }
+        }
+        payload.IsActive = payload.IsActive === undefined || payload.IsActive === null ? !!form.IsActive : !!payload.IsActive;
+
+        setPendingSavePayload(payload);
+        setPendingSaveIsEdit(!!editingId);
+        setShowSaveConfirm(true);
+    };
+
+    const doSaveConfirmed = async () => {
+        if (!pendingSavePayload) return;
+        setShowSaveConfirm(false);
+        setLoading(true); setError(null);
         try {
-            // Send FarmTypeID to backend (expecting ID not free-text type)
-            const payload = { ...form, FarmTypeID: form.FarmTypeID || null, CreatedBy: user?.UserID || user?.id };
-            // Always send an explicit IsActive boolean to the backend to avoid NULL (no-change) parameters.
-            // Accept either the explicit `IsActive` checkbox from the form or legacy `FarmStatus` values.
-            if (payload.FarmStatus !== undefined && payload.FarmStatus !== null) {
-                try {
-                    const s = String(payload.FarmStatus).trim().toLowerCase();
-                    if (s === 'inactive' || s === '0' || s === 'false') payload.IsActive = false;
-                    else if (s === 'active' || s === '1' || s === 'true') payload.IsActive = true;
-                } catch (e) { /* ignore */ }
-            }
-            // Ensure IsActive is always present as boolean (fallback to form checkbox state)
-            payload.IsActive = payload.IsActive === undefined || payload.IsActive === null ? !!form.IsActive : !!payload.IsActive;
-            if (editingId) {
-                await fetchWithAuth({ url: `/farms/${editingId}`, method: 'put', data: { ...payload, UpdatedBy: user?.UserID || user?.id } });
+            if (pendingSaveIsEdit && editingId) {
+                await fetchWithAuth({ url: `/farms/${editingId}`, method: 'put', data: { ...pendingSavePayload, UpdatedBy: user?.UserID || user?.id } });
             } else {
-                await fetchWithAuth({ url: `/farms`, method: 'post', data: payload });
+                await fetchWithAuth({ url: `/farms`, method: 'post', data: pendingSavePayload });
             }
-            setShowForm(false); fetchList();
+            setShowForm(false); setPendingSavePayload(null); fetchList();
         } catch (err) {
             setError(getErrorMessage(err) || 'Save failed');
             if (err?.response?.status === 401) navigate('/login');
@@ -827,16 +870,17 @@ export default function Farms() {
                                 <th className="px-4 py-3">Type</th>
                                 <th className="px-4 py-3">Owner</th>
                                 <th className="px-4 py-3">Contact</th>
-                                <th className="px-4 py-3">Region</th>
-                                <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3">Created By</th>
+                                    <th className="px-4 py-3">Region</th>
+                                    <th className="px-4 py-3">Status</th>
                                 <th className="px-4 py-3 text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan={9} className="text-center p-4"><LoadingSpinner /></td></tr>
+                                <tr><td colSpan={10} className="text-center p-4"><LoadingSpinner /></td></tr>
                             ) : list.length === 0 ? (
-                                <tr><td colSpan={9} className="text-center p-4">No farms found.</td></tr>
+                                <tr><td colSpan={10} className="text-center p-4">No farms found.</td></tr>
                             ) : (
                                 (() => {
                                     const pageIndex = pagination.pageIndex || 0;
@@ -856,6 +900,11 @@ export default function Farms() {
                                             }</td>
                                             <td className="px-4 py-3">{it.FarmOwner || it.OwnerName || it.Owner || it.FarmerName || it.ContactPerson || ''}</td>
                                             <td className="px-4 py-3">{it.ContactPhone || it.ContactNumber || it.Phone || it.WorkPhone || it.ContactEmail || ''}</td>
+                                            <td className="px-4 py-3">{(() => {
+                                                const id = it?.CreatedBy || it?.createdBy || it?.CreatedById || it?.CreatedByID || null;
+                                                const key = id ? String(id) : '';
+                                                return (advisorMap && advisorMap[key]) ? advisorMap[key] : (it.CreatedByName || it.CreatorName || key || '');
+                                            })()}</td>
                                             <td className="px-4 py-3">{(() => {
                                                 const val = pickFirst(it, regionAliases) || findByKeySubstring(it, ['region', 'regionname', 'region_label']);
                                                 return val || '';
@@ -951,6 +1000,18 @@ export default function Farms() {
 
             <ConfirmModal open={showDelete} title="Confirm Deletion" onCancel={() => setShowDelete(false)} onConfirm={doDelete}>
                 Are you sure you want to delete farm {deleteTarget?.FarmName}? This will mark it as inactive.
+            </ConfirmModal>
+            <ConfirmModal
+                open={showSaveConfirm}
+                title={pendingSaveIsEdit ? 'Confirm Update' : 'Confirm Create'}
+                message={pendingSaveIsEdit ? `Are you sure you want to update farm "${form.FarmName || ''}"?` : `Are you sure you want to create farm "${form.FarmName || ''}"?`}
+                onCancel={() => setShowSaveConfirm(false)}
+                onConfirm={doSaveConfirmed}
+                confirmLabel={pendingSaveIsEdit ? 'Update' : 'Create'}
+                cancelLabel="Cancel"
+                loading={loading}
+            >
+                {/* optional short summary could go here */}
             </ConfirmModal>
         </main>
     );

@@ -21,6 +21,9 @@ export default function Role() {
 
   const [form, setForm] = useState({ RoleName: '', RoleDescription: '', IsActive: true, IsSystemRole: false })
   const [saving, setSaving] = useState(false)
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
+  const [pendingSavePayload, setPendingSavePayload] = useState(null)
+  const [pendingSaveIsEdit, setPendingSaveIsEdit] = useState(false)
 
   const [editModal, setEditModal] = useState({ open: false, id: null, form: null, saving: false })
   const [confirm, setConfirm] = useState({ open: false, id: null, title: '', message: '', processing: false })
@@ -50,25 +53,17 @@ export default function Role() {
     if (!form.RoleName) { setMessage({ type: 'error', text: 'Role name is required' }); return }
     const createdBy = getUserId(user)
     if (!createdBy) { setMessage({ type: 'error', text: 'You must be signed in to create roles.' }); return }
-    setSaving(true)
-    try {
-      const payload = {
-        RoleName: form.RoleName.trim(),
-        RoleDescription: form.RoleDescription || null,
-        IsSystemRole: form.IsSystemRole ? 1 : 0,
-        IsActive: form.IsActive ? 1 : 0,
-        CreatedBy: createdBy,
-      }
-      const res = await fetchWithAuth({ url: '/roles', method: 'post', data: payload })
-      setMessage({ type: 'success', text: 'Role created' })
-      resetForm()
-      await fetchRoles(1)
-    } catch (err) {
-      console.error('createRole error', err)
-      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to create role' })
-    } finally {
-      setSaving(false)
+    // prepare payload and show confirmation
+    const payload = {
+      RoleName: form.RoleName.trim(),
+      RoleDescription: form.RoleDescription || null,
+      IsSystemRole: form.IsSystemRole ? 1 : 0,
+      IsActive: form.IsActive ? 1 : 0,
+      CreatedBy: createdBy,
     }
+    setPendingSavePayload(payload)
+    setPendingSaveIsEdit(false)
+    setShowSaveConfirm(true)
   }
 
   const openEdit = (r) => {
@@ -80,17 +75,38 @@ export default function Role() {
     if (!f.RoleName) { setMessage({ type: 'error', text: 'Role name is required' }); return }
     const updatedBy = getUserId(user)
     if (!updatedBy) { setMessage({ type: 'error', text: 'You must be signed in to update roles.' }); return }
-    setEditModal(s => ({ ...s, saving: true }))
+    // prepare payload and show confirmation
+    const payload = { RoleName: f.RoleName.trim(), RoleDescription: f.RoleDescription || null, IsActive: f.IsActive ? 1 : 0, UpdatedBy: updatedBy }
+    setPendingSavePayload({ ...payload, __roleId: id })
+    setPendingSaveIsEdit(true)
+    setShowSaveConfirm(true)
+  }
+
+  const doSaveConfirmed = async () => {
+    if (!pendingSavePayload) return
+    setShowSaveConfirm(false)
+    setSaving(true)
     try {
-      const payload = { RoleName: f.RoleName.trim(), RoleDescription: f.RoleDescription || null, IsActive: f.IsActive ? 1 : 0, UpdatedBy: updatedBy }
-      const res = await fetchWithAuth({ url: `/roles/${id}`, method: 'patch', data: payload })
-      setMessage({ type: 'success', text: 'Role updated' })
-      setEditModal({ open: false, id: null, form: null, saving: false })
-      await fetchRoles(pagination.currentPage)
+      if (pendingSaveIsEdit) {
+        const id = pendingSavePayload.__roleId
+        const payload = { ...pendingSavePayload }
+        delete payload.__roleId
+        await fetchWithAuth({ url: `/roles/${id}`, method: 'patch', data: payload })
+        setMessage({ type: 'success', text: 'Role updated' })
+        setEditModal({ open: false, id: null, form: null, saving: false })
+      } else {
+        await fetchWithAuth({ url: '/roles', method: 'post', data: pendingSavePayload })
+        setMessage({ type: 'success', text: 'Role created' })
+        resetForm()
+      }
+      await fetchRoles(pagination.currentPage || 1)
     } catch (err) {
-      console.error('updateRole error', err)
-      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to update role' })
-      setEditModal(s => ({ ...s, saving: false }))
+      console.error('saveRole error', err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to save role' })
+    } finally {
+      setPendingSavePayload(null)
+      setPendingSaveIsEdit(false)
+      setSaving(false)
     }
   }
 
@@ -240,6 +256,8 @@ export default function Role() {
       </Modal>
 
       <ConfirmModal open={confirm.open} title={confirm.title} message={confirm.message} onCancel={() => setConfirm({ open: false, id: null, title: '', message: '', processing: false })} onConfirm={confirmExecute} confirmLabel="Yes" cancelLabel="No" loading={confirm.processing} />
+
+      <ConfirmModal open={showSaveConfirm} title={pendingSaveIsEdit ? 'Confirm Update' : 'Confirm Create'} message={pendingSaveIsEdit ? `Update role "${(editModal.form && editModal.form.RoleName) || ''}"?` : `Create role "${form.RoleName || ''}"?`} onCancel={() => { setShowSaveConfirm(false); setPendingSavePayload(null); setPendingSaveIsEdit(false); }} onConfirm={doSaveConfirmed} confirmLabel={pendingSaveIsEdit ? 'Update' : 'Create'} cancelLabel="Cancel" loading={saving} />
     </div>
   )
 }
