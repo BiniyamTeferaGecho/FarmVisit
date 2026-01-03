@@ -51,9 +51,6 @@ export default function LookupType({ reloadKey }) {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
   const [showErrorModal, setShowErrorModal] = useState(false)
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
-  const [pendingSavePayload, setPendingSavePayload] = useState(null)
-  const [pendingSaveIsEdit, setPendingSaveIsEdit] = useState(false)
 
   const resetForm = () => setForm({ TypeName: '', TypeDescription: '', IsActive: true })
 
@@ -83,7 +80,7 @@ export default function LookupType({ reloadKey }) {
       setMessage({ type: 'error', text: 'You must be signed in to create lookup types.' })
       return
     }
-    // prepare payload and show confirm
+    setSaving(true)
     setMessage(null)
     try {
       const payload = {
@@ -92,12 +89,15 @@ export default function LookupType({ reloadKey }) {
         IsActive: form.IsActive ? 1 : 0,
         CreatedBy: userId,
       }
-      setPendingSavePayload(payload)
-      setPendingSaveIsEdit(false)
-      setShowSaveConfirm(true)
+  const res = await fetchWithAuth({ url: '/lookup-types', method: 'post', data: payload })
+      setMessage({ type: 'success', text: 'Lookup type created' })
+      resetForm()
+      await refresh()
     } catch (err) {
-      console.error('prepare create error', err)
-      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to prepare create' })
+      console.error(err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to create' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -128,11 +128,12 @@ export default function LookupType({ reloadKey }) {
       setMessage({ type: 'error', text: 'Name is required' })
       return
     }
-    // prepare payload and show confirm
+    setEditModal(s => ({ ...s, saving: true }))
     try {
       const userId = user && (user.UserID || user.userId || user.UserId || user.id || user.ID)
       if (!userId) {
         setMessage({ type: 'error', text: 'You must be signed in to update lookup types.' })
+        setEditModal(s => ({ ...s, saving: false }))
         return
       }
       const payload = {
@@ -142,40 +143,14 @@ export default function LookupType({ reloadKey }) {
         IsActive: form.IsActive ? 1 : 0,
         UpdatedBy: userId,
       }
-      setPendingSavePayload({ ...payload, __ltId: id })
-      setPendingSaveIsEdit(true)
-      setShowSaveConfirm(true)
-    } catch (err) {
-      console.error('prepare update error', err)
-      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to prepare update' })
-    }
-  }
-
-  const doSaveConfirmed = async () => {
-    if (!pendingSavePayload) return
-    setShowSaveConfirm(false)
-    setSaving(true)
-    try {
-      if (pendingSaveIsEdit) {
-        const id = pendingSavePayload.__ltId
-        const payload = { ...pendingSavePayload }
-        delete payload.__ltId
-        await fetchWithAuth({ url: `/lookup-types/${id}`, method: 'put', data: payload })
-        setMessage({ type: 'success', text: 'Updated successfully' })
-        setEditModal({ open: false, id: null, form: null, saving: false })
-      } else {
-        await fetchWithAuth({ url: '/lookup-types', method: 'post', data: pendingSavePayload })
-        setMessage({ type: 'success', text: 'Lookup type created' })
-        resetForm()
-      }
+  await fetchWithAuth({ url: `/lookup-types/${id}`, method: 'put', data: payload })
+      setMessage({ type: 'success', text: 'Updated successfully' })
+      setEditModal({ open: false, id: null, form: null, saving: false })
       await refresh()
     } catch (err) {
-      console.error('save lookup type error', err)
-      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to save' })
-    } finally {
-      setPendingSavePayload(null)
-      setPendingSaveIsEdit(false)
-      setSaving(false)
+      console.error(err)
+      setMessage({ type: 'error', text: err?.response?.data?.message || err.message || 'Failed to update' })
+      setEditModal(s => ({ ...s, saving: false }))
     }
   }
 
@@ -352,8 +327,6 @@ export default function LookupType({ reloadKey }) {
 
       {/* Confirm Modal for delete/deactivate */}
       <ConfirmModal open={confirm.open} title={confirm.title} message={confirm.message} onCancel={() => setConfirm({ open: false, type: null, id: null, title: '', message: '' })} onConfirm={confirmExecute} confirmLabel="Yes" cancelLabel="No" loading={confirm.processing} />
-      {/* Confirm Modal for Create/Update Save */}
-      <ConfirmModal open={showSaveConfirm} title={pendingSaveIsEdit ? 'Confirm Update' : 'Confirm Create'} message={pendingSaveIsEdit ? 'Apply changes to this lookup type?' : 'Create this lookup type?'} onCancel={() => { setShowSaveConfirm(false); setPendingSavePayload(null); setPendingSaveIsEdit(false) }} onConfirm={doSaveConfirmed} confirmLabel="Yes" cancelLabel="No" loading={saving} />
     </div>
   )
 }
