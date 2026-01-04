@@ -8,7 +8,7 @@ import VisitPrintPreview from '../components/print/VisitPrintPreview'
 import ConfirmModal from '../components/ConfirmModal'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { Plus, RefreshCw, Edit, Trash2, Check, Eye, Printer } from 'lucide-react'
-import { FaSearch, FaTimes, FaSync, FaColumns } from 'react-icons/fa'
+import { FaSync, FaColumns } from 'react-icons/fa'
 import ColumnSelector from '../components/ColumnSelector'
 
 
@@ -68,19 +68,8 @@ export default function LayerFarm() {
     });
   }
   const [loadingVisits, setLoadingVisits] = useState(false)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [advancedOpen, setAdvancedOpen] = useState(false)
-  const [createdDateFrom, setCreatedDateFrom] = useState('')
-  const [createdDateTo, setCreatedDateTo] = useState('')
-  const [flockSizeMin, setFlockSizeMin] = useState('')
-  const [flockSizeMax, setFlockSizeMax] = useState('')
-  const [visitScoreMin, setVisitScoreMin] = useState('')
-  const [visitScoreMax, setVisitScoreMax] = useState('')
-  const [regionFilter, setRegionFilter] = useState('')
-  const [zoneFilter, setZoneFilter] = useState('')
-  const [weredaFilter, setWeredaFilter] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(10)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [summary, setSummary] = useState(null)
@@ -389,130 +378,11 @@ export default function LayerFarm() {
     try {
       const p = requestedPage ?? pageNumber
       const s = requestedSize ?? pageSize
-      // If user entered a search term or any advanced filters, call the layer-farm search endpoint
-      const hasFilters = (searchTerm && String(searchTerm).trim() !== '') || createdDateFrom || createdDateTo || flockSizeMin || flockSizeMax || visitScoreMin || visitScoreMax || regionFilter || zoneFilter || weredaFilter
-      if (hasFilters) {
-        const payload = {
-          SearchTerm: searchTerm || null,
-          FarmType: 'LAYER',
-          CreatedDateFrom: createdDateFrom || null,
-          CreatedDateTo: createdDateTo || null,
-          FlockSizeMin: flockSizeMin ? Number(flockSizeMin) : null,
-          FlockSizeMax: flockSizeMax ? Number(flockSizeMax) : null,
-          FarmVisitScore: visitScoreMin ? String(visitScoreMin) : (visitScoreMax ? String(visitScoreMax) : null),
-          Region: regionFilter || null,
-          Zone: zoneFilter || null,
-          Wereda: weredaFilter || null,
-          PageNumber: p || 1,
-          PageSize: s || 25,
-        }
-        const res = await fetchWithAuth({ url: '/layer-farm/search', method: 'post', data: payload })
-        // diagnostic: surface unexpected shapes for easier debugging
-        if (!res || !res.data) {
-          console.warn('layer-farm/search returned no data', res)
-          setMessage({ type: 'error', text: 'Search returned no data from server' })
-        }
-        const rows = res?.data?.data || []
-        const summ = res?.data?.summary || null
-        setSummary(summ)
-        // map schedule rows to display shape compatible with existing table
-        const mapped = Array.isArray(rows) ? rows.map(r => ({
-          LayerVisitID: r.LayerVisitID || null,
-          ScheduleID: r.ScheduleID || r.ScheduleId || null,
-          VisitCode: r.VisitCode || r.VisitCodeName || r.Code || r.VisitID || r.VisitId || null,
-          FarmID: r.FarmID || r.FarmId || (r.Farm && (r.Farm.FarmID || r.Farm.farmId || r.Farm.id)) || null,
-          FarmName: r.FarmName || (r.Farm && (r.Farm.FarmName || r.Farm.Name)) || r.Farm || null,
-          FarmCode: r.FarmCode || (r.Farm && (r.Farm.FarmCode || r.Farm.Code)) || null,
-          CreatedBy: r.CreatedBy || r.CreatedByUserID || r.CreatedById || r.AdvisorID || r.Advisor || null,
-          AdvisorName: r.AdvisorFullName || r.AdvisorName || r.CreatedByName || r.CreatorName || null,
-          Location: r.Location || r.FarmLocation || null,
-          Breed: r.Breed || null,
-          FlockSize: r.FlockSize || null,
-          CreatedAt: r.CreatedDate || r.CreatedAt || null,
-          VisitProximity: r.VisitProximity || r.VisitProximityName || null,
-          VisitStatusCategory: r.VisitStatusCategory || null,
-          DurationCategory: r.DurationCategory || null,
-          DaysDifference: r.DaysDifference !== undefined && r.DaysDifference !== null ? r.DaysDifference : null,
-          VisitStatus: r.VisitStatus || r.Status || null,
-        })) : []
-        setVisits(mapped)
-        // pagination from summary when available
-        const total = summ && (summ.TotalVisits || summ.TotalCount || summ.totalCount) ? (summ.TotalVisits || summ.TotalCount || summ.totalCount) : mapped.length
-        const tp = summ && (summ.TotalPages || summ.totalPages) ? (summ.TotalPages || summ.totalPages) : (s ? Math.ceil(total / s) : 1)
-        setTotalCount(total)
-        setTotalPages(tp)
-        if (!Array.isArray(rows) || rows.length === 0) {
-          // helpful debug message for empty lists
-          setMessage({ type: 'info', text: 'No visits found for the provided filters.' })
-          console.debug('LayerFarm: search returned empty rows', { payload, res })
-        }
-
-        // populate scheduleMap and farmMap similar to previous logic for richer display
-        try {
-          const ids = mapped.map(d => d.ScheduleID).filter(Boolean)
-          const uniq = Array.from(new Set(ids.map(String)))
-          if (uniq.length > 0) {
-            const map = {}
-            await Promise.all(uniq.map(async (id) => {
-              try {
-                const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(id)}`, method: 'get' })
-                const sd = r?.data?.data || r?.data || null
-                if (sd) map[String(id)] = sd
-              } catch (e) { /* ignore */ }
-            }))
-            setScheduleMap(prev => ({ ...(prev || {}), ...map }))
-          }
-          const farmIds = mapped.map(d => d.FarmID).filter(Boolean)
-          const uniqFarms = Array.from(new Set(farmIds.map(String)))
-          if (uniqFarms.length > 0) {
-            const fmap = {}
-            try {
-              const fr = await fetchWithAuth({ url: '/farms', method: 'get' })
-              const farmsData = fr?.data?.data || fr?.data || []
-              if (Array.isArray(farmsData) && farmsData.length > 0) {
-                farmsData.forEach(f => { const id = String(f.FarmID || f.farmId || f.id || f.FarmId || f.Id || f.ID); fmap[id] = f })
-              } else {
-                await Promise.all(uniqFarms.map(async (id) => {
-                  try {
-                    const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
-                    const ff = r?.data?.data || r?.data || null
-                    if (ff) fmap[id] = ff
-                  } catch (e) { /* ignore */ }
-                }))
-              }
-            } catch (e) {
-              await Promise.all(uniqFarms.map(async (id) => {
-                try {
-                  const r = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}`, method: 'get' })
-                  const ff = r?.data?.data || r?.data || null
-                  if (ff) fmap[id] = ff
-                } catch (err) { /* ignore */ }
-              }))
-            }
-            if (Object.keys(fmap).length > 0) setFarmMap(prev => ({ ...prev, ...fmap }))
-          }
-          // advisor map
-          try {
-            const createdSet = new Set()
-            mapped.forEach(r => { if (r.CreatedBy) createdSet.add(String(r.CreatedBy)) })
-            if (createdSet.size > 0) {
-              const amap = {}
-              await Promise.all(Array.from(createdSet).map(async (id) => {
-                try {
-                  const r = await fetchWithAuth({ url: `/users/advisor-by-createdby/${encodeURIComponent(id)}`, method: 'get' })
-                  const rr = r?.data?.data || r?.data || []
-                  if (Array.isArray(rr) && rr.length > 0) { const first = rr[0]; amap[id] = `${first.AdvisorFirstName || first.FirstName || ''} ${first.AdvisorFatherName || first.FatherName || ''}`.trim() } else amap[id] = null
-                } catch (e) { amap[id] = null }
-              }))
-              setAdvisorMap(prev => ({ ...(prev || {}), ...amap }))
-            }
-          } catch (e) { /* ignore */ }
-        } catch (e) { /* ignore */ }
-        return
-      }
+      // no filters: use default list endpoint
 
       // default: fetch layer-farm visits (existing behavior)
-      const res = await fetchWithAuth({ url: '/layer-farm', method: 'get' })
+      // Include paging params so the backend can route to the search proc and return the requested page
+      const res = await fetchWithAuth({ url: '/layer-farm', method: 'get', params: { pageNumber: p, pageSize: s } })
       const data = res?.data?.data || res?.data || []
       if (Array.isArray(data)) setVisits(data)
       else setVisits([])
@@ -544,34 +414,7 @@ export default function LayerFarm() {
 
   useEffect(() => { if (!showModal) setModalTab('form') }, [showModal])
 
-  // Debounced search like Farms.jsx: when searchTerm changes, reset to page 1 and refetch after 300ms
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setPageNumber(1)
-      fetchVisits({ page: 1, size: pageSize })
-    }, 300)
-    return () => clearTimeout(t)
-  }, [searchTerm, pageSize])
-
-  const handleSearch = async () => {
-    try {
-      const next = 1
-      setPageNumber(next)
-      await fetchVisits({ page: next, size: pageSize })
-    } catch (e) { /* ignore */ }
-  }
-
-  const clearSearch = async () => {
-    try {
-      setSearchTerm('')
-      setPageNumber(1)
-      setPageSize(25)
-      setTotalPages(1)
-      setTotalCount(0)
-      setSummary(null)
-      await fetchVisits({ page: 1, size: 25 })
-    } catch (e) { /* ignore */ }
-  }
+  // no search/advanced filters: fetchVisits always uses default list endpoint
 
   const changePage = async (delta) => {
     const next = Math.max(1, Math.min(totalPages || 1, pageNumber + delta))
@@ -580,7 +423,7 @@ export default function LayerFarm() {
   }
 
   const onPageSizeChange = async (e) => {
-    const s = Number(e.target.value) || 25
+    const s = Number(e.target.value) || 10
     setPageSize(s)
     setPageNumber(1)
     await fetchVisits({ page: 1, size: s })
@@ -1003,83 +846,7 @@ export default function LayerFarm() {
         </div>
       </div>
 
-      {/* Search row: Employee-style (left-aligned) */}
-      <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2">
-        <div className="relative w-full md:w-1/3">
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { setPageNumber(1); fetchVisits({ page: 1, size: pageSize }); } }}
-            placeholder="Search (visit code, farm, advisor...)"
-            className="form-input w-full pr-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          />
-          {searchTerm ? (
-            <button type="button" onClick={() => { setSearchTerm(''); setPageNumber(1); fetchVisits({ page: 1, size: pageSize }); }} title="Clear search" className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"><FaTimes /></button>
-          ) : null}
-          <button type="button" onClick={() => { setPageNumber(1); fetchVisits({ page: 1, size: pageSize }); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"><FaSearch /></button>
-        </div>
-
-        <div className="flex items-center sm:ml-2">
-          <button onClick={() => { setSearchTerm(''); setPageNumber(1); setTimeout(()=>fetchVisits({ page: 1, size: pageSize }),0); }} className="flex items-center justify-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 w-full sm:w-auto" title="Refresh Data">
-            <FaSync className="mr-2" /> Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* Advanced filters */}
-      <div className="mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <button type="button" onClick={() => setAdvancedOpen(v => !v)} className="px-3 py-1 bg-white border rounded">{advancedOpen ? 'Hide Filters' : 'Show Filters'}</button>
-          <button type="button" onClick={() => { setCreatedDateFrom(''); setCreatedDateTo(''); setFlockSizeMin(''); setFlockSizeMax(''); setVisitScoreMin(''); setVisitScoreMax(''); setRegionFilter(''); setZoneFilter(''); setWeredaFilter(''); setAdvancedOpen(false); fetchVisits({ page: 1, size: pageSize }) }} className="px-3 py-1 bg-gray-100 border rounded">Clear Filters</button>
-        </div>
-        {advancedOpen && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Created From</label>
-              <input type="date" value={createdDateFrom} onChange={e => setCreatedDateFrom(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Created To</label>
-              <input type="date" value={createdDateTo} onChange={e => setCreatedDateTo(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Region</label>
-              <input type="text" value={regionFilter} onChange={e => setRegionFilter(e.target.value)} placeholder="Region" className="form-input w-full px-2 py-1 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Zone</label>
-              <input type="text" value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} placeholder="Zone" className="form-input w-full px-2 py-1 border rounded" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Wereda</label>
-              <input type="text" value={weredaFilter} onChange={e => setWeredaFilter(e.target.value)} placeholder="Wereda" className="form-input w-full px-2 py-1 border rounded" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Flock Size Min</label>
-                <input type="number" value={flockSizeMin} onChange={e => setFlockSizeMin(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Flock Size Max</label>
-                <input type="number" value={flockSizeMax} onChange={e => setFlockSizeMax(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Visit Score Min</label>
-                <input type="number" value={visitScoreMin} onChange={e => setVisitScoreMin(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700">Visit Score Max</label>
-                <input type="number" value={visitScoreMax} onChange={e => setVisitScoreMax(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
-              </div>
-            </div>
-            <div className="md:col-span-3 flex items-end gap-2 mt-1">
-              <button onClick={() => { setPageNumber(1); fetchVisits({ page: 1, size: pageSize }) }} className="px-3 py-2 bg-indigo-600 text-white rounded">Apply Filters</button>
-              <button onClick={() => { setCreatedDateFrom(''); setCreatedDateTo(''); setFlockSizeMin(''); setFlockSizeMax(''); setVisitScoreMin(''); setVisitScoreMax(''); setRegionFilter(''); setZoneFilter(''); setWeredaFilter(''); fetchVisits({ page: 1, size: pageSize }) }} className="px-3 py-2 bg-gray-100 rounded">Reset</button>
-            </div>
-          </div>
-        )}
-      </div>
+      
 
       {message && <div className={`mb-4 p-3 rounded ${message.type==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{message.text}</div>}
 
