@@ -860,6 +860,102 @@ export default function DairyFarm() {
     } catch (err) { console.error('openEdit error', err); setMessage({ type: 'error', text: 'Failed to load dairy visit' }) } finally { setLoading(false) }
   }
 
+  // Open visit in read-only view mode
+  async function openView(id) {
+    if (!id) return
+    setLoading(true); setMessage(null)
+    try {
+      const res = await fetchWithAuth({ url: `/dairy-farm/${encodeURIComponent(id)}`, method: 'get' })
+      const d = res.data?.data || res.data || null
+      if (d) {
+        setForm({
+          ScheduleID: d.ScheduleID || d.scheduleId || d.ScheduleId || '',
+          Location: d.Location || d.FarmLocation || '',
+          LocationCoordinate: d.LocationCoordinate || d.Location || '',
+          LactationCows: d.LactationCows ?? '',
+          DryCows: d.DryCows ?? '',
+          Heifers: d.Heifers ?? '',
+          Calves: d.Calves ?? '',
+          Buls: d.Buls ?? '',
+          BodyConditionLactetingCow: d.BodyConditionLactetingCow ?? d.BodyCondition ?? '',
+          BodyConditionDryCow: d.BodyConditionDryCow ?? '',
+          FeedingPerCow: d.FeedingPerCow || '',
+          HowTheyGiveForCows: d.HowTheyGiveForCows || '',
+          UsesConcentrate: !!d.UsesConcentrate,
+          WhichCompany: d.WhichCompany || '',
+          IsLocalMix: !!d.IsLocalMix,
+          ListofIngridiant: d.ListofIngridiant || '',
+          SampleCollection: !!d.SampleCollection,
+          HasForage: !!d.HasForage,
+          TypeOfForage: d.TypeOfForage || '',
+          ForageAmount: d.ForageAmount ?? '',
+          ConcentrateFeedSample: !!d.ConcentrateFeedSample,
+          AmountofWaterProvided: d.AmountofWaterProvided || '',
+          FeedingSystem: d.FeedingSystem || '',
+          CompoundFeedSource: d.CompoundFeedSource || '',
+          QuantityOfCommercialFeed: d.QuantityOfCommercialFeed ?? '',
+          QuantityOfHomeMix: d.QuantityOfHomeMix ?? '',
+          FeedingMechanism: d.FeedingMechanism || '',
+          ManureScore1: d.ManureScore1 ?? '',
+          ManureScore2: d.ManureScore2 ?? '',
+          ManureScore3: d.ManureScore3 ?? '',
+          ManureScore4: d.ManureScore4 ?? '',
+          Ventilation: d.Ventilation || '',
+          LightIntensity: d.LightIntensity || '',
+          BeddingType: d.BeddingType || '',
+          SpaceAvailability: d.SpaceAvailability || '',
+          VaccinationHistory: d.VaccinationHistory || '',
+          VaccinationType: d.VaccinationType || '',
+          VaccinationTime: d.VaccinationTime || '',
+          BreedingHistory: d.BreedingHistory || '',
+          BreedingMethod: d.BreedingMethod || '',
+          AreTheyUsingNaturalorAI: d.AreTheyUsingNaturalorAI || '',
+          InseminationFrequency: d.InseminationFrequency || '',
+          CalvingInterval: d.CalvingInterval ?? '',
+          AgeAtFirstCalving: d.AgeAtFirstCalving ?? '',
+          HowManyTimes: d.HowManyTimes || '',
+          TypeofFeedwithComplain: d.TypeofFeedwithComplain || '',
+          SampleTaken: !!d.SampleTaken,
+          BatchNumber: d.BatchNumber || '',
+          AvgMilkProductionPerDayPerCow: d.AvgMilkProductionPerDayPerCow ?? d.AvgMilkProductionPerDay ?? '',
+          MaxMilkProductionPerDayPerCow: d.MaxMilkProductionPerDayPerCow ?? d.MaxMilkProductionPerCow ?? '',
+          TotalMilkPerDay: d.TotalMilkPerDay ?? '',
+          MilkSupplyTo: d.MilkSupplyTo || '',
+          MilkPricePerLitter: d.MilkPricePerLitter ?? '',
+          Medication: !!d.Medication,
+          WhatTypeofMedication: d.WhatTypeofMedication || '',
+          IssuesComplaints: d.IssuesComplaints || '',
+          AnalyzeRequested: d.AnalyzeRequested || '',
+          RecommendationAdvice: d.RecommendationAdvice || '',
+          FarmAdvisorConclusion: d.FarmAdvisorConclusion || '',
+          CustomerFeedbackorCompliants: d.CustomerFeedbackorCompliants || d.FeedBackOnAKF || '',
+          ComplainSampleTaken: !!d.ComplainSampleTaken || !!d.SampleTaken,
+          BatchNumberorProductionDate: d.BatchNumberorProductionDate || d.BatchNumber || '',
+          AnyRelatedEvidenceImage: d.AnyRelatedEvidenceImage || '',
+          IsVisitCompleted: !!d.IsVisitCompleted,
+        })
+        // Fetch and cache schedule (so modal can display Visit Code / Advisor info)
+        try {
+          const scheduleId = d.ScheduleID || d.scheduleId || d.ScheduleId || null
+          if (scheduleId) {
+            let sched = scheduleMap[String(scheduleId)] || null
+            if (!sched) {
+              try {
+                const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(scheduleId)}`, method: 'get' })
+                sched = r?.data?.data || r?.data || null
+                if (sched) setScheduleMap(prev => ({ ...(prev || {}), [String(scheduleId)]: sched }))
+              } catch (e) { /* ignore schedule fetch errors */ }
+            }
+          }
+        } catch (err) { /* ignore */ }
+        setEditingId(id)
+        setForm(f => ({ ...f, LocationCoordinate: f.LocationCoordinate || savedLocationMap[String(id)] || f.Location || '' }))
+        setViewMode(true)
+        setShowForm(true)
+      }
+    } catch (err) { console.error('openView error', err); setMessage({ type: 'error', text: 'Failed to load dairy visit' }) } finally { setLoading(false) }
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between mb-6">
@@ -1026,7 +1122,7 @@ export default function DairyFarm() {
                           <button onClick={() => !isCompleted && triggerCompleteConfirm(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted || completingId === (it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'}`} aria-disabled={isCompleted} title="Complete Visit">
                             {completingId === (it.DairyFarmVisitId || it.DairyFarmVisitID || it.id) ? <SmallSpinner /> : <Check size={16} />}
                           </button>
-                          <button onClick={() => handlePrint(it)} className="p-2 text-indigo-600 rounded-full hover:text-white hover:bg-indigo-600" title="Print Visit" aria-label="Print Visit"><Printer size={16} /></button>
+                          <button onClick={() => openView(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} className="p-2 text-indigo-600 rounded-full hover:text-white hover:bg-indigo-600" title="View Visit" aria-label="View Visit"><Eye size={16} /></button>
                           <button onClick={() => !isCompleted && openEdit(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
                           <button onClick={() => !isCompleted && confirmDelete(it)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                         </>
