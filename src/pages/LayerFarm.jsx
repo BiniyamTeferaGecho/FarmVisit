@@ -69,6 +69,16 @@ export default function LayerFarm() {
   }
   const [loadingVisits, setLoadingVisits] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [createdDateFrom, setCreatedDateFrom] = useState('')
+  const [createdDateTo, setCreatedDateTo] = useState('')
+  const [flockSizeMin, setFlockSizeMin] = useState('')
+  const [flockSizeMax, setFlockSizeMax] = useState('')
+  const [visitScoreMin, setVisitScoreMin] = useState('')
+  const [visitScoreMax, setVisitScoreMax] = useState('')
+  const [regionFilter, setRegionFilter] = useState('')
+  const [zoneFilter, setZoneFilter] = useState('')
+  const [weredaFilter, setWeredaFilter] = useState('')
   const [pageNumber, setPageNumber] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [totalPages, setTotalPages] = useState(1)
@@ -369,13 +379,39 @@ export default function LayerFarm() {
     }
   }
 
-  const fetchVisits = async () => {
+  const fetchVisits = async (opts = {}) => {
+    const requestedPage = opts.page ?? opts.pageNumber ?? null
+    const requestedSize = opts.size ?? opts.pageSize ?? null
+    // update local state to reflect requested pagination when provided
+    if (requestedPage != null && requestedPage !== pageNumber) setPageNumber(requestedPage)
+    if (requestedSize != null && requestedSize !== pageSize) setPageSize(requestedSize)
     setLoadingVisits(true)
     try {
-      // If user entered a search term or custom paging, use the schedule search stored-proc
-      if (searchTerm && String(searchTerm).trim() !== '') {
-        const params = { SearchTerm: searchTerm, FarmType: 'LAYER', PageNumber: pageNumber, PageSize: pageSize }
-        const res = await fetchWithAuth({ url: '/farm-visit-schedule/search', method: 'get', params })
+      const p = requestedPage ?? pageNumber
+      const s = requestedSize ?? pageSize
+      // If user entered a search term or any advanced filters, call the layer-farm search endpoint
+      const hasFilters = (searchTerm && String(searchTerm).trim() !== '') || createdDateFrom || createdDateTo || flockSizeMin || flockSizeMax || visitScoreMin || visitScoreMax || regionFilter || zoneFilter || weredaFilter
+      if (hasFilters) {
+        const payload = {
+          SearchTerm: searchTerm || null,
+          FarmType: 'LAYER',
+          CreatedDateFrom: createdDateFrom || null,
+          CreatedDateTo: createdDateTo || null,
+          FlockSizeMin: flockSizeMin ? Number(flockSizeMin) : null,
+          FlockSizeMax: flockSizeMax ? Number(flockSizeMax) : null,
+          FarmVisitScore: visitScoreMin ? String(visitScoreMin) : (visitScoreMax ? String(visitScoreMax) : null),
+          Region: regionFilter || null,
+          Zone: zoneFilter || null,
+          Wereda: weredaFilter || null,
+          PageNumber: p || 1,
+          PageSize: s || 25,
+        }
+        const res = await fetchWithAuth({ url: '/layer-farm/search', method: 'post', data: payload })
+        // diagnostic: surface unexpected shapes for easier debugging
+        if (!res || !res.data) {
+          console.warn('layer-farm/search returned no data', res)
+          setMessage({ type: 'error', text: 'Search returned no data from server' })
+        }
         const rows = res?.data?.data || []
         const summ = res?.data?.summary || null
         setSummary(summ)
@@ -402,9 +438,14 @@ export default function LayerFarm() {
         setVisits(mapped)
         // pagination from summary when available
         const total = summ && (summ.TotalVisits || summ.TotalCount || summ.totalCount) ? (summ.TotalVisits || summ.TotalCount || summ.totalCount) : mapped.length
-        const tp = summ && (summ.TotalPages || summ.totalPages) ? (summ.TotalPages || summ.totalPages) : (pageSize ? Math.ceil(total / pageSize) : 1)
+        const tp = summ && (summ.TotalPages || summ.totalPages) ? (summ.TotalPages || summ.totalPages) : (s ? Math.ceil(total / s) : 1)
         setTotalCount(total)
         setTotalPages(tp)
+        if (!Array.isArray(rows) || rows.length === 0) {
+          // helpful debug message for empty lists
+          setMessage({ type: 'info', text: 'No visits found for the provided filters.' })
+          console.debug('LayerFarm: search returned empty rows', { payload, res })
+        }
 
         // populate scheduleMap and farmMap similar to previous logic for richer display
         try {
@@ -479,19 +520,19 @@ export default function LayerFarm() {
       try {
         const ids = (Array.isArray(data) ? data : []).map(d => d.ScheduleID || d.scheduleId || null).filter(Boolean);
         const uniq = Array.from(new Set(ids.map(String)));
-          if (uniq.length > 0) {
-            const map = {};
-            await Promise.all(uniq.map(async (id) => {
-              try {
-                const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(id)}`, method: 'get' });
-                const sd = r?.data?.data || r?.data || null;
-                if (sd) {
-                  map[String(id)] = sd;
-                }
-              } catch (e) { /* ignore per-row failures */ }
-            }))
-            setScheduleMap(prev => ({ ...prev, ...map }));
-          }
+            if (uniq.length > 0) {
+              const map = {};
+              await Promise.all(uniq.map(async (id) => {
+                try {
+                  const r = await fetchWithAuth({ url: `/farm-visit-schedule/${encodeURIComponent(id)}`, method: 'get' });
+                  const sd = r?.data?.data || r?.data || null;
+                  if (sd) {
+                    map[String(id)] = sd;
+                  }
+                } catch (e) { /* ignore per-row failures */ }
+              }))
+              if (Object.keys(map).length > 0) setScheduleMap(prev => ({ ...prev, ...map }));
+            }
       } catch (e) { /* ignore schedule-map populate errors */ }
     } catch (err) {
       console.error('fetch visits error', err)
@@ -984,6 +1025,60 @@ export default function LayerFarm() {
             <FaSync className="mr-2" /> Refresh
           </button>
         </div>
+      </div>
+
+      {/* Advanced filters */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <button type="button" onClick={() => setAdvancedOpen(v => !v)} className="px-3 py-1 bg-white border rounded">{advancedOpen ? 'Hide Filters' : 'Show Filters'}</button>
+          <button type="button" onClick={() => { setCreatedDateFrom(''); setCreatedDateTo(''); setFlockSizeMin(''); setFlockSizeMax(''); setVisitScoreMin(''); setVisitScoreMax(''); setRegionFilter(''); setZoneFilter(''); setWeredaFilter(''); setAdvancedOpen(false); fetchVisits({ page: 1, size: pageSize }) }} className="px-3 py-1 bg-gray-100 border rounded">Clear Filters</button>
+        </div>
+        {advancedOpen && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Created From</label>
+              <input type="date" value={createdDateFrom} onChange={e => setCreatedDateFrom(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Created To</label>
+              <input type="date" value={createdDateTo} onChange={e => setCreatedDateTo(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Region</label>
+              <input type="text" value={regionFilter} onChange={e => setRegionFilter(e.target.value)} placeholder="Region" className="form-input w-full px-2 py-1 border rounded" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Zone</label>
+              <input type="text" value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} placeholder="Zone" className="form-input w-full px-2 py-1 border rounded" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Wereda</label>
+              <input type="text" value={weredaFilter} onChange={e => setWeredaFilter(e.target.value)} placeholder="Wereda" className="form-input w-full px-2 py-1 border rounded" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Flock Size Min</label>
+                <input type="number" value={flockSizeMin} onChange={e => setFlockSizeMin(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Flock Size Max</label>
+                <input type="number" value={flockSizeMax} onChange={e => setFlockSizeMax(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Visit Score Min</label>
+                <input type="number" value={visitScoreMin} onChange={e => setVisitScoreMin(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700">Visit Score Max</label>
+                <input type="number" value={visitScoreMax} onChange={e => setVisitScoreMax(e.target.value)} className="form-input w-full px-2 py-1 border rounded" />
+              </div>
+            </div>
+            <div className="md:col-span-3 flex items-end gap-2 mt-1">
+              <button onClick={() => { setPageNumber(1); fetchVisits({ page: 1, size: pageSize }) }} className="px-3 py-2 bg-indigo-600 text-white rounded">Apply Filters</button>
+              <button onClick={() => { setCreatedDateFrom(''); setCreatedDateTo(''); setFlockSizeMin(''); setFlockSizeMax(''); setVisitScoreMin(''); setVisitScoreMax(''); setRegionFilter(''); setZoneFilter(''); setWeredaFilter(''); fetchVisits({ page: 1, size: pageSize }) }} className="px-3 py-2 bg-gray-100 rounded">Reset</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {message && <div className={`mb-4 p-3 rounded ${message.type==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{message.text}</div>}
