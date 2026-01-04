@@ -929,10 +929,10 @@ export default function LayerFarm() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
         <h2 className="text-2xl font-bold text-gray-800">Layer Farm Visits</h2>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { resetForm(); setEditingId(null); setShowModal(true); setMessage(null) }} disabled={saving} className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded disabled:opacity-60">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-2 w-full sm:w-auto">
+          <button onClick={() => { resetForm(); setEditingId(null); setShowModal(true); setMessage(null) }} disabled={saving} className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded disabled:opacity-60 w-full sm:w-auto">
             {saving ? (
               <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -941,7 +941,7 @@ export default function LayerFarm() {
             ) : <Plus size={16} />} 
             <span>{saving ? 'Saving...' : 'New Visit'}</span>
           </button>
-          <button onClick={() => fetchVisits({ page: pageNumber, size: pageSize })} className="flex items-center gap-2 px-3 py-2 bg-white border rounded">
+          <button onClick={() => fetchVisits({ page: pageNumber, size: pageSize })} className="flex items-center justify-center gap-2 px-3 py-2 bg-white border rounded w-full sm:w-auto">
             {loadingVisits ? (
               <svg className="animate-spin h-4 w-4 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -950,20 +950,20 @@ export default function LayerFarm() {
             ) : <RefreshCw size={14} />} <span>Refresh</span>
           </button>
           
-          <button onClick={doBulkComplete} className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded">
+          <button onClick={doBulkComplete} className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded w-full sm:w-auto">
             Bulk Complete
           </button>
-          <button onClick={doExport} className="flex items-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded">
+          <button onClick={doExport} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto">
             Export
           </button>
-          <button onClick={doCleanup} className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded">
+          <button onClick={doCleanup} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded w-full sm:w-auto">
             Cleanup
           </button>
         </div>
       </div>
 
       {/* Search row: Employee-style (left-aligned) */}
-      <div className="mb-4 flex items-center space-x-2">
+      <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2">
         <div className="relative w-full md:w-1/3">
           <input
             type="search"
@@ -979,8 +979,8 @@ export default function LayerFarm() {
           <button type="button" onClick={() => { setPageNumber(1); fetchVisits({ page: 1, size: pageSize }); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"><FaSearch /></button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setSearchTerm(''); setPageNumber(1); setTimeout(()=>fetchVisits({ page: 1, size: pageSize }),0); }} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" title="Refresh Data">
+        <div className="flex items-center sm:ml-2">
+          <button onClick={() => { setSearchTerm(''); setPageNumber(1); setTimeout(()=>fetchVisits({ page: 1, size: pageSize }),0); }} className="flex items-center justify-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 w-full sm:w-auto" title="Refresh Data">
             <FaSync className="mr-2" /> Refresh
           </button>
         </div>
@@ -1115,7 +1115,7 @@ export default function LayerFarm() {
                     return <span className={cls}>{label}</span>
                   })()}</td>}
                   {columnVisibility.actions && <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-1">
                       {(() => {
                         const isCompleted = Boolean(
                           v.IsVisitCompleted === true || v.IsVisitCompleted === 1 || String(v.IsVisitCompleted) === '1' || String(v.IsVisitCompleted).toLowerCase() === 'true'
@@ -1124,13 +1124,13 @@ export default function LayerFarm() {
                         const deleteClass = `p-2 text-red-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-red-600'}`
                         return (
                           <>
-                            <button onClick={() => !isCompleted && triggerCompleteConfirm(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'}`} aria-disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} title="Complete Visit">
+                            <button onClick={() => !isCompleted && triggerCompleteConfirm(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'} w-full sm:w-auto`} aria-disabled={isCompleted || completingId === (v.LayerVisitID || v.LayerVisitId || v.id)} title="Complete Visit">
                               {completingId === (v.LayerVisitID || v.LayerVisitId || v.id) ? <SmallSpinner /> : <Check size={16} />}
                             </button>
-                            <button onClick={() => handleView(v.LayerVisitID || v.LayerVisitId || v.id)} className="p-2 text-sky-600 rounded-full hover:text-white hover:bg-sky-600" title="View Visit"><Eye size={16} /></button>
+                            <button onClick={() => handleView(v.LayerVisitID || v.LayerVisitId || v.id)} className="p-2 text-sky-600 rounded-full hover:text-white hover:bg-sky-600 w-full sm:w-auto" title="View Visit"><Eye size={16} /></button>
                             {/* Print button removed from actions column per request */}
-                            <button onClick={() => !isCompleted && handleEdit(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
-                            <button onClick={() => !isCompleted && handleDelete(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
+                            <button onClick={() => !isCompleted && handleEdit(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={`${editClass} w-full sm:w-auto`} aria-disabled={isCompleted}><Edit size={16} /></button>
+                            <button onClick={() => !isCompleted && handleDelete(v.LayerVisitID || v.LayerVisitId || v.id)} disabled={isCompleted} className={`${deleteClass} w-full sm:w-auto`} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                           </>
                         )
                       })()}

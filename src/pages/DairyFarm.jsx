@@ -958,30 +958,30 @@ export default function DairyFarm() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
         <h2 className="text-2xl font-bold text-gray-800">Dairy Farm Visits</h2>
-        <div className="flex items-center gap-2">
-          <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-2 w-full sm:w-auto">
+          <button onClick={openCreate} className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded w-full sm:w-auto">
             <Plus size={16} /> New Visit
           </button>
-          <button onClick={fetchList} className="flex items-center gap-2 px-3 py-2 bg-white border rounded">
+          <button onClick={fetchList} className="flex items-center justify-center gap-2 px-3 py-2 bg-white border rounded w-full sm:w-auto">
             <RefreshCw size={14} /> Refresh
           </button>
-          <button onClick={doBulkComplete} className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded">
+          <button onClick={doBulkComplete} className="flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded w-full sm:w-auto">
             Bulk Complete
           </button>
-          <button onClick={doExport} className="flex items-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded">
+          <button onClick={doExport} className="flex items-center justify-center gap-2 px-3 py-2 bg-yellow-500 text-white rounded w-full sm:w-auto">
             Export
           </button>
-          <button onClick={doCleanup} className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded">
+          <button onClick={doCleanup} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500 text-white rounded w-full sm:w-auto">
             Cleanup
           </button>
         </div>
       </div>
 
       {/* Search row: left-aligned like other list pages (Employee-style) */}
-      <div className="mb-4 flex items-center space-x-2">
-        <div className="relative w-full md:w-1/3">
+      <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <div className="relative w-full sm:w-1/3">
           <input
             type="search"
             value={searchTerm}
@@ -996,8 +996,8 @@ export default function DairyFarm() {
           <button type="button" onClick={() => { fetchList(searchTerm); }} title="Search" className="absolute right-0 top-1/2 -translate-y-1/2 bg-indigo-600 text-white p-2 rounded-r-md hover:bg-indigo-700"><FaSearch /></button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setSearchTerm(''); setTimeout(()=>fetchList(),0); }} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600" title="Refresh Data">
+        <div className="flex items-center sm:ml-2">
+          <button onClick={() => { setSearchTerm(''); setTimeout(()=>fetchList(),0); }} className="flex items-center justify-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 w-full sm:w-auto" title="Refresh Data">
             <FaSync className="mr-2" /> Refresh
           </button>
         </div>
@@ -1108,7 +1108,7 @@ export default function DairyFarm() {
                   return <span className={cls}>{label}</span>
                 })()}</td>}
                 {columnVisibility.actions && <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-1">
                     {(() => {
                       // Treat several representations of a completed flag as truthy
                       const isCompleted = Boolean(
@@ -1122,9 +1122,9 @@ export default function DairyFarm() {
                           <button onClick={() => !isCompleted && triggerCompleteConfirm(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted || completingId === (it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} className={`p-2 text-green-600 rounded-full ${isCompleted ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-green-600'}`} aria-disabled={isCompleted} title="Complete Visit">
                             {completingId === (it.DairyFarmVisitId || it.DairyFarmVisitID || it.id) ? <SmallSpinner /> : <Check size={16} />}
                           </button>
-                          <button onClick={() => openView(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} className="p-2 text-indigo-600 rounded-full hover:text-white hover:bg-indigo-600" title="View Visit" aria-label="View Visit"><Eye size={16} /></button>
-                          <button onClick={() => !isCompleted && openEdit(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted} className={editClass} aria-disabled={isCompleted}><Edit size={16} /></button>
-                          <button onClick={() => !isCompleted && confirmDelete(it)} disabled={isCompleted} className={deleteClass} aria-disabled={isCompleted}><Trash2 size={16} /></button>
+                          <button onClick={() => openView(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} className="p-2 text-indigo-600 rounded-full hover:text-white hover:bg-indigo-600 w-full sm:w-auto" title="View Visit" aria-label="View Visit"><Eye size={16} /></button>
+                          <button onClick={() => !isCompleted && openEdit(it.DairyFarmVisitId || it.DairyFarmVisitID || it.id)} disabled={isCompleted} className={`${editClass} w-full sm:w-auto`} aria-disabled={isCompleted}><Edit size={16} /></button>
+                          <button onClick={() => !isCompleted && confirmDelete(it)} disabled={isCompleted} className={`${deleteClass} w-full sm:w-auto`} aria-disabled={isCompleted}><Trash2 size={16} /></button>
                         </>
                       )
                     })()}
