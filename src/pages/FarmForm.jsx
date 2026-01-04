@@ -31,6 +31,35 @@ const SelectField = React.memo(({ icon, label, name, value, onChange, error, chi
 ));
 
 function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], loading, onCancel, onSubmit, editingId }) {
+    const { fetchWithAuth } = useAuth();
+    const [regionOptions, setRegionOptions] = useState([]);
+    const [regionLoading, setRegionLoading] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                setRegionLoading(true);
+                const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/Region`, method: 'get' });
+                const payload = res?.data?.data || res?.data || res;
+                let rows = [];
+                if (Array.isArray(payload)) rows = payload;
+                else if (Array.isArray(payload.items)) rows = payload.items;
+                else if (Array.isArray(payload.recordset)) rows = payload.recordset;
+                else if (Array.isArray(payload.data)) rows = payload.data;
+                const opts = (rows || []).map(r => {
+                    const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null;
+                    const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? '';
+                    return value ? { value: String(value), label: String(label) } : null;
+                }).filter(Boolean);
+                if (!cancelled) setRegionOptions(opts);
+            } catch (e) {
+                if (!cancelled) setRegionOptions([]);
+            } finally { if (!cancelled) setRegionLoading(false); }
+        })();
+        return () => { cancelled = true };
+    }, [fetchWithAuth]);
+
     const handleChange = (e) => {
         if (typeof onFieldChange === 'function') return onFieldChange(e);
         const { name, value, type, checked } = e.target;
@@ -64,7 +93,12 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
                 </div>
                 <InputField icon={<FaPhone />} label="Contact Phone" name="ContactPhone" value={form.ContactPhone} onChange={handleChange} error={fieldErrors.ContactPhone} placeholder="0912345678" />
                 <InputField icon={<FaMapMarkerAlt />} label="Address" name="Address" value={form.Address} onChange={handleChange} placeholder="123 Main St" />
-                <InputField icon={<FaMapMarkerAlt />} label="Region" name="Region" value={form.Region} onChange={handleChange} placeholder="e.g. Amhara" />
+                <SelectField icon={<FaMapMarkerAlt />} label="Region" name="Region" value={form.Region} onChange={handleChange} error={fieldErrors.Region}>
+                    <option value="">Select region</option>
+                    {(regionOptions || []).map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </SelectField>
                 <InputField icon={<FaMapMarkerAlt />} label="Zone" name="Zone" value={form.Zone} onChange={handleChange} placeholder="e.g. North Shewa" />
                 <InputField icon={<FaMapMarkerAlt />} label="Wereda" name="Wereda" value={form.Wereda} onChange={handleChange} placeholder="e.g. Debre Berhan" />
                 <InputField icon={<FaMapMarkerAlt />} label="City/Town" name="CityTown" value={form.CityTown} onChange={handleChange} placeholder="e.g. Addis Ababa" />

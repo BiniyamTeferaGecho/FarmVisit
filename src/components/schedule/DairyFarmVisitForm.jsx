@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, UploadCloud, ClipboardList, Thermometer, Droplet, AlertTriangle, Pill, Microscope } from 'lucide-react';
+import { useAuth } from '../../auth/AuthProvider'
 
 const SectionCard = ({ title, icon, children }) => (
   <div className="bg-white shadow-md rounded-lg p-6 mb-6"> 
@@ -62,6 +63,1154 @@ const TextAreaField = ({ label, name, value, onChange, placeholder, readOnly = f
     {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
   </div>
 );
+
+// Dropdown multi-select with checkboxes for Compound Feed Source
+const CompoundFeedMultiSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Compound Feed Source';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadCompoundFeedOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  // parse stored value into array
+  const selectedVals = Array.isArray(value) ? value : (String(value || '').split(/[,;|]+/).map(s => s.trim()).filter(Boolean));
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || it.Name || it.name || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  // include synthetic options for selected values not in options
+  const optionValuesSet = new Set(options.map(o => String(optionValue(o))));
+  const synthetic = selectedVals.filter(v => v && !optionValuesSet.has(String(v))).map(v => ({ LookupValue: v, Name: v }));
+
+  const allOptions = [...options, ...synthetic];
+
+  const toggleValue = (val) => {
+    const s = new Set(selectedVals.map(String));
+    if (s.has(String(val))) s.delete(String(val)); else s.add(String(val));
+    const arr = Array.from(s);
+    const joined = arr.join(', ');
+    if (typeof onChange === 'function') onChange(joined);
+  };
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('touchstart', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('touchstart', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  if (readOnly) {
+    return (
+      <input name={name} value={Array.isArray(value) ? value.join(', ') : (value || '')} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />
+    );
+  }
+
+  const handleBlur = (e) => {
+    const related = e.relatedTarget || document.activeElement;
+    if (ref.current && !ref.current.contains(related)) {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={ref} onBlurCapture={handleBlur}>
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full text-left mt-1 rounded-md border border-gray-300 bg-white py-2 px-3 h-11 flex items-center justify-between">
+        <div className="truncate">
+          {selectedVals && selectedVals.length ? selectedVals.join(', ') : (loading ? 'Loading...' : 'Select compound feed sources')}
+        </div>
+        <svg className="ml-2 h-4 w-4 text-gray-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto py-2">
+          {loading && <div className="px-3 text-sm text-gray-500">Loading...</div>}
+          {!loading && allOptions.length === 0 && <div className="px-3 text-sm text-gray-500">No options</div>}
+          {!loading && allOptions.map((it, idx) => {
+            const val = optionValue(it);
+            const lab = optionLabel(it);
+            const checked = selectedVals.includes(String(val));
+            return (
+              <label key={idx} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" checked={checked} onChange={() => toggleValue(val)} className="h-4 w-4 text-indigo-600" />
+                <span className="ml-2 text-sm text-gray-700 truncate">{lab}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Feeding System (saves LookupValue)
+const FeedingSystemSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Feeding System';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadFeedingSystemOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  // find label for current value
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Feeding System</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Watering System (saves LookupValue)
+const WateringSystemSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Watering System';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadWateringSystemOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Watering System</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Milk Supply To (saves LookupValue)
+const MilkSupplyToSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Milk Supply To';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadMilkSupplyToOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Milk Supply To</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Ventilation (saves LookupValue)
+const VentilationSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Ventilation';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadVentilationOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Ventilation</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Light Intensity (saves LookupValue)
+const LightIntensitySelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Light Intensity';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadLightIntensityOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Light Intensity</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Bedding Type (saves LookupValue)
+const BeddingTypeSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Bedding Type';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadBeddingTypeOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Bedding Type</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Space Availability (saves LookupValue)
+const SpaceAvailabilitySelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Space Availability';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadSpaceAvailabilityOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Space Availability</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Simple date picker for Vaccination Time
+const VaccinationTimeDatePicker = ({ name, value, onChange, readOnly = false }) => {
+  const parseForInput = (v) => {
+    if (!v) return '';
+    // if ISO datetime, take date part
+    if (typeof v === 'string') {
+      if (v.includes('T')) return v.split('T')[0];
+      if (v.includes(' ')) return v.split(' ')[0];
+      if (v.length >= 10) return v.substring(0, 10);
+      return v;
+    }
+    return String(v);
+  };
+
+  const inputValue = parseForInput(value);
+
+  if (readOnly) {
+    return <input name={name} value={inputValue} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Vaccination Time</label>
+      <input
+        type="date"
+        name={name}
+        value={inputValue}
+        onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }}
+        className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11"
+      />
+    </div>
+  );
+};
+
+// Single-select dropdown for Which Company (saves LookupValue)
+const CompanySelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Company';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadCompanyOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Which Company</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select Company --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Single-select dropdown for Feeding Mechanism (saves LookupValue)
+const FeedingMechanismSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Feeding Mechanism';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadFeedingMechanismOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const currentLabel = (() => {
+    if (!value) return '';
+    const found = options.find(o => String(optionValue(o)) === String(value));
+    if (found) return optionLabel(found);
+    return String(value);
+  })();
+
+  if (readOnly) {
+    return <input name={name} value={currentLabel} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />;
+  }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 text-left mb-1">Feeding Mechanism</label>
+      <select name={name} value={value || ''} onChange={(e) => { if (typeof onChange === 'function') onChange(e.target.value); }} className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-base py-2 px-3 h-11">
+        <option value="">-- Select --</option>
+        {(!loading && options) && options.map((it, idx) => (
+          <option key={idx} value={optionValue(it)}>{optionLabel(it)}</option>
+        ))}
+      </select>
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Multi-select dropdown for Home Mixing Ingredients (saves LookupValue joined by comma)
+const HomeMixingIngredientsSelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'Home Mixing Ingredients';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadHomeMixingOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const selectedVals = Array.isArray(value) ? value : (String(value || '').split(/[,;|]+/).map(s => s.trim()).filter(Boolean));
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || it.Name || it.name || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const optionValuesSet = new Set(options.map(o => String(optionValue(o))));
+  const synthetic = selectedVals.filter(v => v && !optionValuesSet.has(String(v))).map(v => ({ LookupValue: v, Name: v }));
+  const allOptions = [...options, ...synthetic];
+
+  const toggleValue = (val) => {
+    const s = new Set(selectedVals.map(String));
+    if (s.has(String(val))) s.delete(String(val)); else s.add(String(val));
+    const arr = Array.from(s);
+    const joined = arr.join(', ');
+    if (typeof onChange === 'function') onChange(joined);
+  };
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('touchstart', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('touchstart', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  if (readOnly) {
+    return (
+      <input name={name} value={Array.isArray(value) ? value.join(', ') : (value || '')} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />
+    );
+  }
+
+  const handleBlur = (e) => {
+    const related = e.relatedTarget || document.activeElement;
+    if (ref.current && !ref.current.contains(related)) {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={ref} onBlurCapture={handleBlur}>
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full text-left mt-1 rounded-md border border-gray-300 bg-white py-2 px-3 h-11 flex items-center justify-between">
+        <div className="truncate">
+          {selectedVals && selectedVals.length ? selectedVals.join(', ') : (loading ? 'Loading...' : 'Select ingredients')}
+        </div>
+        <svg className="ml-2 h-4 w-4 text-gray-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto py-2">
+          {loading && <div className="px-3 text-sm text-gray-500">Loading...</div>}
+          {!loading && allOptions.length === 0 && <div className="px-3 text-sm text-gray-500">No options</div>}
+          {!loading && allOptions.map((it, idx) => {
+            const val = optionValue(it);
+            const lab = optionLabel(it);
+            const checked = selectedVals.includes(String(val));
+            return (
+              <label key={idx} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" checked={checked} onChange={() => toggleValue(val)} className="h-4 w-4 text-indigo-600" />
+                <span className="ml-2 text-sm text-gray-700 truncate">{lab}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
+
+// Multi-select dropdown for "How Much Feeding Per Day" (saves LookupValue joined by comma)
+const HowMuchFeedingPerDaySelect = ({ name, value, onChange, readOnly = false }) => {
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const extractItems = (body) => {
+      if (!body) return [];
+      if (Array.isArray(body)) return body;
+      if (Array.isArray(body.data)) return body.data;
+      if (body.data && Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.items)) return body.items;
+      return [];
+    };
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let res = null;
+        const typeName = 'How Much Feeding Per Day';
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
+        } else {
+          const base = window.location.origin;
+          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          res = await r.json();
+        }
+        const items = extractItems(res) || [];
+        if (mounted) setOptions(items);
+      } catch (err) {
+        console.debug('loadHowMuchFeedingOptions error', err);
+        if (mounted) setError('Failed to load options');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false };
+  }, [fetchWithAuth]);
+
+  const selectedVals = Array.isArray(value) ? value : (String(value || '').split(/[,;|]+/).map(s => s.trim()).filter(Boolean));
+
+  const optionValue = (it) => {
+    if (!it) return '';
+    return it.LookupValue || it.Value || it.LookupCode || it.code || it.value || it.Name || it.name || String(it);
+  };
+  const optionLabel = (it) => {
+    if (!it) return '';
+    return it.Name || it.Value || it.LookupValue || it.name || it.value || String(it);
+  };
+
+  const optionValuesSet = new Set(options.map(o => String(optionValue(o))));
+  const synthetic = selectedVals.filter(v => v && !optionValuesSet.has(String(v))).map(v => ({ LookupValue: v, Name: v }));
+  const allOptions = [...options, ...synthetic];
+
+  const toggleValue = (val) => {
+    const s = new Set(selectedVals.map(String));
+    if (s.has(String(val))) s.delete(String(val)); else s.add(String(val));
+    const arr = Array.from(s);
+    const joined = arr.join(', ');
+    if (typeof onChange === 'function') onChange(joined);
+  };
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('touchstart', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('touchstart', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  if (readOnly) {
+    return (
+      <input name={name} value={Array.isArray(value) ? value.join(', ') : (value || '')} readOnly className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-base py-2 px-3 h-11 bg-gray-100 cursor-not-allowed" />
+    );
+  }
+
+  const handleBlur = (e) => {
+    const related = e.relatedTarget || document.activeElement;
+    if (ref.current && !ref.current.contains(related)) {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={ref} onBlurCapture={handleBlur}>
+      <button type="button" onClick={() => setOpen(o => !o)} className="w-full text-left mt-1 rounded-md border border-gray-300 bg-white py-2 px-3 h-11 flex items-center justify-between">
+        <div className="truncate">
+          {selectedVals && selectedVals.length ? selectedVals.join(', ') : (loading ? 'Loading...' : 'Select feeding times')}
+        </div>
+        <svg className="ml-2 h-4 w-4 text-gray-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto py-2">
+          {loading && <div className="px-3 text-sm text-gray-500">Loading...</div>}
+          {!loading && allOptions.length === 0 && <div className="px-3 text-sm text-gray-500">No options</div>}
+          {!loading && allOptions.map((it, idx) => {
+            const val = optionValue(it);
+            const lab = optionLabel(it);
+            const checked = selectedVals.includes(String(val));
+            return (
+              <label key={idx} className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" checked={checked} onChange={() => toggleValue(val)} className="h-4 w-4 text-indigo-600" />
+                <span className="ml-2 text-sm text-gray-700 truncate">{lab}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+      {error && <div className="text-sm text-red-600 mt-1">{error}</div>}
+    </div>
+  );
+};
 
 const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnly = false, locationReadOnlyInModal = false, externalErrors = {} }) => {
   const data = form ?? {};
@@ -205,6 +1354,20 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
       // ignore
     }
   }, [form?.IsLocalMix]);
+
+  // When HasForage is turned off, clear TypeOfForage and ForageAmount from the form payload
+  useEffect(() => {
+    try {
+      if (readOnly) return;
+      if (form && form.HasForage === false && (form.TypeOfForage || form.ForageAmount)) {
+        if (typeof onChange === 'function') {
+          onChange({ ...form, TypeOfForage: '', ForageAmount: '' });
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [form?.HasForage]);
 
   const validate = () => {
     const errs = {};
@@ -356,19 +1519,75 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           <InputField label="Body Condition (Dry cows)" name="BodyConditionDryCow" type="number" step="0.1" value={data.BodyConditionDryCow} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.BodyConditionDryCow} />
 
           {/* Feeding and feed source fields - always visible and ordered */}
-          <InputField label="Feeding System" name="FeedingSystem" value={data.FeedingSystem} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Compound Feed Source" name="CompoundFeedSource" value={data.CompoundFeedSource} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Which Company" name="WhichCompany" value={data.WhichCompany} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <TextAreaField label="List of Home Mixing Ingredient" name="ListOfHomeMixingIngridient" value={data.ListOfHomeMixingIngridient || data.ListofIngridiant} onChange={handleChange} placeholder="List ingredients..." readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Quantity of Commercial Feed" name="QuantityOfCommercialFeed" type="number" value={data.QuantityOfCommercialFeed} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Quantity of Home Mix" name="QuantityOfHomeMix" type="number" value={data.QuantityOfHomeMix} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="How Many Times (feeding)" name="HowManyTimes" value={data.HowManyTimes} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Feeding Mechanism" name="FeedingMechanism" value={data.FeedingMechanism} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <div>
+            <FeedingSystemSelect
+              name="FeedingSystem"
+              value={data.FeedingSystem}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, FeedingSystem: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.FeedingSystem && <div className="text-sm text-red-600 mt-1">{errors.FeedingSystem}</div>}
+          </div>
+          {/* Compound Feed Source: multi-select populated from lookup API */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 text-left mb-1">Compound Feed Source</label>
+            <CompoundFeedMultiSelect
+              name="CompoundFeedSource"
+              value={data.CompoundFeedSource}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, CompoundFeedSource: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.CompoundFeedSource && <div className="text-sm text-red-600 mt-1">{errors.CompoundFeedSource}</div>}
+          </div>
+          <div>
+            <CompanySelect
+              name="WhichCompany"
+              value={data.WhichCompany}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, WhichCompany: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.WhichCompany && <div className="text-sm text-red-600 mt-1">{errors.WhichCompany}</div>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 text-left mb-1">List of Home Mixing Ingredient</label>
+            <HomeMixingIngredientsSelect
+              name="ListOfHomeMixingIngridient"
+              value={data.ListOfHomeMixingIngridient || data.ListofIngridiant}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, ListOfHomeMixingIngridient: val, ListofIngridiant: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.ListOfHomeMixingIngridient && <div className="text-sm text-red-600 mt-1">{errors.ListOfHomeMixingIngridient}</div>}
+          </div>
+          <InputField label="Quantity of Commercial Feed (Kg)" name="QuantityOfCommercialFeed" type="number" value={data.QuantityOfCommercialFeed} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <InputField label="Quantity of Home Mix (Kg)" name="QuantityOfHomeMix" type="number" value={data.QuantityOfHomeMix} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 text-left mb-1">How Many Times (feeding)</label>
+            <HowMuchFeedingPerDaySelect
+              name="HowManyTimes"
+              value={data.HowManyTimes}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, HowManyTimes: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.HowManyTimes && <div className="text-sm text-red-600 mt-1">{errors.HowManyTimes}</div>}
+          </div>
+          <div>
+            <FeedingMechanismSelect
+              name="FeedingMechanism"
+              value={data.FeedingMechanism}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, FeedingMechanism: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.FeedingMechanism && <div className="text-sm text-red-600 mt-1">{errors.FeedingMechanism}</div>}
+          </div>
 
           <CheckboxField label="Sample Collected" name="SampleCollection" checked={data.SampleCollection} onChange={handleChange} disabled={readOnly} />
           <CheckboxField label="Has Forage" name="HasForage" checked={data.HasForage} onChange={handleChange} disabled={readOnly} />
-          <InputField label="Type of Forage" name="TypeOfForage" value={data.TypeOfForage} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Forage Amount" name="ForageAmount" type="number" value={data.ForageAmount} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.ForageAmount} />
+          {data.HasForage ? (
+            <>
+              <InputField label="Type of Forage" name="TypeOfForage" value={data.TypeOfForage} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+              <InputField label="Forage Amount" name="ForageAmount" type="number" value={data.ForageAmount} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.ForageAmount} />
+            </>
+          ) : null}
           <CheckboxField label="Concentrate Feed Sample" name="ConcentrateFeedSample" checked={data.ConcentrateFeedSample} onChange={handleChange} disabled={readOnly} />
 
           {/* Retain older feeding inputs (if present) */}
@@ -379,12 +1598,28 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
         <SectionCard title="Production & Water" icon={<Thermometer className="text-red-600" />}>
           <InputField label="Amount of Water Provided" name="AmountofWaterProvided" value={data.AmountofWaterProvided} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Watering System" name="WateringSystem" value={data.WateringSystem} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <div>
+            <WateringSystemSelect
+              name="WateringSystem"
+              value={data.WateringSystem}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, WateringSystem: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.WateringSystem && <div className="text-sm text-red-600 mt-1">{errors.WateringSystem}</div>}
+          </div>
           <InputField label="If limited, how much" name="IfLimitedHowMuch" value={data.IfLimitedHowMuch} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <InputField label="Avg Milk Production/Day (per cow)" name="AvgMilkProductionPerDayPerCow" type="number" step="0.01" value={data.AvgMilkProductionPerDayPerCow} onChange={handleChange} unit="L/day" readOnly={readOnly} disabled={readOnly} error={errors && errors.AvgMilkProductionPerDayPerCow} />
           <InputField label="Max Milk Production/Day (per cow)" name="MaxMilkProductionPerDayPerCow" type="number" step="0.01" value={data.MaxMilkProductionPerDayPerCow} onChange={handleChange} unit="L" readOnly={readOnly} disabled={readOnly} error={errors && errors.MaxMilkProductionPerDayPerCow} />
           <InputField label="Total Milk/Day" name="TotalMilkPerDay" type="number" step="0.01" value={data.TotalMilkPerDay} onChange={handleChange} unit="L" readOnly={readOnly} disabled={readOnly} error={errors && errors.TotalMilkPerDay} />
-          <InputField label="Milk Supply To" name="MilkSupplyTo" value={data.MilkSupplyTo} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <div>
+            <MilkSupplyToSelect
+              name="MilkSupplyTo"
+              value={data.MilkSupplyTo}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, MilkSupplyTo: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.MilkSupplyTo && <div className="text-sm text-red-600 mt-1">{errors.MilkSupplyTo}</div>}
+          </div>
           <InputField label="Milk Price/Liter" name="MilkPricePerLitter" type="number" step="0.01" value={data.MilkPricePerLitter} onChange={handleChange} unit="ETB/L" readOnly={readOnly} disabled={readOnly} error={errors && errors.MilkPricePerLitter} />
           <div className="col-span-1 md:col-span-2 grid grid-cols-4 gap-4">
             <InputField label="Manure Score 1" name="ManureScore1" type="number" value={data.ManureScore1} onChange={handleChange} readOnly={readOnly} disabled={readOnly} error={errors && errors.ManureScore1} />
@@ -404,16 +1639,56 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           {/* LitterCondition removed — field not used by current backend stored-proc */}
         </SectionCard>
         <SectionCard title="Housing & Environment" icon={<AlertTriangle className="text-yellow-600" />}>
-          <InputField label="Ventilation" name="Ventilation" value={data.Ventilation} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Light Intensity" name="LightIntensity" value={data.LightIntensity} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Bedding Type" name="BeddingType" value={data.BeddingType} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Space Availability" name="SpaceAvailability" value={data.SpaceAvailability} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <div>
+            <VentilationSelect
+              name="Ventilation"
+              value={data.Ventilation}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, Ventilation: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.Ventilation && <div className="text-sm text-red-600 mt-1">{errors.Ventilation}</div>}
+          </div>
+          <div>
+            <LightIntensitySelect
+              name="LightIntensity"
+              value={data.LightIntensity}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, LightIntensity: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.LightIntensity && <div className="text-sm text-red-600 mt-1">{errors.LightIntensity}</div>}
+          </div>
+          <div>
+            <BeddingTypeSelect
+              name="BeddingType"
+              value={data.BeddingType}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, BeddingType: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.BeddingType && <div className="text-sm text-red-600 mt-1">{errors.BeddingType}</div>}
+          </div>
+          <div>
+            <SpaceAvailabilitySelect
+              name="SpaceAvailability"
+              value={data.SpaceAvailability}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, SpaceAvailability: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.SpaceAvailability && <div className="text-sm text-red-600 mt-1">{errors.SpaceAvailability}</div>}
+          </div>
         </SectionCard>
         <SectionCard title="Health, Medication & Advice" icon={<Pill className="text-purple-600" />}>
           <CheckboxField label="Medication" name="Medication" checked={data.Medication} onChange={handleChange} disabled={readOnly} />
           <TextAreaField label="Vaccination History" name="VaccinationHistory" value={data.VaccinationHistory} onChange={handleChange} placeholder="Vaccination history..." readOnly={readOnly} disabled={readOnly} />
           <InputField label="Vaccination Type" name="VaccinationType" value={data.VaccinationType} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
-          <InputField label="Vaccination Time" name="VaccinationTime" value={data.VaccinationTime} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
+          <div>
+            <VaccinationTimeDatePicker
+              name="VaccinationTime"
+              value={data.VaccinationTime}
+              onChange={(val) => { if (typeof onChange === 'function') onChange({ ...data, VaccinationTime: val }); }}
+              readOnly={readOnly}
+            />
+            {errors && errors.VaccinationTime && <div className="text-sm text-red-600 mt-1">{errors.VaccinationTime}</div>}
+          </div>
           <TextAreaField label="What Type of Medication" name="WhatTypeofMedication" value={data.WhatTypeofMedication} onChange={handleChange} placeholder="Describe medications..." readOnly={readOnly} disabled={readOnly} />
           <InputField label="Recent Medication Type" name="RecentMedicationType" value={data.RecentMedicationType} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />
           <InputField label="Recent Medication Time" name="RecentMedicationTime" value={data.RecentMedicationTime} onChange={handleChange} readOnly={readOnly} disabled={readOnly} />

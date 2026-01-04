@@ -5,9 +5,13 @@ import Modal from '../components/Modal';
 import FarmForm from './FarmForm';
 import FarmPrintForm from '../components/print/forms/FarmPrintForm'
 import ConfirmModal from '../components/ConfirmModal';
+import ListHeaderWithFilter from '../components/ListHeaderWithFilter';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
-import { FaPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUndo, FaMapMarkerAlt, FaBuilding, FaUser, FaPhone, FaEnvelope, FaGlobe, FaInfoCircle, FaSearch, FaTimes } from 'react-icons/fa';
+import ColumnHeaderFilter from '../components/ColumnHeaderFilter';
+import ColumnSelector from '../components/ColumnSelector';
+import { FaPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUndo, FaMapMarkerAlt, FaBuilding, FaUser, FaPhone, FaEnvelope, FaGlobe, FaInfoCircle, FaSearch, FaTimes, FaColumns } from 'react-icons/fa';
+import { toCsv } from '../utils/csv';
 
 const initialForm = {
     FarmName: '',
@@ -42,6 +46,7 @@ export default function Farms() {
     const [loading, setLoading] = useState(false);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
     const [form, setForm] = useState(initialForm);
+    const [originalForm, setOriginalForm] = useState(null);
     const [totalRows, setTotalRows] = useState(0);
     const [farmTypes, setFarmTypes] = useState([]);
     const [farmTypesLoadError, setFarmTypesLoadError] = useState(null);
@@ -55,6 +60,7 @@ export default function Farms() {
     const [showSaveConfirm, setShowSaveConfirm] = useState(false);
     const [pendingSavePayload, setPendingSavePayload] = useState(null);
     const [pendingSaveIsEdit, setPendingSaveIsEdit] = useState(false);
+    const [pendingSaveChanges, setPendingSaveChanges] = useState([]);
     const [bulkFile, setBulkFile] = useState(null);
     const [gpsModalOpen, setGpsModalOpen] = useState(false);
     const [gpsFor, setGpsFor] = useState(null);
@@ -64,7 +70,6 @@ export default function Farms() {
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [fieldErrors, setFieldErrors] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
     const [filterRegion, setFilterRegion] = useState('');
     const [filterZone, setFilterZone] = useState('');
     const [filterWereda, setFilterWereda] = useState('');
@@ -76,6 +81,126 @@ export default function Farms() {
     const [filterCreatedTo, setFilterCreatedTo] = useState('');
     const [filterIsActive, setFilterIsActive] = useState('All'); // 'All' | 'Active' | 'Inactive'
     const [filterIncludeDeleted, setFilterIncludeDeleted] = useState(false);
+    const [columnFilters, setColumnFilters] = useState({});
+
+    // Column visibility selector
+    const defaultFarmCols = ['farmCode','rowNumber','farmName','type','owner','contact','createdBy','region','status','actions'];
+    const [visibleCols, setVisibleCols] = useState(() => {
+        try {
+            if (typeof window !== 'undefined') {
+                const raw = window.localStorage.getItem('farms.columns');
+                if (raw) {
+                    const parsed = JSON.parse(raw || '{}');
+                    if (parsed && typeof parsed === 'object') {
+                        const keys = defaultFarmCols.filter(id => !!parsed[id]);
+                        if (keys.length) return new Set(keys);
+                    }
+                }
+            }
+        } catch (e) { /* ignore */ }
+        return new Set(defaultFarmCols);
+    });
+    const toggleColumn = (id) => setVisibleCols(prev => { const next = new Set(prev ? Array.from(prev) : []); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+
+    const buildApiFiltersFromColumnFilters = (cf = {}) => {
+        const api = {};
+        if (cf.type) api.FarmTypeID = cf.type;
+        if (cf.region) api.Region = cf.region;
+        if (cf.createdBy) {
+            // if createdBy looks like a GUID, send as CreatedByID, otherwise send as CreatedByName
+            const g = String(cf.createdBy)
+            const isGuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(g)
+            // backend expects CreatedByID (GUID) when a GUID is provided
+            if (isGuid) api.CreatedByID = cf.createdBy
+            else api.CreatedByName = cf.createdBy
+        }
+        if (cf.status !== undefined && cf.status !== null) api.IsActive = cf.status;
+        if (cf.createdDateRange) {
+            if (cf.createdDateRange.from) api.CreatedDateFrom = cf.createdDateRange.from;
+            if (cf.createdDateRange.to) api.CreatedDateTo = cf.createdDateRange.to;
+        }
+        // Search term precedence: farmName -> farmCode -> owner -> contact
+        const search = cf.farmName || cf.farmCode || cf.owner || cf.contact || '';
+        if (search) api.SearchTerm = search;
+        // If createdBy is a free-text name and SearchTerm isn't set, use it to search creator names
+        if (!api.SearchTerm && cf.createdBy) {
+            // if createdBy is not a GUID, use it as a name search
+            const g = String(cf.createdBy)
+            const isGuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(g)
+            if (!isGuid) api.SearchTerm = cf.createdBy
+        }
+        return api;
+    };
+
+    const applyColumnFilter = (key, val) => {
+        const next = { ...(columnFilters || {}) };
+        if (val === null || val === undefined || val === '') delete next[key];
+        else next[key] = val;
+        setColumnFilters(next);
+        const apiFilters = buildApiFiltersFromColumnFilters(next);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+        fetchList({ pageIndex: 0, pageSize: pagination.pageSize, filters: apiFilters });
+    };
+
+    const clearColumnFilter = (key) => {
+        const next = { ...(columnFilters || {}) };
+        delete next[key];
+        setColumnFilters(next);
+        const apiFilters = buildApiFiltersFromColumnFilters(next);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+        fetchList({ pageIndex: 0, pageSize: pagination.pageSize, filters: apiFilters });
+    };
+
+    const createdByOptions = (() => {
+        const map = new Map();
+        if (Array.isArray(list)) {
+            for (const it of list) {
+                const id = it?.CreatedBy || it?.createdBy || it?.CreatedById || it?.CreatedByID || null;
+                const key = id ? String(id) : null;
+                const name = key ? (advisorMap && advisorMap[key] ? advisorMap[key] : (it.CreatedByName || it.CreatorName || key)) : null;
+                if (key && !map.has(key)) map.set(key, name);
+            }
+        }
+        if (advisorMap) {
+            for (const k of Object.keys(advisorMap)) if (!map.has(k)) map.set(k, advisorMap[k]);
+        }
+        return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+    })();
+    const [regionOptions, setRegionOptions] = useState([])
+
+    // Fetch distinct regions for the Region dropdown. Prefer the server view; fall back to deriving from current page.
+    useEffect(() => {
+        let cancelled = false
+        ;(async () => {
+            try {
+                const r = await fetchWithAuth({ url: `/farms/views/by-region`, method: 'get' })
+                const payload = r?.data?.data || r?.data || r
+                const rows = Array.isArray(payload) ? payload : (Array.isArray(payload.recordset) ? payload.recordset : []);
+                if (rows && rows.length > 0) {
+                    const set = new Set();
+                    for (const row of rows) {
+                        const rv = (row.Region || row.FarmRegion || row.region || null)
+                        if (rv) set.add(String(rv))
+                    }
+                    if (!cancelled) setRegionOptions(Array.from(set).sort().map(v => ({ value: v, label: v })))
+                    return
+                }
+            } catch (e) { /* ignore and fallback */ }
+
+            // fallback: derive from current list
+            try {
+                const set = new Set();
+                if (Array.isArray(list)) {
+                    for (const it of list) {
+                        const val = pickFirst(it, regionAliases) || findByKeySubstring(it, ['region', 'regionname', 'region_label']);
+                        if (val) set.add(String(val));
+                    }
+                }
+                if (!cancelled) setRegionOptions(Array.from(set).sort().map(v => ({ value: v, label: v })))
+            } catch (e) { if (!cancelled) setRegionOptions([]) }
+        })()
+        return () => { cancelled = true }
+    }, [fetchWithAuth, list])
 
     useEffect(() => { fetchList({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize }) }, [pagination.pageIndex, pagination.pageSize]);
 
@@ -117,6 +242,29 @@ export default function Farms() {
             setFarmTypes([]);
             setFarmTypesLoadError('Failed to load farm types. You can still enter a farm but the dropdown is unavailable.');
         }
+    };
+
+    const exportFarms = async () => {
+        setLoading(true); setError(null);
+        try {
+            try {
+                const res = await fetchWithAuth({ url: `/farms/report`, method: 'get' });
+                const rows = res?.data?.data || res?.data || null;
+                if (rows && Array.isArray(rows) && rows.length > 0) {
+                    const csvText = toCsv(rows);
+                    const blob = new Blob([csvText], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'farms_report.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+                    return;
+                }
+            } catch (e) { }
+
+            // fallback to client data export
+            const rows = Array.isArray(list) ? list : [];
+            if (rows.length === 0) { setError('No data to export'); return; }
+            const csvText = toCsv(rows);
+            const blob = new Blob([csvText], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'farms_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        } catch (err) { setError(err?.message || 'Export failed') } finally { setLoading(false) }
     };
 
     // auto-open error modal when `error` is set
@@ -302,6 +450,10 @@ export default function Farms() {
             const FarmSizeMax = (filters.FarmSizeMax !== undefined) ? filters.FarmSizeMax : (filterFarmSizeMax || null);
             const CreatedDateFrom = (filters.CreatedDateFrom ?? filterCreatedFrom) || null;
             const CreatedDateTo = (filters.CreatedDateTo ?? filterCreatedTo) || null;
+            const CreatedByID = (filters.CreatedByID ?? filters.EmployeeID ?? filters.employeeId ?? filters.createdById ?? null) || null;
+            const CreatedByName = (filters.CreatedByName ?? filters.createdByName ?? filters.CreatedBy ?? filters.createdBy ?? null) || null;
+            const FarmCode = (filters.FarmCode ?? filters.farmCode ?? null) || null;
+            const FarmName = (filters.FarmName ?? filters.farmName ?? null) || null;
             const IsActive = (filters.IsActive !== undefined && filters.IsActive !== null) ? filters.IsActive : (filterIsActive === 'All' ? null : (filterIsActive === 'Active' ? 1 : 0));
             const IncludeDeleted = (filters.IncludeDeleted !== undefined) ? (filters.IncludeDeleted ? 1 : 0) : (filterIncludeDeleted ? 1 : 0);
 
@@ -315,13 +467,32 @@ export default function Farms() {
             if (FarmSizeMax) qs.append('FarmSizeMax', String(FarmSizeMax));
             if (CreatedDateFrom) qs.append('CreatedDateFrom', String(CreatedDateFrom));
             if (CreatedDateTo) qs.append('CreatedDateTo', String(CreatedDateTo));
+            if (CreatedByID) {
+                qs.append('CreatedByID', String(CreatedByID));
+                console.debug('fetchList: appending CreatedByID filter', CreatedByID, `/farms?${qs.toString()}`);
+            }
+            if (CreatedByName) {
+                qs.append('CreatedByName', String(CreatedByName));
+                console.debug('fetchList: appending CreatedByName filter', CreatedByName, `/farms?${qs.toString()}`);
+            }
+            if (FarmCode) {
+                qs.append('FarmCode', String(FarmCode));
+            }
+            if (FarmName) {
+                qs.append('FarmName', String(FarmName));
+            }
             if (IsActive !== null) qs.append('IsActive', String(IsActive));
             qs.append('IncludeDeleted', String(IncludeDeleted));
 
             if (sortColumn) qs.append('SortColumn', sortColumn);
             if (sortDir) qs.append('SortDirection', sortDir);
 
-            const res = await fetchWithAuth({ url: `/farms?${qs.toString()}`, method: 'get' });
+            // Decide which backend endpoint to call: use /farms/search when advanced filters are present
+            const advancedFiltersPresent = Boolean(SearchTerm || FarmTypeID || Region || Zone || Wereda || CityTown || FarmSizeMin || FarmSizeMax || CreatedDateFrom || CreatedDateTo || CreatedByID || CreatedByName || IsActive !== null || IncludeDeleted)
+            const endpoint = advancedFiltersPresent ? '/farms/search' : '/farms'
+            // Debug: log final outgoing request for troubleshooting filters
+            try { console.debug('fetchList: final request', { endpoint, url: `${endpoint}?${qs.toString()}`, filters, builtQuery: qs.toString() }); } catch (e) {}
+            const res = await fetchWithAuth({ url: `${endpoint}?${qs.toString()}`, method: 'get' });
             const payload = res.data?.data || res.data;
             try { console.debug('fetchList response summary', { url: '/farms', payloadShape: Object.prototype.toString.call(payload), payloadSample: Array.isArray(payload) ? payload.length : (payload && typeof payload === 'object' ? Object.keys(payload).slice(0,5) : null) }); } catch(e) {}
 
@@ -442,7 +613,7 @@ export default function Farms() {
         }
     }, [totalRows, pagination.pageSize]);
 
-    const openCreate = () => { setEditingId(null); setForm(initialForm); setFieldErrors({}); setShowForm(true) };
+    const openCreate = () => { setEditingId(null); setForm(initialForm); setOriginalForm(initialForm); setFieldErrors({}); setShowForm(true) };
 
     const openEdit = async (idOrObj) => {
         // Accept either an id string or the farm object from the list.
@@ -473,11 +644,13 @@ export default function Farms() {
                 const res = await fetchWithAuth({ url: `/farms/${encodeURIComponent(id)}?includeDeleted=1`, method: 'get' });
                 const d = res.data?.data || res.data;
                 if (d) {
-                    setForm(mapFarmToForm(d));
-                    setEditingId(id);
-                    setShowForm(true);
-                    return;
-                }
+                        const mapped = mapFarmToForm(d);
+                        setForm(mapped);
+                        setOriginalForm(mapped);
+                        setEditingId(id);
+                        setShowForm(true);
+                        return;
+                    }
             } catch (fetchErr) {
                 // if fetch fails, fallback to using the supplied object (if present) so editing is still possible
                 if (idOrObj && typeof idOrObj === 'object') {
@@ -555,8 +728,25 @@ export default function Farms() {
         }
         payload.IsActive = payload.IsActive === undefined || payload.IsActive === null ? !!form.IsActive : !!payload.IsActive;
 
+        // compute a simple diff between originalForm and payload
+        const computeChanges = (oldObj = {}, newObj = {}) => {
+            const changes = [];
+            const keys = new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})]);
+            for (const k of keys) {
+                try {
+                    const oldVal = oldObj && oldObj[k] !== undefined && oldObj[k] !== null ? String(oldObj[k]) : '';
+                    const newVal = newObj && newObj[k] !== undefined && newObj[k] !== null ? String(newObj[k]) : '';
+                    if (oldVal !== newVal) {
+                        changes.push({ key: k, label: k, oldValue: oldVal, newValue: newVal });
+                    }
+                } catch (e) { /* ignore */ }
+            }
+            return changes;
+        };
+
         setPendingSavePayload(payload);
         setPendingSaveIsEdit(!!editingId);
+        setPendingSaveChanges(computeChanges(originalForm || {}, payload));
         setShowSaveConfirm(true);
     };
 
@@ -698,8 +888,38 @@ export default function Farms() {
         <main className="text-left flex-1 p-6 bg-gray-100 dark:bg-gray-900">
             <div className="text-left bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
                 <div className="text-left flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                    <h1 className="text-left text-2xl font-bold text-gray-800 dark:text-white">Manage Farms</h1>
-                    <div className="text-left flex items-center space-x-2 mt-4 md:mt-0">
+                    <div className="w-full md:flex-1">
+                        <ListHeaderWithFilter
+                            title="Manage Farms"
+                            icon={<FaBuilding />}
+                            selectOptions={farmTypes}
+                            onApplyFilters={(filters) => {
+                                // merge with existing filters and refresh
+                                const merged = {
+                                    pageIndex: 0,
+                                    pageSize: pagination.pageSize,
+                                };
+                                // apply supported filter keys
+                                const apiFilters = {
+                                    SearchTerm: filters.SearchTerm || null,
+                                    FarmTypeID: filters.FarmTypeID || null,
+                                    CreatedDateFrom: filters.CreatedDateFrom || null,
+                                    CreatedDateTo: filters.CreatedDateTo || null,
+                                };
+                                // call fetchList with explicit filters
+                                setPagination(p => ({ ...p, pageIndex: 0 }));
+                                fetchList({ pageIndex: 0, pageSize: pagination.pageSize, filters: apiFilters });
+                            }}
+                            onClear={() => {
+                                // reset advanced filters as well
+                                setFilterRegion(''); setFilterZone(''); setFilterWereda(''); setFilterCityTown(''); setFilterFarmTypeID(''); setFilterFarmSizeMin(''); setFilterFarmSizeMax(''); setFilterCreatedFrom(''); setFilterCreatedTo(''); setFilterIsActive('All'); setFilterIncludeDeleted(false);
+                                setPagination(p => ({ ...p, pageIndex: 0 }));
+                                fetchList({ pageIndex: 0, pageSize: pagination.pageSize });
+                            }}
+                        />
+                    </div>
+
+                    <div className="text-left flex items-center space-x-2 mt-4 md:mt-0 md:ml-4">
                         <button onClick={openCreate} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                             <FaPlus className="mr-2" /> New Farm
                         </button>
@@ -717,24 +937,13 @@ export default function Farms() {
                         <button onClick={downloadTemplate} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
                             <FaDownload className="mr-2" /> Template
                         </button>
+                        <div />
+                        <button onClick={exportFarms} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                            <FaFileCsv className="mr-2" /> Export
+                        </button>
                     </div>
                 </div>
-                {/* Pagination controls */}
-                <div className="mt-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">Rows per page:</span>
-                        <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm">
-                            {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                    </div>
-                    <div className="text-sm text-gray-600">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
-                    <div className="flex items-center space-x-2">
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
-                    </div>
-                </div>
+                {/* Pagination controls moved to bottom of list */}
 
                 {error ? <div className="mb-4 p-4 bg-red-100 text-red-700 border border-red-400 rounded-lg">An error occurred. Please try again.</div> : null}
                 <AlertModal open={showErrorModal} title="Error" message={"An unexpected error occurred. Please try again or contact support."} details={error} onClose={() => { setShowErrorModal(false); setError(null); }} />
@@ -783,77 +992,13 @@ export default function Farms() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setShowFilters(s => !s)} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">Filters</button>
                         <button onClick={() => fetchList({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize, search: searchQuery || null })} className="flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
                             <FaSync className="mr-2" /> Refresh
                         </button>
                     </div>
                 </div>
 
-                {/* Advanced filters panel */}
-                {showFilters && (
-                    <div className="mb-4 p-4 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="text-sm text-gray-600">Region</label>
-                                <input value={filterRegion} onChange={e => setFilterRegion(e.target.value)} placeholder="Region" className="mt-1 block w-full form-input" />
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Zone</label>
-                                <input value={filterZone} onChange={e => setFilterZone(e.target.value)} placeholder="Zone" className="mt-1 block w-full form-input" />
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Wereda</label>
-                                <input value={filterWereda} onChange={e => setFilterWereda(e.target.value)} placeholder="Wereda" className="mt-1 block w-full form-input" />
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">City / Town</label>
-                                <input value={filterCityTown} onChange={e => setFilterCityTown(e.target.value)} placeholder="City or Town" className="mt-1 block w-full form-input" />
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Farm Type</label>
-                                <select value={filterFarmTypeID} onChange={e => setFilterFarmTypeID(e.target.value)} className="mt-1 block w-full form-select">
-                                    <option value="">Any</option>
-                                    {farmTypes.map(ft => <option key={ft.FarmTypeID || ft.Id || ft.id} value={ft.FarmTypeID || ft.Id || ft.id}>{ft.TypeName || ft.Type || ft.Name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Is Active</label>
-                                <select value={filterIsActive} onChange={e => setFilterIsActive(e.target.value)} className="mt-1 block w-full form-select">
-                                    <option value="All">All</option>
-                                    <option value="Active">Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Farm Size Min</label>
-                                <input type="number" value={filterFarmSizeMin} onChange={e => setFilterFarmSizeMin(e.target.value)} placeholder="Min" className="mt-1 block w-full form-input" />
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Farm Size Max</label>
-                                <input type="number" value={filterFarmSizeMax} onChange={e => setFilterFarmSizeMax(e.target.value)} placeholder="Max" className="mt-1 block w-full form-input" />
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Created From</label>
-                                <input type="date" value={filterCreatedFrom} onChange={e => setFilterCreatedFrom(e.target.value)} className="mt-1 block w-full form-input" />
-                            </div>
-                            <div>
-                                <label className="text-sm text-gray-600">Created To</label>
-                                <input type="date" value={filterCreatedTo} onChange={e => setFilterCreatedTo(e.target.value)} className="mt-1 block w-full form-input" />
-                            </div>
-                            <div className="flex items-center space-x-2 md:col-span-3">
-                                <label className="inline-flex items-center">
-                                    <input type="checkbox" checked={filterIncludeDeleted} onChange={e => setFilterIncludeDeleted(e.target.checked)} className="mr-2" /> Include deleted
-                                </label>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 flex items-center gap-2">
-                            <button className="px-4 py-2 bg-indigo-600 text-white rounded" onClick={() => { setPagination(p => ({ ...p, pageIndex: 0 })); fetchList({ pageIndex: 0, pageSize: pagination.pageSize }); }}>Apply</button>
-                            <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => { setFilterRegion(''); setFilterZone(''); setFilterWereda(''); setFilterCityTown(''); setFilterFarmTypeID(''); setFilterFarmSizeMin(''); setFilterFarmSizeMax(''); setFilterCreatedFrom(''); setFilterCreatedTo(''); setFilterIsActive('All'); setFilterIncludeDeleted(false); setPagination(p => ({ ...p, pageIndex: 0 })); fetchList({ pageIndex: 0, pageSize: pagination.pageSize }); }}>Clear</button>
-                        </div>
-                    </div>
-                )}
+                
                 {farmTypesLoadError ? (
                     <div className="mb-4 p-3 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded">
                         {farmTypesLoadError}
@@ -864,16 +1009,123 @@ export default function Farms() {
                     <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
                         <thead className="bg-gray-50 dark:bg-gray-700 text-xs text-gray-700 dark:text-gray-300 uppercase">
                             <tr>
-                                <th className="px-4 py-3">Farm Code</th>
-                                <th className="px-4 py-3">#</th>
-                                <th className="px-4 py-3">Farm Name</th>
-                                <th className="px-4 py-3">Type</th>
-                                <th className="px-4 py-3">Owner</th>
-                                <th className="px-4 py-3">Contact</th>
-                                    <th className="px-4 py-3">Created By</th>
-                                    <th className="px-4 py-3">Region</th>
-                                    <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3 text-center">Actions</th>
+                                {visibleCols.has('farmCode') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Farm Code"
+                                            columnKey="farmCode"
+                                            type="text"
+                                            value={columnFilters?.farmCode || ''}
+                                            onApply={(v) => applyColumnFilter('farmCode', v)}
+                                            onClear={() => clearColumnFilter('farmCode')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('rowNumber') && (<th className="px-4 py-3">#</th>)}
+                                {visibleCols.has('farmName') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Farm Name"
+                                            columnKey="farmName"
+                                            type="text"
+                                            value={columnFilters?.farmName || ''}
+                                            onApply={(v) => applyColumnFilter('farmName', v)}
+                                            onClear={() => clearColumnFilter('farmName')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('type') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Type"
+                                            columnKey="type"
+                                            type="select"
+                                            options={(farmTypes || []).map(ft => ({ value: String(ft.FarmTypeID || ft.Id || ft.id || ft.ID || ''), label: ft.TypeName || ft.Type || ft.Name || ft.Label || String(ft.FarmTypeID || ft.Id || '') }))}
+                                            value={columnFilters?.type || ''}
+                                            onApply={(v) => applyColumnFilter('type', v)}
+                                            onClear={() => clearColumnFilter('type')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('owner') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Owner"
+                                            columnKey="owner"
+                                            type="text"
+                                            value={columnFilters?.owner || ''}
+                                            onApply={(v) => applyColumnFilter('owner', v)}
+                                            onClear={() => clearColumnFilter('owner')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('contact') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Contact"
+                                            columnKey="contact"
+                                            type="text"
+                                            value={columnFilters?.contact || ''}
+                                            onApply={(v) => applyColumnFilter('contact', v)}
+                                            onClear={() => clearColumnFilter('contact')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('createdBy') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Created By"
+                                            columnKey="createdBy"
+                                            type="select"
+                                            options={createdByOptions}
+                                            value={columnFilters?.createdBy || ''}
+                                            onApply={(v) => applyColumnFilter('createdBy', v)}
+                                            onClear={() => clearColumnFilter('createdBy')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('region') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Region"
+                                            columnKey="region"
+                                            type="select"
+                                            options={regionOptions}
+                                            value={columnFilters?.region || ''}
+                                            onApply={(v) => applyColumnFilter('region', v)}
+                                            onClear={() => clearColumnFilter('region')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('status') && (
+                                    <th className="px-4 py-3">
+                                        <ColumnHeaderFilter
+                                            title="Status"
+                                            columnKey="status"
+                                            type="status"
+                                            value={columnFilters?.status || ''}
+                                            onApply={(v) => applyColumnFilter('status', v)}
+                                            onClear={() => clearColumnFilter('status')}
+                                        />
+                                    </th>
+                                )}
+                                {visibleCols.has('actions') && (
+                                    <th className="px-4 py-3">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className="text-sm text-gray-700">Actions</span>
+                                            <ColumnSelector
+                                                columns={defaultFarmCols.map(id => ({ key: id, label: ({ farmCode: 'Farm Code', rowNumber: '#', farmName: 'Farm Name', type: 'Type', owner: 'Owner', contact: 'Contact', createdBy: 'Created By', region: 'Region', status: 'Status', actions: 'Actions' }[id] || id) }))}
+                                                visibilityMap={Object.fromEntries(defaultFarmCols.map(id => [id, visibleCols.has(id)]))}
+                                                onChange={(next) => {
+                                                    setVisibleCols(new Set(Object.keys(next).filter(k => next[k])));
+                                                    try { window.localStorage.setItem('farms.columns', JSON.stringify(next)); } catch (e) { }
+                                                }}
+                                                trigger={<FaColumns className="w-4 h-4 text-gray-600" />}
+                                                localStorageKey="farms.columns"
+                                            />
+                                        </div>
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
@@ -889,32 +1141,16 @@ export default function Farms() {
                                     try { console.debug('Farms pagination debug', { totalRows, listLength: list.length, pageIndex, pageSize, start, returnedLength: list.length }); } catch(e) {}
                                     return list.map((it, idx) => (
                                         <tr key={it.FarmID || start + idx} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                            <td className="px-4 py-3">{it.FarmCode || it.Code || ''}</td>
-                                            <td className="px-4 py-3">{start + idx + 1}</td>
-                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FarmName || ''}</td>
-                                            <td className="px-4 py-3">{
-                                                (() => {
-                                                    const idKey = (it?.FarmTypeID || it?.farmTypeID || it?.FarmType || '')?.toString();
-                                                    return (idKey && farmTypeNameCache[idKey]) ? farmTypeNameCache[idKey] : (it.FarmTypeName || it.FarmType || it.Type || it.FarmTypeCode || '');
-                                                })()
-                                            }</td>
-                                            <td className="px-4 py-3">{it.FarmOwner || it.OwnerName || it.Owner || it.FarmerName || it.ContactPerson || ''}</td>
-                                            <td className="px-4 py-3">{it.ContactPhone || it.ContactNumber || it.Phone || it.WorkPhone || it.ContactEmail || ''}</td>
-                                            <td className="px-4 py-3">{(() => {
-                                                const id = it?.CreatedBy || it?.createdBy || it?.CreatedById || it?.CreatedByID || null;
-                                                const key = id ? String(id) : '';
-                                                return (advisorMap && advisorMap[key]) ? advisorMap[key] : (it.CreatedByName || it.CreatorName || key || '');
-                                            })()}</td>
-                                            <td className="px-4 py-3">{(() => {
-                                                const val = pickFirst(it, regionAliases) || findByKeySubstring(it, ['region', 'regionname', 'region_label']);
-                                                return val || '';
-                                            })()}</td>
-                                            <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 rounded-full text-xs ${it.IsActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                    {it.IsActive ? 'Active' : 'Inactive'}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 flex items-center justify-center space-x-2">
+                                            {visibleCols.has('farmCode') && (<td className="px-4 py-3">{it.FarmCode || it.Code || ''}</td>)}
+                                            {visibleCols.has('rowNumber') && (<td className="px-4 py-3">{start + idx + 1}</td>)}
+                                            {visibleCols.has('farmName') && (<td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FarmName || ''}</td>)}
+                                            {visibleCols.has('type') && (<td className="px-4 py-3">{(() => { const idKey = (it?.FarmTypeID || it?.farmTypeID || it?.FarmType || '')?.toString(); return (idKey && farmTypeNameCache[idKey]) ? farmTypeNameCache[idKey] : (it.FarmTypeName || it.FarmType || it.Type || it.FarmTypeCode || ''); })()}</td>)}
+                                            {visibleCols.has('owner') && (<td className="px-4 py-3">{it.FarmOwner || it.OwnerName || it.Owner || it.FarmerName || it.ContactPerson || ''}</td>)}
+                                            {visibleCols.has('contact') && (<td className="px-4 py-3">{it.ContactPhone || it.ContactNumber || it.Phone || it.WorkPhone || it.ContactEmail || ''}</td>)}
+                                            {visibleCols.has('createdBy') && (<td className="px-4 py-3">{(() => { const id = it?.CreatedBy || it?.createdBy || it?.CreatedById || it?.CreatedByID || null; const key = id ? String(id) : ''; return (advisorMap && advisorMap[key]) ? advisorMap[key] : (it.CreatedByName || it.CreatorName || key || ''); })()}</td>)}
+                                            {visibleCols.has('region') && (<td className="px-4 py-3">{(() => { const val = pickFirst(it, regionAliases) || findByKeySubstring(it, ['region', 'regionname', 'region_label']); return val || ''; })()}</td>)}
+                                            {visibleCols.has('status') && (<td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs ${it.IsActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{it.IsActive ? 'Active' : 'Inactive'}</span></td>)}
+                                            {visibleCols.has('actions') && (<td className="px-4 py-3 flex items-center justify-center space-x-2">
                                                 <button onClick={() => openEdit(it)} className="text-indigo-500 hover:text-indigo-700"><FaEdit /></button>
                                                 <button onClick={() => openGpsModal(it)} className="text-blue-500 hover:text-blue-700"><FaMapMarkerAlt /></button>
                                                 {it.DeletedAt ? (
@@ -925,7 +1161,7 @@ export default function Farms() {
                                                 ) : (
                                                     <button onClick={() => confirmDelete(it)} className="text-red-500 hover:text-red-700"><FaTrash /></button>
                                                 )}
-                                            </td>
+                                            </td>)}
                                         </tr>
                                     ));
                                 })()
@@ -935,6 +1171,22 @@ export default function Farms() {
                 </div>
                 <div className="mt-3 flex items-center justify-end text-sm text-gray-600">
                     <span>Total farms: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong></span>
+                </div>
+                {/* Pagination controls (bottom) */}
+                <div className="mt-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">Rows per page:</span>
+                        <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm">
+                            {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div className="text-sm text-gray-600">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
+                    <div className="flex items-center space-x-2">
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+                    </div>
                 </div>
             </div>
 
@@ -1010,9 +1262,8 @@ export default function Farms() {
                 confirmLabel={pendingSaveIsEdit ? 'Update' : 'Create'}
                 cancelLabel="Cancel"
                 loading={loading}
-            >
-                {/* optional short summary could go here */}
-            </ConfirmModal>
+                changes={pendingSaveChanges}
+            />
         </main>
     );
 }

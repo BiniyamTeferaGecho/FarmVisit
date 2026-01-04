@@ -283,6 +283,18 @@ export default function Lookups({ reloadKey }) {
               <label className="text-sm font-medium text-slate-700 block mb-1 text-left">Description</label>
               <textarea value={form.LookupDescription} onChange={(e) => setForm({ ...form, LookupDescription: e.target.value })} rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm" />
             </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 block mb-1 text-left">Sort Order</label>
+              <input type="number" value={form.SortOrder} onChange={(e) => setForm({ ...form, SortOrder: Number(e.target.value) })} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 block mb-1 text-left">Parent Lookup</label>
+              <select value={form.ParentLookupID || ''} onChange={(e) => setForm({ ...form, ParentLookupID: e.target.value || null })} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm">
+                <option value="">-- None --</option>
+                {lookups && lookups.map(p => <option key={p.LookupID} value={p.LookupID}>{p.LookupValue}</option>)}
+              </select>
+            </div>
+            
             <div className="flex items-center gap-3 text-left">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={form.IsActive} onChange={(e) => setForm({ ...form, IsActive: e.target.checked })} className="form-checkbox h-4 w-4" />
@@ -327,7 +339,7 @@ export default function Lookups({ reloadKey }) {
                     <td className="p-3 align-top font-medium text-slate-800">{l.LookupCode}</td>
                     <td className="p-3 align-top text-slate-600">{l.LookupValue}</td>
                     <td className="p-3 align-top">{l.IsActive ? <span className="text-green-600">Yes</span> : <span className="text-red-600">No</span>}</td>
-                    <td className="p-3 align-top text-slate-500">{l.ParentLookupID || '-'}</td>
+                    <td className="p-3 align-top text-slate-500">{(l.ParentLookupID && (lookups.find(p => p.LookupID === l.ParentLookupID)?.LookupValue)) || '-'}</td>
                     <td className="p-3 align-top">
                       <div className="flex items-center gap-2">
                         <button onClick={() => openEdit(l)} className="p-2 rounded-md hover:bg-gray-100" title="Edit"><Edit3 className="h-4 w-4"/></button>
@@ -344,7 +356,7 @@ export default function Lookups({ reloadKey }) {
 
       <Modal open={editModal.open} onClose={() => setEditModal({ open: false, id: null, form: null })} title={editModal.form ? `Edit: ${editModal.form.LookupCode}` : 'Edit Lookup'}>
         {editModal.form && (
-          <div className="space-y-4">
+            <div className="space-y-4">
             <div>
               <label className="text-left text-sm font-medium text-slate-700 block mb-1">Code</label>
               <input value={editModal.form.LookupCode} readOnly className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-100" />
@@ -362,6 +374,29 @@ export default function Lookups({ reloadKey }) {
                 <input type="checkbox" checked={!!editModal.form.IsActive} onChange={(e) => setEditModal(s => ({ ...s, form: { ...s.form, IsActive: e.target.checked } }))} className="form-checkbox h-4 w-4" />
                 <span>Active</span>
               </label>
+            </div>
+            <div>
+              <label className="text-left text-sm font-medium text-slate-700 block mb-1">Sort Order</label>
+              <input type="number" value={editModal.form.SortOrder} onChange={(e) => setEditModal(s => ({ ...s, form: { ...s.form, SortOrder: Number(e.target.value) } }))} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm" />
+            </div>
+            <div>
+              <label className="text-left text-sm font-medium text-slate-700 block mb-1">Parent Lookup</label>
+              <select value={editModal.form.ParentLookupID || ''} onChange={(e) => setEditModal(s => ({ ...s, form: { ...s.form, ParentLookupID: e.target.value || null } }))} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm">
+                <option value="">-- None --</option>
+                {lookups && lookups.map(p => <option key={p.LookupID} value={p.LookupID}>{p.LookupValue}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-left text-sm font-medium text-slate-700 block mb-1">Custom Field 1</label>
+              <input value={editModal.form.CustomField1} onChange={(e) => setEditModal(s => ({ ...s, form: { ...s.form, CustomField1: e.target.value } }))} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm" />
+            </div>
+            <div>
+              <label className="text-left text-sm font-medium text-slate-700 block mb-1">Custom Field 2</label>
+              <input value={editModal.form.CustomField2} onChange={(e) => setEditModal(s => ({ ...s, form: { ...s.form, CustomField2: e.target.value } }))} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm" />
+            </div>
+            <div>
+              <label className="text-left text-sm font-medium text-slate-700 block mb-1">Custom Field 3</label>
+              <input value={editModal.form.CustomField3} onChange={(e) => setEditModal(s => ({ ...s, form: { ...s.form, CustomField3: e.target.value } }))} className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm" />
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setEditModal({ open: false, id: null, form: null })} className="px-4 py-2 rounded border">Cancel</button>

@@ -6,7 +6,9 @@ import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import EmployeeForm, { SelectField } from './EmployeeForm';
-import { FaUserPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUserCog, FaUndo, FaIdCard, FaVenusMars, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBuilding, FaUserTie, FaSearch, FaTimes } from 'react-icons/fa';
+import { FaUserPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUserCog, FaUndo, FaIdCard, FaVenusMars, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBuilding, FaUserTie, FaSearch, FaTimes, FaColumns } from 'react-icons/fa';
+import ColumnSelector from '../components/ColumnSelector';
+import { toCsv } from '../utils/csv';
 
 const initialForm = {
     FirstName: '',
@@ -53,6 +55,7 @@ export default function Employee() {
     const [showSaveConfirm, setShowSaveConfirm] = useState(false);
     const [pendingSavePayload, setPendingSavePayload] = useState(null);
     const [pendingSaveIsEdit, setPendingSaveIsEdit] = useState(false);
+    const [pendingSaveChanges, setPendingSaveChanges] = useState([]);
     const [showDelete, setShowDelete] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [bulkFile, setBulkFile] = useState(null);
@@ -66,6 +69,22 @@ export default function Employee() {
     const [fieldErrors, setFieldErrors] = useState({});
     const [touchedFields, setTouchedFields] = useState({});
     const [isFormValid, setIsFormValid] = useState(false);
+    const defaultEmployeeCols = ['idx','firstName','lastName','gender','phone','region','active','actions'];
+    const [visibleCols, setVisibleCols] = useState(() => {
+        try {
+            if (typeof window !== 'undefined') {
+                const raw = window.localStorage.getItem('employees.columns');
+                if (raw) {
+                    const parsed = JSON.parse(raw || '{}');
+                    if (parsed && typeof parsed === 'object') {
+                        const keys = defaultEmployeeCols.filter(id => !!parsed[id]);
+                        if (keys.length) return new Set(keys);
+                    }
+                }
+            }
+        } catch (e) { /* ignore */ }
+        return new Set(defaultEmployeeCols);
+    });
 
     // refetch when pagination changes
     useEffect(() => {
@@ -188,12 +207,29 @@ export default function Employee() {
         if (Object.keys(errs).length) { setFieldErrors(errs); return }
 
         const payload = { ...form, CreatedBy: user?.UserID || user?.id };
+        const computeChanges = (oldObj = {}, newObj = {}) => {
+            const changes = [];
+            const keys = new Set([...Object.keys(oldObj || {}), ...Object.keys(newObj || {})]);
+            for (const k of keys) {
+                try {
+                    const oldVal = oldObj && oldObj[k] !== undefined && oldObj[k] !== null ? String(oldObj[k]) : '';
+                    const newVal = newObj && newObj[k] !== undefined && newObj[k] !== null ? String(newObj[k]) : '';
+                    if (oldVal !== newVal) changes.push({ key: k, label: k, oldValue: oldVal, newValue: newVal });
+                } catch (e) { }
+            }
+            return changes;
+        };
+
         if (editingId) {
             setPendingSavePayload({ ...payload, UpdatedBy: user?.UserID || user?.id });
             setPendingSaveIsEdit(true);
+            // try to find the original object from list
+            const orig = list.find(x => String(x.EmployeeID || x.EmployeeId || x.id) === String(editingId)) || {};
+            setPendingSaveChanges(computeChanges(orig, payload));
         } else {
             setPendingSavePayload(payload);
             setPendingSaveIsEdit(false);
+            setPendingSaveChanges(computeChanges({}, payload));
         }
         setShowSaveConfirm(true);
     };
@@ -319,8 +355,9 @@ export default function Employee() {
         setLoading(true); setError(null);
         try {
             const res = await fetchWithAuth({ url: `/advisor/report`, method: 'get' });
-            const csv = (res.data && res.data.data) ? res.data.data.map(r => Object.values(r).join(',')) : [];
-            const blob = new Blob([csv.join('\r\n')], { type: 'text/csv' });
+            const rows = (res.data && res.data.data) ? res.data.data : (res.data || []);
+            const csvText = toCsv(Array.isArray(rows) ? rows : []);
+            const blob = new Blob([csvText], { type: 'text/csv' });
             const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'employees_report.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
         } catch (err) { setError(getErrorMessage(err) || 'Report failed') } finally { setLoading(false) }
     };
@@ -333,11 +370,13 @@ export default function Employee() {
         } catch (err) { setError(getErrorMessage(err) || 'Stats failed') } finally { setLoading(false) }
     };
 
+    const visibleCount = visibleCols.size || 1;
+
     return (
         <main className="text-left flex-1 p-6 bg-gray-100 dark:bg-gray-900">
             <div className="text-left bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
                 <div className="text-left flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-                    <h1 className="text-left text-2xl font-bold text-gray-800 dark:text-white">Manage Employees</h1>
+                    <h1 className="text-left text-2xl font-bold text-gray-800 dark:text-white flex items-center"><FaIdCard className="inline-block mr-3 text-indigo-600" />Manage Employees</h1>
                     <div className="text-left flex items-center space-x-2 mt-4 md:mt-0">
                         <button onClick={openCreate} className="text-left flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                             <FaUserPlus className="mr-2" /> New Employee
@@ -353,9 +392,13 @@ export default function Employee() {
                                 Upload
                             </button>
                         )}
-                        <button onClick={downloadTemplate} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
-                            <FaDownload className="mr-2" /> Template
-                        </button>
+                            <button onClick={downloadTemplate} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                                <FaDownload className="mr-2" /> Template
+                            </button>
+                            <button onClick={generateReport} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                                <FaFileCsv className="mr-2" /> Export
+                            </button>
+                        <div />
                     </div>
                 </div>
 
@@ -392,56 +435,54 @@ export default function Employee() {
                     </div>
                 </div>
 
-                {/* Pagination controls (Rows per page, page X of Y, navigation) */}
-                <div className="mt-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">Rows per page:</span>
-                        <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm">
-                            {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                    </div>
-                    <div className="text-sm text-gray-600">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
-                    <div className="flex items-center space-x-2">
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
-                    </div>
-                </div>
+                
 
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
                         <thead className="bg-gray-50 dark:bg-gray-700 text-xs text-gray-700 dark:text-gray-300 uppercase">
                             <tr>
-                                <th className="px-4 py-3">#</th>
-                                <th className="px-4 py-3">First Name</th>
-                                <th className="px-4 py-3">Last Name</th>
-                                <th className="px-4 py-3">Gender</th>
-                                <th className="px-4 py-3">Phone</th>
-                                <th className="px-4 py-3">Region</th>
-                                <th className="px-4 py-3">Active</th>
-                                <th className="px-4 py-3 text-center">Actions</th>
+                                {visibleCols.has('idx') && <th className="px-4 py-3">#</th>}
+                                {visibleCols.has('firstName') && <th className="px-4 py-3">First Name</th>}
+                                {visibleCols.has('lastName') && <th className="px-4 py-3">Last Name</th>}
+                                {visibleCols.has('gender') && <th className="px-4 py-3">Gender</th>}
+                                {visibleCols.has('phone') && <th className="px-4 py-3">Phone</th>}
+                                {visibleCols.has('region') && <th className="px-4 py-3">Region</th>}
+                                {visibleCols.has('active') && <th className="px-4 py-3">Active</th>}
+                                {visibleCols.has('actions') && (
+                                    <th className="px-4 py-3">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className="text-sm text-gray-700">Actions</span>
+                                            <ColumnSelector
+                                                columns={defaultEmployeeCols.map(c => ({ key: c, label: (c === 'idx' ? '#' : (c === 'firstName' ? 'First Name' : c === 'lastName' ? 'Last Name' : c === 'gender' ? 'Gender' : c === 'phone' ? 'Phone' : c === 'region' ? 'Region' : c === 'active' ? 'Active' : 'Actions')) }))}
+                                                visibilityMap={Object.fromEntries(defaultEmployeeCols.map(id => [id, visibleCols.has(id)]))}
+                                                onChange={(next) => setVisibleCols(new Set(Object.keys(next).filter(k => next[k])))}
+                                                trigger={<FaColumns className="w-4 h-4 text-gray-600" />}
+                                                localStorageKey="employees.columns"
+                                            />
+                                        </div>
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
-                                <tr><td colSpan="8" className="text-center p-4"><LoadingSpinner /></td></tr>
+                                <tr><td colSpan={visibleCount} className="text-center p-4"><LoadingSpinner /></td></tr>
                             ) : list.length === 0 ? (
-                                <tr><td colSpan="8" className="text-center p-4">No employees found.</td></tr>
+                                <tr><td colSpan={visibleCount} className="text-center p-4">No employees found.</td></tr>
                             ) : list.map((it, idx) => (
                                 <tr key={it.EmployeeID || idx} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-4 py-3">{idx + 1}</td>
-                                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FirstName || ''}</td>
-                                    <td className="px-4 py-3">{it.LastName || it.GrandFatherName || it.FatherName || ''}</td>
-                                    <td className="px-4 py-3">{it.Gender || ''}</td>
-                                    <td className="px-4 py-3">{it.PersonalPhone || it.WorkPhone}</td>
-                                    <td className="px-4 py-3">{it.Region}</td>
-                                    <td className="px-4 py-3">
+                                    {visibleCols.has('idx') && <td className="px-4 py-3">{idx + 1}</td>}
+                                    {visibleCols.has('firstName') && <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FirstName || ''}</td>}
+                                    {visibleCols.has('lastName') && <td className="px-4 py-3">{it.LastName || it.GrandFatherName || it.FatherName || ''}</td>}
+                                    {visibleCols.has('gender') && <td className="px-4 py-3">{it.Gender || ''}</td>}
+                                    {visibleCols.has('phone') && <td className="px-4 py-3">{it.PersonalPhone || it.WorkPhone}</td>}
+                                    {visibleCols.has('region') && <td className="px-4 py-3">{it.Region}</td>}
+                                    {visibleCols.has('active') && <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded-full text-xs ${it.IsActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                             {it.IsActive ? 'Yes' : 'No'}
                                         </span>
-                                    </td>
-                                    <td className="px-4 py-3 flex items-center justify-center space-x-2">
+                                    </td>}
+                                    {visibleCols.has('actions') && <td className="px-4 py-3 flex items-center justify-center space-x-2">
                                         <button onClick={() => openEdit(it.EmployeeID)} className="text-indigo-500 hover:text-indigo-700"><FaEdit /></button>
                                         <button onClick={() => openChangeManager(it)} className="text-sky-500 hover:text-sky-700"><FaUserCog /></button>
                                         {it.DeletedAt ? (
@@ -449,14 +490,31 @@ export default function Employee() {
                                         ) : (
                                             <button onClick={() => confirmDelete(it)} className="text-red-500 hover:text-red-700"><FaTrash /></button>
                                         )}
-                                    </td>
+                                    </td>}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
-                <div className="mt-3 flex items-center justify-end text-sm text-gray-600">
-                    <span>Total employees: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong></span>
+                <div className="mt-3 flex items-center justify-between gap-4">
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">Rows per page:</span>
+                        <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm">
+                            {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <div className="text-sm text-gray-600">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
+                        <div className="flex items-center space-x-2">
+                            <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
+                            <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
+                            <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
+                            <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+                        </div>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                        Total employees: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong>
+                    </div>
                 </div>
             </div>
 
@@ -498,6 +556,7 @@ export default function Employee() {
                     confirmLabel={pendingSaveIsEdit ? 'Update' : 'Create'}
                     cancelLabel="Cancel"
                     loading={loading}
+                    changes={pendingSaveChanges}
                 />
             )}
         </main>
