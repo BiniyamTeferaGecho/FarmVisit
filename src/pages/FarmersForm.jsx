@@ -20,13 +20,13 @@ const SelectField = React.memo(({ icon, label, name, value, onChange, error, chi
     <label className="text-left text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
     <div className="relative mt-1">
       <div className="text-left absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">{icon}</div>
-      <select name={name} value={value} onChange={onChange} disabled={readOnly || loading} aria-busy={loading}
+      <select name={name} value={value} onChange={onChange} disabled={readOnly} aria-busy={loading}
         className="text-left block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         {...props}>
         {children}
       </select>
       {loading && (
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400">
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 pointer-events-none">
           <svg className="animate-spin h-4 w-4 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
