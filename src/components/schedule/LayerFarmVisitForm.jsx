@@ -227,7 +227,24 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
       // Use fetchWithAuth when available so refresh/401 logic is applied
       let res
-      if (typeof fetchWithAuth === 'function') {
+        // Ensure Location is present for Layer visits; try to auto-fill using browser geolocation
+        if (!payload.Location && typeof window !== 'undefined' && navigator && navigator.geolocation) {
+          try {
+            const pos = await new Promise((resolve, reject) => {
+              const timer = setTimeout(() => reject(new Error('Geolocation timeout')), 10000)
+              navigator.geolocation.getCurrentPosition((p) => { clearTimeout(timer); resolve(p) }, (err) => { clearTimeout(timer); reject(err) }, { enableHighAccuracy: false, maximumAge: 0, timeout: 10000 })
+            })
+            const coord = `${pos.coords.latitude},${pos.coords.longitude}`
+            payload.Location = coord
+          } catch (geoErr) {
+            // If we cannot obtain geolocation, abort save with a friendly message so server does not receive NULL Location
+            setInternalSaving(false)
+            alert('Location is required for Layer visits. Please enable location permission in your browser or enter Location (lat,lon) manually.')
+            return
+          }
+        }
+
+        if (typeof fetchWithAuth === 'function') {
         // Use create endpoint for layer farm visits
         res = await fetchWithAuth({ url: '/layer-farm', method: 'post', data: payload })
       } else {
