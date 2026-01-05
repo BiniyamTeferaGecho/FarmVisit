@@ -705,11 +705,35 @@ const FarmVisitSchedule = () => {
           }
 
           try {
+            // Determine whether we have a Location from any source before attempting Start.
+            // Sources: selectedSchedule row, current visit form data, or any previously-saved layer visit for this schedule.
+            let scheduleHasLocation = selectedSchedule && (selectedSchedule.Location || selectedSchedule.location);
+            let visitProvidesLocation = data && (data.Location || data.location);
+
+            // If neither schedule nor form has Location, try to fetch a saved layer visit for this schedule
+            // which might contain a Location (user may have saved the visit earlier).
+            if (!scheduleHasLocation && !visitProvidesLocation) {
+              try {
+                const saved = await api.getLayerFilledFormByScheduleId(dispatch, scheduleId, apiClient).catch(() => null);
+                const savedForm = saved && saved.form ? (saved.form || saved.layerForm || null) : null;
+                const savedLoc = savedForm && (savedForm.Location || savedForm.location) ? (savedForm.Location || savedForm.location) : null;
+                if (savedLoc) {
+                  visitProvidesLocation = savedLoc;
+                }
+              } catch (e) {
+                // ignore errors fetching saved visit; we'll handle absence below
+              }
+            }
+
+            // If schedule has no Location and no visit provides one, block Start and prompt user
+            if (!scheduleHasLocation && !visitProvidesLocation) {
+              showToast('Cannot start visit: Location is required. Please add Location via the visit form or the schedule before starting.', 'error');
+              return;
+            }
+
             // If the schedule record itself is missing a Location but the visit form provides one,
             // patch the schedule before attempting to start it. The server's start endpoint
             // may require the schedule row to have a Location set.
-            const scheduleHasLocation = selectedSchedule && (selectedSchedule.Location || selectedSchedule.location);
-            const visitProvidesLocation = data && (data.Location || data.location);
             if (!scheduleHasLocation && visitProvidesLocation) {
               try {
                 const patchPayload = { ScheduleID: scheduleId, Location: data.Location || data.location, UpdatedBy: startedBy };

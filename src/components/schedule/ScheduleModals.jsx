@@ -742,11 +742,12 @@ const ScheduleModals = ({
             }
           }}
           onSaveLayer={() => {
-            const payload = { ...(selectedSchedule || {}), FarmType: 'LAYER', ...(state.layerForm || fillVisitFormData?.layerForm || {}) };
+            // Prefer local/external fillVisitFormData (user edits in modal) over reducer state
+            const payload = { ...(selectedSchedule || {}), FarmType: 'LAYER', ...(fillVisitFormData?.layerForm || state.layerForm || {}) };
             onFillVisitSave(payload);
           }}
           onSaveDairy={() => {
-            const payload = { ...(selectedSchedule || {}), FarmType: 'DAIRY', ...(state.dairyForm || fillVisitFormData?.dairyForm || {}) };
+            const payload = { ...(selectedSchedule || {}), FarmType: 'DAIRY', ...(fillVisitFormData?.dairyForm || state.dairyForm || {}) };
             onFillVisitSave(payload);
           }}
           loading={state.fillLoading}
