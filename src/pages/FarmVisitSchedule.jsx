@@ -749,7 +749,7 @@ const FarmVisitSchedule = () => {
               }
             }
 
-            const started = await api.startFarmVisit(dispatch, scheduleId, startedBy, apiClient);
+            const started = await api.startFarmVisit(dispatch, scheduleId, startedBy, apiClient, { Location: data.Location || data.location });
             if (started) {
               // Update selected schedule locally
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: started });

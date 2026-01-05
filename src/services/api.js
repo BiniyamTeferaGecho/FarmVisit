@@ -359,9 +359,9 @@ export const fillVisit = async (dispatch, visitData, fetchWithAuth) => {
   }
 };
 
-export const startFarmVisit = async (dispatch, id, startedBy, fetchWithAuth) => {
+export const startFarmVisit = async (dispatch, id, startedBy, fetchWithAuth, extra = {}) => {
   try {
-    const data = { StartedBy: startedBy };
+    const data = { StartedBy: startedBy, ...extra };
     const res = await callWithAuthOrApi(fetchWithAuth, { url: `/farm-visit-schedule/${id}/start`, method: 'POST', data });
     dispatch({ type: 'SET_SUCCESS', payload: 'Visit started.' });
     // Normalize return: prefer res.data.data (the updated schedule row) when present
