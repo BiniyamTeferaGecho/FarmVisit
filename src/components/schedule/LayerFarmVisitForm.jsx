@@ -107,6 +107,11 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
       setLocationAutoFilled(false);
       setLocationAutoFilledAt(null);
       setLocationReadOnly(false);
+      try {
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+          window.dispatchEvent(new CustomEvent('fill:location:changed', { detail: { value: parsedValue } }));
+        }
+      } catch (e) { /* ignore event dispatch errors */ }
     }
     // If SampleTaken is unchecked, clear SampleType to avoid stale values
     if (name === 'SampleTaken' && parsedValue === false) {

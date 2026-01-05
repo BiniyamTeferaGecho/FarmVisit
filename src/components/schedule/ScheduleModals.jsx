@@ -375,6 +375,15 @@ const ScheduleModals = ({
     } catch (e) { /* ignore logging errors */ }
   }, [isFillVisitModalOpen]);
 
+  // Clear inline fill errors when the Location input is edited in the modal
+  useEffect(() => {
+    const handler = () => {
+      try { dispatch({ type: 'SET_FILL_ERROR', payload: null }); } catch (e) { /* ignore */ }
+    };
+    try { window.addEventListener('fill:location:changed', handler); } catch (e) { /* ignore */ }
+    return () => { try { window.removeEventListener('fill:location:changed', handler); } catch (e) { /* ignore */ } };
+  }, []);
+
   // When the schedule modal opens for creation and the current user is an advisor,
   // fetch the advisor's display name and set the AdvisorID on the form (read-only behavior).
   // No login-based advisor prefill: advisor must be chosen explicitly by the user.
