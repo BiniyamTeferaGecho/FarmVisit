@@ -417,9 +417,9 @@ const ScheduleModals = ({
             })}
           </SelectField>
           <InputField 
-            label="Proposed Date & Time"
+            label="Proposed Date"
             name="ProposedDate"
-            type="datetime-local"
+            type="date"
             value={formData.ProposedDate}
             onChange={handleFormChange}
             icon={<Calendar size={16} className="text-gray-400" />}
@@ -508,7 +508,7 @@ const ScheduleModals = ({
           <InputField
             label="Next Follow-up Date"
             name="NextFollowUpDate"
-            type="datetime-local"
+            type="date"
             value={formData.NextFollowUpDate}
             onChange={handleFormChange}
             icon={<Calendar size={16} className="text-gray-400" />}
@@ -669,7 +669,7 @@ const ScheduleModals = ({
           <ActionButton onClick={() => setProcessData(prev => ({ ...prev, status: 'REJECTED' }))} className={processData.status === 'REJECTED' ? 'bg-red-600' : 'bg-gray-300 text-gray-800'}><XCircle size={16} className="mr-2"/>Reject</ActionButton>
           <ActionButton onClick={() => setProcessData(prev => ({ ...prev, status: 'POSTPONED' }))} className={processData.status === 'POSTPONED' ? 'bg-purple-600' : 'bg-gray-300 text-gray-800'}><Clock size={16} className="mr-2"/>Postpone</ActionButton>
         </div>
-        {processData.status === 'POSTPONED' && <InputField label="New Date" type="datetime-local" name="postponedDate" value={processData.postponedDate} onChange={(e) => setProcessData(prev => ({ ...prev, postponedDate: e.target.value }))} icon={<Calendar size={16} className="text-gray-400" />} />}
+        {processData.status === 'POSTPONED' && <InputField label="New Date" type="date" name="postponedDate" value={processData.postponedDate} onChange={(e) => setProcessData(prev => ({ ...prev, postponedDate: e.target.value }))} icon={<Calendar size={16} className="text-gray-400" />} />}
         <TextAreaField label="Reason" name="reason" value={processData.reason} onChange={(e) => setProcessData(prev => ({ ...prev, reason: e.target.value }))} placeholder="Reason for decision..." icon={<StickyNote size={16} className="text-gray-400" />} />
         <div className="mt-6 flex justify-end gap-3">
           <ActionButton onClick={() => closeModal('process')} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Cancel</ActionButton>
@@ -678,7 +678,7 @@ const ScheduleModals = ({
       </Modal>
 
       <Modal open={isCompleteModalOpen} title="Complete Visit" onClose={() => closeModal('complete')}>
-        <InputField label="Actual Visit Date & Time" type="datetime-local" name="actualDateTime" value={completeData.actualDateTime} onChange={(e) => setCompleteData(prev => ({ ...prev, actualDateTime: e.target.value }))} icon={<Calendar size={16} className="text-gray-400" />} />
+        <InputField label="Actual Visit Date" type="date" name="actualDateTime" value={completeData.actualDateTime} onChange={(e) => setCompleteData(prev => ({ ...prev, actualDateTime: e.target.value }))} icon={<Calendar size={16} className="text-gray-400" />} />
         <div className="mt-4">
             <TextAreaField label="Follow-up Notes" name="followUpNotes" value={completeData.followUpNotes} onChange={(e) => setCompleteData(prev => ({ ...prev, followUpNotes: e.target.value }))} placeholder="Follow-up notes..." icon={<StickyNote size={16} className="text-gray-400" />} />
         </div>
