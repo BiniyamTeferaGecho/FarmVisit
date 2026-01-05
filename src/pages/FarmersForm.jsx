@@ -15,16 +15,24 @@ const InputField = React.memo(({ icon, label, name, value, onChange, error, ...p
   </div>
 ))
 
-const SelectField = React.memo(({ icon, label, name, value, onChange, error, children, readOnly = false, ...props }) => (
+const SelectField = React.memo(({ icon, label, name, value, onChange, error, children, readOnly = false, loading = false, ...props }) => (
   <div>
     <label className="text-left text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
     <div className="relative mt-1">
       <div className="text-left absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">{icon}</div>
-      <select name={name} value={value} onChange={onChange} disabled={readOnly}
-        className="text-left block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      <select name={name} value={value} onChange={onChange} disabled={readOnly || loading} aria-busy={loading}
+        className="text-left block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         {...props}>
         {children}
       </select>
+      {loading && (
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400">
+          <svg className="animate-spin h-4 w-4 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+        </div>
+      )}
     </div>
     {error && <p className="text-left mt-1 text-xs text-red-500">{error}</p>}
   </div>
@@ -334,8 +342,8 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
           setSelectedRegionId(sel && sel.id ? sel.id : null)
           // set the form region to the lookup value (string)
           handleChange({ target: { name: 'Region', value: val } })
-        }} onFocus={() => { if (!leading) fetchRegionOptions() }} onClick={() => { if (!leading) fetchRegionOptions() }} onTouchStart={() => { if (!leading) fetchRegionOptions() }} error={fieldErrors?.Region} readOnly={readOnly}>
-          <option value="">{regionLoading ? 'Loading...' : 'Select region'}</option>
+        }} onFocus={() => { if (!leading) fetchRegionOptions() }} onClick={() => { if (!leading) fetchRegionOptions() }} onTouchStart={() => { if (!leading) fetchRegionOptions() }} loading={regionLoading} error={fieldErrors?.Region} readOnly={readOnly}>
+          <option value="">Select region</option>
           {(regionOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
@@ -347,8 +355,8 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
           // zone select options use value=LookupValue; but we allow matching by id if needed
           setSelectedZoneId(sel && sel.id ? sel.id : null)
           handleChange({ target: { name: 'Zone', value: val } })
-        }} error={fieldErrors?.Zone} readOnly={readOnly}>
-          <option value="">{zoneLoading ? 'Loading...' : 'Select Zone/Sub-City'}</option>
+        }} loading={zoneLoading} error={fieldErrors?.Zone} readOnly={readOnly}>
+          <option value="">Select Zone/Sub-City</option>
           {(zoneOptions || []).map(opt => (
             <option key={opt.id || opt.value} value={opt.value}>{opt.label}</option>
           ))}
@@ -359,8 +367,8 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
           const sel = (weredaOptions || []).find(o => o.value === val || o.id === val)
           setSelectedWeredaId(sel && sel.id ? sel.id : null)
           handleChange({ target: { name: 'Woreda', value: val } })
-        }} error={fieldErrors?.Woreda} readOnly={readOnly}>
-          <option value="">{weredaLoading ? 'Loading...' : 'Select woreda'}</option>
+        }} loading={weredaLoading} error={fieldErrors?.Woreda} readOnly={readOnly}>
+          <option value="">Select woreda</option>
           {(weredaOptions || []).map(opt => (
             <option key={opt.id || opt.value} value={opt.value}>{opt.label}</option>
           ))}
@@ -369,27 +377,27 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
         <SelectField icon={<FaMapMarkerAlt />} label="Village / City" name="Village" value={form.Village} onChange={(e) => {
           const val = e.target.value
           handleChange({ target: { name: 'Village', value: val } })
-        }} error={fieldErrors?.Village} readOnly={readOnly}>
-          <option value="">{cityLoading ? 'Loading...' : 'Select village / city'}</option>
+        }} loading={cityLoading} error={fieldErrors?.Village} readOnly={readOnly}>
+          <option value="">Select village / city</option>
           {(cityOptions || []).map(opt => (
             <option key={opt.id || opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </SelectField>
         <InputField icon={<FaMapMarkerAlt />} label="House Number" name="HouseNumber" value={form.HouseNumber} onChange={handleChange} placeholder="House number" readOnly={readOnly} />
-        <SelectField icon={<FaLanguage />} label="Primary Language" name="PrimaryLanguage" value={form.PrimaryLanguage} onChange={handleChange} onFocus={() => { if (!leading) fetchPrimaryOptions() }} onClick={() => { if (!leading) fetchPrimaryOptions() }} onTouchStart={() => { if (!leading) fetchPrimaryOptions() }} error={fieldErrors?.PrimaryLanguage} readOnly={readOnly}>
-          <option value="">{primaryLoading ? 'Loading...' : 'Select primary language'}</option>
+        <SelectField icon={<FaLanguage />} label="Primary Language" name="PrimaryLanguage" value={form.PrimaryLanguage} onChange={handleChange} onFocus={() => { if (!leading) fetchPrimaryOptions() }} onClick={() => { if (!leading) fetchPrimaryOptions() }} onTouchStart={() => { if (!leading) fetchPrimaryOptions() }} loading={primaryLoading} error={fieldErrors?.PrimaryLanguage} readOnly={readOnly}>
+          <option value="">Select primary language</option>
           {(primaryOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </SelectField>
-        <SelectField icon={<FaUserGraduate />} label="Education Level" name="EducationLevel" value={form.EducationLevel} onChange={handleChange} onFocus={() => { if (!leading) fetchEducationOptions() }} onClick={() => { if (!leading) fetchEducationOptions() }} onTouchStart={() => { if (!leading) fetchEducationOptions() }} error={fieldErrors?.EducationLevel} readOnly={readOnly}>
-          <option value="">{educationLoading ? 'Loading...' : 'Select education level'}</option>
+        <SelectField icon={<FaUserGraduate />} label="Education Level" name="EducationLevel" value={form.EducationLevel} onChange={handleChange} onFocus={() => { if (!leading) fetchEducationOptions() }} onClick={() => { if (!leading) fetchEducationOptions() }} onTouchStart={() => { if (!leading) fetchEducationOptions() }} loading={educationLoading} error={fieldErrors?.EducationLevel} readOnly={readOnly}>
+          <option value="">Select education level</option>
           {(educationOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </SelectField>
-        <SelectField icon={<FaUser />} label="Marital Status" name="MaritalStatus" value={form.MaritalStatus} onChange={handleChange} onFocus={() => { if (!leading) fetchMaritalOptions() }} onClick={() => { if (!leading) fetchMaritalOptions() }} onTouchStart={() => { if (!leading) fetchMaritalOptions() }} error={fieldErrors?.MaritalStatus} readOnly={readOnly}>
-          <option value="">{maritalLoading ? 'Loading...' : 'Select marital status'}</option>
+        <SelectField icon={<FaUser />} label="Marital Status" name="MaritalStatus" value={form.MaritalStatus} onChange={handleChange} onFocus={() => { if (!leading) fetchMaritalOptions() }} onClick={() => { if (!leading) fetchMaritalOptions() }} onTouchStart={() => { if (!leading) fetchMaritalOptions() }} loading={maritalLoading} error={fieldErrors?.MaritalStatus} readOnly={readOnly}>
+          <option value="">Select marital status</option>
           {(maritalOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
