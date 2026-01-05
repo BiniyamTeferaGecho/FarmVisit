@@ -102,6 +102,12 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     if (errors && errors[name]) {
       setErrors(prev => { const c = { ...(prev || {}) }; delete c[name]; return c; });
     }
+    // If user manually edits Location after an auto-fill, clear the auto-filled indicator
+    if (name === 'Location') {
+      setLocationAutoFilled(false);
+      setLocationAutoFilledAt(null);
+      setLocationReadOnly(false);
+    }
     // If SampleTaken is unchecked, clear SampleType to avoid stale values
     if (name === 'SampleTaken' && parsedValue === false) {
       if (typeof onChange === 'function') onChange({ ...data, SampleTaken: false, SampleType: '' });
