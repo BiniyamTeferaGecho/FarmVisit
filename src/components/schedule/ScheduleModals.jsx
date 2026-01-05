@@ -742,10 +742,11 @@ const ScheduleModals = ({
             }
           }}
           onSaveLayer={() => {
-            // Build payload and ensure Location is included from any available source to avoid start failure
-            const payload = { ...(selectedSchedule || {}), FarmType: 'LAYER', ...(state.layerForm || fillVisitFormData?.layerForm || {}) };
-            // fallback sources for Location
-            payload.Location = payload.Location || (state.layerForm && state.layerForm.Location) || (fillVisitFormData && fillVisitFormData.layerForm && fillVisitFormData.layerForm.Location) || selectedSchedule && (selectedSchedule.Location || selectedSchedule.location) || null;
+            // Build payload and ensure Location is included from any available source to avoid start failure.
+            // Prefer modal-local `fillVisitFormData` (user edits) over reducer `state.layerForm` so typed values are not ignored.
+            const payload = { ...(selectedSchedule || {}), FarmType: 'LAYER', ...(fillVisitFormData?.layerForm || state.layerForm || {}) };
+            // fallback sources for Location (prefer modal-local values)
+            payload.Location = payload.Location || (fillVisitFormData && fillVisitFormData.layerForm && fillVisitFormData.layerForm.Location) || (state.layerForm && state.layerForm.Location) || selectedSchedule && (selectedSchedule.Location || selectedSchedule.location) || null;
             try { console.debug('ScheduleModals.onSaveLayer payload', payload); } catch (e) { /* ignore */ }
             onFillVisitSave(payload);
           }}
