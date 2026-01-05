@@ -98,6 +98,43 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
     return () => { cancelled = true }
   }, [fetchWithAuth, leading])
 
+  // Expose lazy-load functions so selects can fetch on first focus (mobile friendly)
+  const fetchRegionOptions = async () => {
+    if (regionLoading || (regionOptions && regionOptions.length > 0)) return
+    setRegionLoading(true)
+    try {
+      let res = await fetchWithAuth({ url: `/lookups/location-hierarchy`, method: 'get' })
+      let payload = res?.data?.data || res?.data || res
+      let rows = []
+      if (Array.isArray(payload)) rows = payload
+      else if (Array.isArray(payload.items)) rows = payload.items
+      else if (Array.isArray(payload.recordset)) rows = payload.recordset
+      else if (Array.isArray(payload.data)) rows = payload.data
+
+      if (!rows || rows.length === 0) {
+        res = await fetchWithAuth({ url: 'http://localhost:80/api/lookups/by-type-name/Region', method: 'get' })
+        payload = res?.data?.data || res?.data || res
+        if (Array.isArray(payload)) rows = payload
+        else if (Array.isArray(payload.items)) rows = payload.items
+        else if (Array.isArray(payload.recordset)) rows = payload.recordset
+        else if (Array.isArray(payload.data)) rows = payload.data
+        else rows = []
+      }
+
+      const opts = (rows || []).map(r => {
+        const id = r?.LookupID || r?.LookupId || r?.id || null
+        const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null
+        const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? ''
+        return value ? { id: id ? String(id) : null, value: String(value), label: String(label) } : null
+      }).filter(Boolean)
+      setRegionOptions(opts)
+    } catch (e) {
+      setRegionOptions([])
+    } finally {
+      setRegionLoading(false)
+    }
+  }
+
   // When region changes, load zones for that region
   useEffect(() => {
     let cancelled = false
@@ -209,87 +246,75 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
 
   // Fetch Primary Language lookup options (LookupValue -> sent to backend)
   // Fetch Primary Language lookup options only when `leading` is true
-  useEffect(() => {
-    if (!leading) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        setPrimaryLoading(true)
-        const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Primary Language')}`, method: 'get' })
-        const payload = res?.data?.data || res?.data || res
-        let rows = []
-        if (Array.isArray(payload)) rows = payload
-        else if (Array.isArray(payload.items)) rows = payload.items
-        else if (Array.isArray(payload.recordset)) rows = payload.recordset
-        else if (Array.isArray(payload.data)) rows = payload.data
-        const opts = (rows || []).map(r => {
-          const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null
-          const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? ''
-          return value ? { value: String(value), label: String(label) } : null
-        }).filter(Boolean)
-        if (!cancelled) setPrimaryOptions(opts)
-      } catch (e) {
-        if (!cancelled) setPrimaryOptions([])
-      } finally { if (!cancelled) setPrimaryLoading(false) }
-    })()
-    return () => { cancelled = true }
-  }, [fetchWithAuth, leading])
+  const fetchPrimaryOptions = async () => {
+    if (primaryLoading || (primaryOptions && primaryOptions.length > 0)) return
+    setPrimaryLoading(true)
+    try {
+      const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Primary Language')}`, method: 'get' })
+      const payload = res?.data?.data || res?.data || res
+      let rows = []
+      if (Array.isArray(payload)) rows = payload
+      else if (Array.isArray(payload.items)) rows = payload.items
+      else if (Array.isArray(payload.recordset)) rows = payload.recordset
+      else if (Array.isArray(payload.data)) rows = payload.data
+      const opts = (rows || []).map(r => {
+        const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null
+        const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? ''
+        return value ? { value: String(value), label: String(label) } : null
+      }).filter(Boolean)
+      setPrimaryOptions(opts)
+    } catch (e) {
+      setPrimaryOptions([])
+    } finally { setPrimaryLoading(false) }
+  }
 
   // Fetch Marital Status lookup options (LookupValue -> sent to backend)
   // Fetch Marital Status only when `leading` is true
-  useEffect(() => {
-    if (!leading) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        setMaritalLoading(true)
-        const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Marital Status')}`, method: 'get' })
-        const payload = res?.data?.data || res?.data || res
-        let rows = []
-        if (Array.isArray(payload)) rows = payload
-        else if (Array.isArray(payload.items)) rows = payload.items
-        else if (Array.isArray(payload.recordset)) rows = payload.recordset
-        else if (Array.isArray(payload.data)) rows = payload.data
-        const opts = (rows || []).map(r => {
-          const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null
-          const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? ''
-          return value ? { value: String(value), label: String(label) } : null
-        }).filter(Boolean)
-        if (!cancelled) setMaritalOptions(opts)
-      } catch (e) {
-        if (!cancelled) setMaritalOptions([])
-      } finally { if (!cancelled) setMaritalLoading(false) }
-    })()
-    return () => { cancelled = true }
-  }, [fetchWithAuth, leading])
+  const fetchMaritalOptions = async () => {
+    if (maritalLoading || (maritalOptions && maritalOptions.length > 0)) return
+    setMaritalLoading(true)
+    try {
+      const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Marital Status')}`, method: 'get' })
+      const payload = res?.data?.data || res?.data || res
+      let rows = []
+      if (Array.isArray(payload)) rows = payload
+      else if (Array.isArray(payload.items)) rows = payload.items
+      else if (Array.isArray(payload.recordset)) rows = payload.recordset
+      else if (Array.isArray(payload.data)) rows = payload.data
+      const opts = (rows || []).map(r => {
+        const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null
+        const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? ''
+        return value ? { value: String(value), label: String(label) } : null
+      }).filter(Boolean)
+      setMaritalOptions(opts)
+    } catch (e) {
+      setMaritalOptions([])
+    } finally { setMaritalLoading(false) }
+  }
 
   // Fetch Education Level lookup options (LookupValue -> sent to backend)
   // Fetch Education Level only when `leading` is true
-  useEffect(() => {
-    if (!leading) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        setEducationLoading(true)
-        const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Education Level')}`, method: 'get' })
-        const payload = res?.data?.data || res?.data || res
-        let rows = []
-        if (Array.isArray(payload)) rows = payload
-        else if (Array.isArray(payload.items)) rows = payload.items
-        else if (Array.isArray(payload.recordset)) rows = payload.recordset
-        else if (Array.isArray(payload.data)) rows = payload.data
-        const opts = (rows || []).map(r => {
-          const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null
-          const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? ''
-          return value ? { value: String(value), label: String(label) } : null
-        }).filter(Boolean)
-        if (!cancelled) setEducationOptions(opts)
-      } catch (e) {
-        if (!cancelled) setEducationOptions([])
-      } finally { if (!cancelled) setEducationLoading(false) }
-    })()
-    return () => { cancelled = true }
-  }, [fetchWithAuth, leading])
+  const fetchEducationOptions = async () => {
+    if (educationLoading || (educationOptions && educationOptions.length > 0)) return
+    setEducationLoading(true)
+    try {
+      const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Education Level')}`, method: 'get' })
+      const payload = res?.data?.data || res?.data || res
+      let rows = []
+      if (Array.isArray(payload)) rows = payload
+      else if (Array.isArray(payload.items)) rows = payload.items
+      else if (Array.isArray(payload.recordset)) rows = payload.recordset
+      else if (Array.isArray(payload.data)) rows = payload.data
+      const opts = (rows || []).map(r => {
+        const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null
+        const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? ''
+        return value ? { value: String(value), label: String(label) } : null
+      }).filter(Boolean)
+      setEducationOptions(opts)
+    } catch (e) {
+      setEducationOptions([])
+    } finally { setEducationLoading(false) }
+  }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -309,7 +334,7 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
           setSelectedRegionId(sel && sel.id ? sel.id : null)
           // set the form region to the lookup value (string)
           handleChange({ target: { name: 'Region', value: val } })
-        }} error={fieldErrors?.Region} readOnly={readOnly}>
+        }} onFocus={() => { if (!leading) fetchRegionOptions() }} error={fieldErrors?.Region} readOnly={readOnly}>
           <option value="">Select region</option>
           {(regionOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -351,19 +376,19 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
           ))}
         </SelectField>
         <InputField icon={<FaMapMarkerAlt />} label="House Number" name="HouseNumber" value={form.HouseNumber} onChange={handleChange} placeholder="House number" readOnly={readOnly} />
-        <SelectField icon={<FaLanguage />} label="Primary Language" name="PrimaryLanguage" value={form.PrimaryLanguage} onChange={handleChange} error={fieldErrors?.PrimaryLanguage} readOnly={readOnly}>
+        <SelectField icon={<FaLanguage />} label="Primary Language" name="PrimaryLanguage" value={form.PrimaryLanguage} onChange={handleChange} onFocus={() => { if (!leading) fetchPrimaryOptions() }} error={fieldErrors?.PrimaryLanguage} readOnly={readOnly}>
           <option value="">Select primary language</option>
           {(primaryOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </SelectField>
-        <SelectField icon={<FaUserGraduate />} label="Education Level" name="EducationLevel" value={form.EducationLevel} onChange={handleChange} error={fieldErrors?.EducationLevel} readOnly={readOnly}>
+        <SelectField icon={<FaUserGraduate />} label="Education Level" name="EducationLevel" value={form.EducationLevel} onChange={handleChange} onFocus={() => { if (!leading) fetchEducationOptions() }} error={fieldErrors?.EducationLevel} readOnly={readOnly}>
           <option value="">Select education level</option>
           {(educationOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </SelectField>
-        <SelectField icon={<FaUser />} label="Marital Status" name="MaritalStatus" value={form.MaritalStatus} onChange={handleChange} error={fieldErrors?.MaritalStatus} readOnly={readOnly}>
+        <SelectField icon={<FaUser />} label="Marital Status" name="MaritalStatus" value={form.MaritalStatus} onChange={handleChange} onFocus={() => { if (!leading) fetchMaritalOptions() }} error={fieldErrors?.MaritalStatus} readOnly={readOnly}>
           <option value="">Select marital status</option>
           {(maritalOptions || []).map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
