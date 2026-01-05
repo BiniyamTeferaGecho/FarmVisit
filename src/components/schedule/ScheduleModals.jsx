@@ -742,7 +742,11 @@ const ScheduleModals = ({
             }
           }}
           onSaveLayer={() => {
+            // Build payload and ensure Location is included from any available source to avoid start failure
             const payload = { ...(selectedSchedule || {}), FarmType: 'LAYER', ...(state.layerForm || fillVisitFormData?.layerForm || {}) };
+            // fallback sources for Location
+            payload.Location = payload.Location || (state.layerForm && state.layerForm.Location) || (fillVisitFormData && fillVisitFormData.layerForm && fillVisitFormData.layerForm.Location) || selectedSchedule && (selectedSchedule.Location || selectedSchedule.location) || null;
+            try { console.debug('ScheduleModals.onSaveLayer payload', payload); } catch (e) { /* ignore */ }
             onFillVisitSave(payload);
           }}
           onSaveDairy={() => {
