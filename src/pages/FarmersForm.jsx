@@ -83,7 +83,7 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
 
         // If the hierarchy endpoint didn't return rows, fall back to by-type-name/Region
         if (!rows || rows.length === 0) {
-          res = await fetchWithAuth({ url: 'http://localhost:80/api/lookups/by-type-name/Region', method: 'get' })
+          res = await fetchWithAuth({ url: '/lookups/by-type-name/Region', method: 'get' })
           payload = res?.data?.data || res?.data || res
           if (Array.isArray(payload)) rows = payload
           else if (Array.isArray(payload.items)) rows = payload.items
@@ -258,7 +258,7 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
     if (primaryLoading || (primaryOptions && primaryOptions.length > 0)) return
     setPrimaryLoading(true)
     try {
-      const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Primary Language')}`, method: 'get' })
+      const res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent('Primary Language')}`, method: 'get' })
       const payload = res?.data?.data || res?.data || res
       let rows = []
       if (Array.isArray(payload)) rows = payload
@@ -282,7 +282,7 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
     if (maritalLoading || (maritalOptions && maritalOptions.length > 0)) return
     setMaritalLoading(true)
     try {
-      const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Marital Status')}`, method: 'get' })
+      const res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent('Marital Status')}`, method: 'get' })
       const payload = res?.data?.data || res?.data || res
       let rows = []
       if (Array.isArray(payload)) rows = payload
@@ -306,7 +306,7 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
     if (educationLoading || (educationOptions && educationOptions.length > 0)) return
     setEducationLoading(true)
     try {
-      const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Education Level')}`, method: 'get' })
+      const res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent('Education Level')}`, method: 'get' })
       const payload = res?.data?.data || res?.data || res
       let rows = []
       if (Array.isArray(payload)) rows = payload
