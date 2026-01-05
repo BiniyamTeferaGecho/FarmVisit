@@ -843,8 +843,8 @@ const FarmVisitSchedule = () => {
     } catch (err) {
       console.error('onFillVisitSave error', err);
       // If server returned validation details, map them to externalErrors so modal forms can display inline messages
-      const payload = payload || localFillData || {};
-      const farmType = (payload.FarmType || payload.FarmTypeCode || '').toString().toUpperCase() || (selectedSchedule && (selectedSchedule.FarmType || selectedSchedule.FarmTypeCode || '')).toString().toUpperCase();
+      const payloadData = (typeof payload !== 'undefined' && payload) ? payload : (localFillData || {});
+      const farmType = (payloadData.FarmType || payloadData.FarmTypeCode || '').toString().toUpperCase() || (selectedSchedule && (selectedSchedule.FarmType || selectedSchedule.FarmTypeCode || '')).toString().toUpperCase();
       const resp = err && err.response && err.response.data ? err.response.data : null;
       // Common shapes: { success:false, message:'', details: { field: 'msg' } } or { errors: { field: 'msg' } } or errors: [{field,msg}]
       let fieldErrs = (resp && (resp.details || resp.fieldErrors || resp.errors || resp.validationErrors)) || {};
