@@ -324,6 +324,19 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
     } finally { setEducationLoading(false) }
   }
 
+  // If running on a touch-capable device, prefetch these lookups on mount
+  // (helps mobile native pickers have options available when opened)
+  const isTouchDevice = (typeof window !== 'undefined') && (('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0))
+  useEffect(() => {
+    if (leading) return
+    if (!isTouchDevice) return
+    // Prefetch if not already loaded
+    if (!primaryLoading && (!primaryOptions || primaryOptions.length === 0)) fetchPrimaryOptions()
+    if (!educationLoading && (!educationOptions || educationOptions.length === 0)) fetchEducationOptions()
+    if (!maritalLoading && (!maritalOptions || maritalOptions.length === 0)) fetchMaritalOptions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
