@@ -1140,8 +1140,8 @@ const FarmVisitSchedule = () => {
           <div>
             <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">From</label>
             <input
-              type="date"
-              value={state.dateRange && state.dateRange.startDate ? new Date(state.dateRange.startDate).toISOString().slice(0,10) : ''}
+              type="datetime-local"
+              value={state.dateRange && state.dateRange.startDate ? new Date(state.dateRange.startDate).toISOString().slice(0,16) : ''}
               onChange={(e) => {
                 const v = e.target.value;
                 const newStart = v ? new Date(v) : null;
@@ -1149,14 +1149,14 @@ const FarmVisitSchedule = () => {
                 dispatch({ type: 'SET_DATE_RANGE', payload: nextRange });
                 handleSearch({ dateRange: nextRange });
               }}
-              className="w-40 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+              className="w-56 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
             />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-1 block">To</label>
             <input
-              type="date"
-              value={state.dateRange && state.dateRange.endDate ? new Date(state.dateRange.endDate).toISOString().slice(0,10) : ''}
+              type="datetime-local"
+              value={state.dateRange && state.dateRange.endDate ? new Date(state.dateRange.endDate).toISOString().slice(0,16) : ''}
               onChange={(e) => {
                 const v = e.target.value;
                 const newEnd = v ? new Date(v) : null;
@@ -1164,7 +1164,7 @@ const FarmVisitSchedule = () => {
                 dispatch({ type: 'SET_DATE_RANGE', payload: nextRange });
                 handleSearch({ dateRange: nextRange });
               }}
-              className="w-40 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+              className="w-56 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
             />
           </div>
           <div>
