@@ -756,6 +756,7 @@ const ScheduleModals = ({
           loading={state.fillLoading}
           error={state.fillError}
           readOnly={fillReadOnly}
+          locationReadOnlyInModal={false}
         />
       )}
 
