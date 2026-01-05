@@ -30,7 +30,7 @@ const SelectField = React.memo(({ icon, label, name, value, onChange, error, chi
   </div>
 ))
 
-function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCancel, onSubmit, editingId, readOnly = false }) {
+function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCancel, onSubmit, editingId, readOnly = false, leading = false }) {
   const handleChange = (e) => {
     if (readOnly) return; // prevent changes in read-only mode
     if (typeof onFieldChange === 'function') return onFieldChange(e)
@@ -57,7 +57,9 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
   const [maritalOptions, setMaritalOptions] = useState([])
   const [maritalLoading, setMaritalLoading] = useState(false)
 
+  // Prefetch region hierarchy only when `leading` is true to avoid background requests
   useEffect(() => {
+    if (!leading) return
     let cancelled = false
     ;(async () => {
       try {
@@ -94,7 +96,7 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
       } finally { if (!cancelled) setRegionLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [fetchWithAuth])
+  }, [fetchWithAuth, leading])
 
   // When region changes, load zones for that region
   useEffect(() => {
@@ -206,7 +208,9 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
   }, [form.Woreda, weredaOptions])
 
   // Fetch Primary Language lookup options (LookupValue -> sent to backend)
+  // Fetch Primary Language lookup options only when `leading` is true
   useEffect(() => {
+    if (!leading) return
     let cancelled = false
     ;(async () => {
       try {
@@ -229,10 +233,12 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
       } finally { if (!cancelled) setPrimaryLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [fetchWithAuth])
+  }, [fetchWithAuth, leading])
 
   // Fetch Marital Status lookup options (LookupValue -> sent to backend)
+  // Fetch Marital Status only when `leading` is true
   useEffect(() => {
+    if (!leading) return
     let cancelled = false
     ;(async () => {
       try {
@@ -255,10 +261,12 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
       } finally { if (!cancelled) setMaritalLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [fetchWithAuth])
+  }, [fetchWithAuth, leading])
 
   // Fetch Education Level lookup options (LookupValue -> sent to backend)
+  // Fetch Education Level only when `leading` is true
   useEffect(() => {
+    if (!leading) return
     let cancelled = false
     ;(async () => {
       try {
@@ -281,7 +289,7 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
       } finally { if (!cancelled) setEducationLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [fetchWithAuth])
+  }, [fetchWithAuth, leading])
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
