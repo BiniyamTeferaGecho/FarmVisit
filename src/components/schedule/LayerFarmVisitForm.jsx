@@ -92,6 +92,8 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
   const [locationReadOnly, setLocationReadOnly] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState(null);
+  const [locationAutoFilled, setLocationAutoFilled] = useState(false);
+  const [locationAutoFilledAt, setLocationAutoFilledAt] = useState(null);
 
   const handleChange = (e) => {
     if (!e) return;
@@ -656,6 +658,8 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
           const coord = `${lat}, ${lng}`;
           try {
             if (typeof onChange === 'function') onChange({ ...data, Location: coord });
+            setLocationAutoFilled(true);
+            setLocationAutoFilledAt(new Date().toISOString());
           } catch (e) { /* ignore */ }
           setLocationReadOnly(true);
           setLocLoading(false);
@@ -695,6 +699,11 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
                   {locLoading ? 'Getting...' : 'Get'}
                 </button>
               )}
+              {locationAutoFilled && (
+                <div className="ml-2 text-sm text-green-600">
+                  Auto-filled{locationAutoFilledAt ? ` • ${new Date(locationAutoFilledAt).toLocaleString()}` : ''}
+                </div>
+              )}
               {!readOnly && locationReadOnly && !locationReadOnlyInModal && (
                 <button type="button" onClick={() => { setLocationReadOnly(false); setLocError(null); }} className="px-2 py-2 bg-gray-200 text-sm rounded-md">
                   Edit
@@ -705,13 +714,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
               <div className="text-sm text-red-600 mt-1">{errors.Location}</div>
             ) : locError ? (
               <div className="text-sm text-red-600 mt-1">{locError}</div>
-            ) : (
-              <div className="text-sm text-gray-500 mt-1">Format: <span className="italic">lat, long</span> — e.g. <span className="font-mono">9.030000, 38.740000</span>. Click to auto-fill.</div>
-            )}
-          </div>
-          <InputField disabled={readOnly} label="Farm ID (GUID)" name="FarmID" value={data.FarmID || data.farmId} onChange={handleChange} placeholder="Optional Farm GUID" error={errors && errors.FarmID} />
-          <div>
-            <label htmlFor="Breed" className="block text-sm font-medium text-gray-700 text-left mb-1">Breed</label>
+            ) : null}
             <div className="relative">
               <select
                 id="Breed"
