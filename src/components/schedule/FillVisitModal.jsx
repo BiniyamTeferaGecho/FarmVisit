@@ -19,7 +19,9 @@ const FillVisitModal = ({
   loading,
   error,
   readOnly = false,
-  externalErrors = {}
+  externalErrors = {},
+  // allow parent to control whether Location is editable within the modal
+  locationReadOnlyInModal = true,
 }) => {
   if (!open || !target) return null;
 
@@ -53,7 +55,7 @@ const FillVisitModal = ({
                 onCancel={onClose}
                 loading={loading}
                 readOnly={readOnly}
-                locationReadOnlyInModal={true}
+                locationReadOnlyInModal={locationReadOnlyInModal}
                 externalErrors={externalErrors?.layerForm || {}}
               />
             )}
@@ -65,7 +67,7 @@ const FillVisitModal = ({
                 onCancel={onClose}
                 loading={loading}
                 readOnly={readOnly}
-                locationReadOnlyInModal={true}
+                locationReadOnlyInModal={locationReadOnlyInModal}
                 externalErrors={externalErrors?.dairyForm || {}}
               />
             )}

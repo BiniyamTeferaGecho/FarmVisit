@@ -747,6 +747,26 @@ const ScheduleModals = ({
             const payload = { ...(selectedSchedule || {}), FarmType: 'LAYER', ...(fillVisitFormData?.layerForm || state.layerForm || {}) };
             // fallback sources for Location (prefer modal-local values)
             payload.Location = payload.Location || (fillVisitFormData && fillVisitFormData.layerForm && fillVisitFormData.layerForm.Location) || (state.layerForm && state.layerForm.Location) || selectedSchedule && (selectedSchedule.Location || selectedSchedule.location) || null;
+            // Final fallback: if payload lacks Location (race conditions), try reading the input directly from DOM
+            try {
+              if (!payload.Location) {
+                const el = (typeof document !== 'undefined') ? document.querySelector('input[name="Location"], textarea[name="Location"]') : null;
+                const v = el && el.value ? String(el.value).trim() : '';
+                if (v) payload.Location = v;
+              }
+            } catch (e) { /* ignore DOM read errors */ }
+            // If Location is still missing, show an inline error in the Fill modal and block save/start.
+            const hasLocation = payload && (payload.Location || payload.location);
+            if (!hasLocation) {
+              try {
+                dispatch({ type: 'SET_FILL_ERROR', payload: 'Location is required before saving/starting the visit. Please add a Location.' });
+                const focusEl = (typeof document !== 'undefined') ? document.querySelector('input[name="Location"], textarea[name="Location"]') : null;
+                if (focusEl && typeof focusEl.focus === 'function') focusEl.focus();
+              } catch (e) { /* ignore dispatch/focus errors */ }
+              return;
+            }
+            // clear any prior fill errors
+            try { dispatch({ type: 'SET_FILL_ERROR', payload: null }); } catch (e) { /* ignore */ }
             try { console.debug('ScheduleModals.onSaveLayer payload', payload); } catch (e) { /* ignore */ }
             onFillVisitSave(payload);
           }}
