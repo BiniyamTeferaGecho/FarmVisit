@@ -11,6 +11,14 @@ import {
 } from '@tanstack/react-table';
 import { FaPlus, FaFileCsv, FaDownload, FaSync, FaEdit, FaTrash, FaSearch, FaChevronUp, FaChevronDown, FaSort, FaFileExcel, FaFilePdf, FaEye, FaTrashAlt, FaTimes, FaUser, FaPhone, FaEnvelope, FaIdCard, FaMapMarkerAlt, FaTractor, FaMoneyBillWave, FaUserGraduate, FaLanguage, FaColumns } from 'react-icons/fa';
 import ColumnSelector from '../components/ColumnSelector';
+import TopNav from '../components/TopNav';
+import Sidebar from '../components/Sidebar';
+import ConfirmModal from '../components/ConfirmModal';
+import Modal from '../components/Modal';
+import LoadingSpinner from '../components/LoadingSpinner';
+import AlertModal from '../components/AlertModal';
+import FarmersForm from './FarmersForm';
+import { toCsv } from '../utils/csv';
 // Inlined DataTable component (moved from ../components/DataTable.jsx)
 
 function DataTable({
@@ -147,29 +155,30 @@ function DataTable({
                 </table>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-4 text-sm text-gray-600">
-                <div>
-                    Showing page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())} · Rows: {displayedTotalRows}
+            <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 text-sm text-gray-600">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Showing page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}</span>
+                        <span className="hidden sm:inline">· Rows: {displayedTotalRows}</span>
+                    </div>
+                    <div className="text-sm text-gray-600 sm:ml-4 block">
+                        <span className="sm:hidden">Rows: {displayedTotalRows}</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <select value={table.getState().pagination.pageSize} onChange={e => table.setPageSize(Number(e.target.value))} className="form-select px-2 py-1 border rounded text-sm">
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end w-full sm:w-auto">
+                    <select value={table.getState().pagination.pageSize} onChange={e => table.setPageSize(Number(e.target.value))} className="form-select px-2 py-2 border rounded text-sm w-full sm:w-auto">
                         {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
-                    <button onClick={() => table.setPageIndex(0)} disabled={table.getState().pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-                    <button onClick={() => table.setPageIndex(Math.max(0, table.getState().pagination.pageIndex - 1))} disabled={table.getState().pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-                    <button onClick={() => table.setPageIndex(Math.min(table.getState().pagination.pageIndex + 1, Math.max(0, table.getPageCount() - 1)))} disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-                    <button onClick={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))} disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+                    <button onClick={() => table.setPageIndex(0)} disabled={table.getState().pagination.pageIndex === 0} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
+                    <button onClick={() => table.setPageIndex(Math.max(0, table.getState().pagination.pageIndex - 1))} disabled={table.getState().pagination.pageIndex === 0} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
+                    <button onClick={() => table.setPageIndex(Math.min(table.getState().pagination.pageIndex + 1, Math.max(0, table.getPageCount() - 1)))} disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
+                    <button onClick={() => table.setPageIndex(Math.max(0, table.getPageCount() - 1))} disabled={table.getState().pagination.pageIndex >= Math.max(0, table.getPageCount() - 1)} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
                 </div>
             </div>
-        </div>
+            </div>
     );
 }
-import ConfirmModal from '../components/ConfirmModal';
-import Modal from '../components/Modal';
-import LoadingSpinner from '../components/LoadingSpinner';
-import AlertModal from '../components/AlertModal';
-import FarmersForm from './FarmersForm';
-import { toCsv } from '../utils/csv';
 
 // --- Helper Components ---
 
@@ -241,7 +250,9 @@ const getColumns = (onEdit, onDelete, onView, canEdit, canDelete, advisorMap = {
 
 // --- Main Farmers Page Component ---
 
-export default function Farmers() {
+export default function Farmers({ inDashboard = false }) {
+    const HEADER_HEIGHT = 64;
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const { user, fetchWithAuth, hasFormPermission } = useAuth();
     const navigate = useNavigate();
 
@@ -302,89 +313,74 @@ export default function Farmers() {
 
     const fetchData = useCallback(async (params = {}) => {
         setLoading(true);
+        setError(null);
         try {
-            // Convert react-table params and local filter state to the search API query parameters
-            const qs = new URLSearchParams();
-            const pageNumber = (typeof params.pageIndex === 'number') ? (params.pageIndex + 1) : (params.PageNumber || 1);
+            const pageIndex = (typeof params.pageIndex === 'number') ? params.pageIndex : (typeof params.PageNumber === 'number' ? Math.max(0, params.PageNumber - 1) : 0);
             const pageSize = params.pageSize || params.PageSize || 10;
 
-            // Search and sorting
-            const SearchTerm = params.SearchTerm ?? params.search ?? searchQuery ?? null;
-            const SortColumn = params.SortColumn ?? params.sortColumn ?? null;
-            const SortDirection = params.SortDirection ?? params.sortDirection ?? null;
-            if (SearchTerm) qs.append('SearchTerm', SearchTerm);
-            if (SortColumn) qs.append('SortColumn', SortColumn);
-            if (SortDirection) qs.append('SortDirection', SortDirection);
-
-            // Location and simple filters (params take precedence, fall back to component state)
-            const Region = params.Region ?? params.region ?? filterRegion ?? null;
-            const Zone = params.Zone ?? params.zone ?? filterZone ?? null;
-            const Woreda = params.Woreda ?? params.woreda ?? filterWoreda ?? null;
-            const Kebele = params.Kebele ?? params.kebele ?? filterKebele ?? null;
-            const Village = params.Village ?? params.village ?? filterVillage ?? null;
-            const Gender = params.Gender ?? params.gender ?? filterGender ?? null;
-            const IsActive = (typeof params.IsActive !== 'undefined') ? params.IsActive : (filterIsActive === 'All' ? null : (filterIsActive === 'Active' ? 1 : 0));
-            const IncludeDeleted = (typeof params.IncludeDeleted !== 'undefined') ? params.IncludeDeleted : (filterIncludeDeleted ? 1 : 0);
-
-            if (Region) qs.append('Region', Region);
-            if (Zone) qs.append('Zone', Zone);
-            if (Woreda) qs.append('Woreda', Woreda);
-            if (Kebele) qs.append('Kebele', Kebele);
-            if (Village) qs.append('Village', Village);
-            if (Gender) qs.append('Gender', Gender);
-            if (IsActive !== null && typeof IsActive !== 'undefined') qs.append('IsActive', String(IsActive));
-            if (IncludeDeleted !== null && typeof IncludeDeleted !== 'undefined') qs.append('IncludeDeleted', String(IncludeDeleted));
-
-            // Date filters
-            const CreatedDateFrom = params.CreatedDateFrom ?? params.createdDateFrom ?? filterCreatedFrom ?? null;
-            const CreatedDateTo = params.CreatedDateTo ?? params.createdDateTo ?? filterCreatedTo ?? null;
-            if (CreatedDateFrom) qs.append('CreatedDateFrom', CreatedDateFrom);
-            if (CreatedDateTo) qs.append('CreatedDateTo', CreatedDateTo);
-
-            // Numeric ranges and other advanced filters (allow passing via params if the UI exposes them later)
-            const FarmingExperienceMin = params.FarmingExperienceMin ?? params.farmingExperienceMin ?? params.FarmingExperienceMin;
-            const FarmingExperienceMax = params.FarmingExperienceMax ?? params.farmingExperienceMax ?? params.FarmingExperienceMax;
-            const FamilySizeMin = params.FamilySizeMin ?? params.familySizeMin ?? params.FamilySizeMin;
-            const FamilySizeMax = params.FamilySizeMax ?? params.familySizeMax ?? params.FamilySizeMax;
-            const DependentsMin = params.DependentsMin ?? params.dependentsMin ?? params.DependentsMin;
-            const DependentsMax = params.DependentsMax ?? params.dependentsMax ?? params.DependentsMax;
-            const HouseholdIncomeMin = params.HouseholdIncomeMin ?? params.householdIncomeMin ?? params.HouseholdIncomeMin;
-            const HouseholdIncomeMax = params.HouseholdIncomeMax ?? params.householdIncomeMax ?? params.HouseholdIncomeMax;
-            if (FarmingExperienceMin != null) qs.append('FarmingExperienceMin', String(FarmingExperienceMin));
-            if (FarmingExperienceMax != null) qs.append('FarmingExperienceMax', String(FarmingExperienceMax));
-            if (FamilySizeMin != null) qs.append('FamilySizeMin', String(FamilySizeMin));
-            if (FamilySizeMax != null) qs.append('FamilySizeMax', String(FamilySizeMax));
-            if (DependentsMin != null) qs.append('DependentsMin', String(DependentsMin));
-            if (DependentsMax != null) qs.append('DependentsMax', String(DependentsMax));
-            if (HouseholdIncomeMin != null) qs.append('HouseholdIncomeMin', String(HouseholdIncomeMin));
-            if (HouseholdIncomeMax != null) qs.append('HouseholdIncomeMax', String(HouseholdIncomeMax));
-
-            // CreatedBy filters
-            const CreatedByID = params.CreatedByID ?? params.createdByID ?? params.CreatedBy ?? null;
-            const CreatedByName = params.CreatedByName ?? params.createdByName ?? filterCreatedByName ?? null;
-            const PrimaryLanguage = params.PrimaryLanguage ?? params.primaryLanguage ?? filterPrimaryLanguage ?? null;
-            const EducationLevel = params.EducationLevel ?? params.educationLevel ?? filterEducationLevel ?? null;
-            if (CreatedByID) qs.append('CreatedByID', CreatedByID);
-            if (CreatedByName) qs.append('CreatedByName', CreatedByName);
-            if (PrimaryLanguage) qs.append('PrimaryLanguage', PrimaryLanguage);
-            if (EducationLevel) qs.append('EducationLevel', EducationLevel);
-
-            // Pagination
-            qs.append('PageNumber', String(pageNumber));
+            const qs = new URLSearchParams();
+            qs.append('PageNumber', String(pageIndex + 1));
             qs.append('PageSize', String(pageSize));
 
-            const res = await fetchWithAuth({ url: `/farmers/search?${qs.toString()}`, method: 'get' });
-            const payload = res.data?.data ?? res.data ?? {};
-            const items = Array.isArray(payload) ? payload : (payload.items || payload.data || []);
-            const total = (payload && (payload.total || payload.totalCount)) || res.data?.totalCount || items.length || 0;
-            setData(items);
+            const appendIf = (key, val) => { if (val !== undefined && val !== null && String(val).trim() !== '') qs.append(key, String(val)); };
+
+            appendIf('SearchTerm', params.SearchTerm ?? params.search ?? searchQuery ?? null);
+            appendIf('Region', params.Region ?? params.region ?? filterRegion ?? null);
+            appendIf('Zone', params.Zone ?? params.zone ?? filterZone ?? null);
+            appendIf('Woreda', params.Woreda ?? params.woreda ?? filterWoreda ?? null);
+            appendIf('Kebele', params.Kebele ?? params.kebele ?? filterKebele ?? null);
+            appendIf('Village', params.Village ?? params.village ?? filterVillage ?? null);
+            appendIf('Gender', params.Gender ?? params.gender ?? filterGender ?? null);
+            if (typeof (params.IsActive ?? (filterIsActive === 'All' ? null : (filterIsActive === 'Active' ? 1 : 0))) !== 'undefined' && params.IsActive !== null) {
+                const iv = params.IsActive ?? (filterIsActive === 'All' ? null : (filterIsActive === 'Active' ? 1 : 0));
+                if (iv !== null) qs.append('IsActive', String(iv));
+            }
+            if (params.IncludeDeleted ?? filterIncludeDeleted) qs.append('IncludeDeleted', '1');
+
+            // Date filters
+            appendIf('CreatedDateFrom', params.CreatedDateFrom ?? params.createdDateFrom ?? filterCreatedFrom ?? null);
+            appendIf('CreatedDateTo', params.CreatedDateTo ?? params.createdDateTo ?? filterCreatedTo ?? null);
+
+            const endpoint = (qs.toString() && qs.toString().length > 0) ? `/farmers?${qs.toString()}` : '/farmers';
+            const res = await fetchWithAuth({ url: endpoint, method: 'get' });
+            const payload = res?.data?.data || res?.data || res;
+
+            // normalize into array + total
+            let items = null; let total = 0;
+            if (!payload) {
+                items = [];
+                total = 0;
+            } else if (Array.isArray(payload)) {
+                items = payload;
+                total = payload.length;
+            } else if (payload.items && Array.isArray(payload.items)) {
+                items = payload.items;
+                total = payload.total || payload.totalCount || items.length;
+            } else if (Array.isArray(payload.recordset)) {
+                items = payload.recordset;
+                total = payload.recordset.length || (payload.total || payload.totalCount || 0);
+            } else if (payload.data && Array.isArray(payload.data)) {
+                items = payload.data;
+                total = payload.total || payload.totalCount || items.length;
+            } else if (payload && payload.FarmerID) {
+                items = [payload];
+                total = 1;
+            } else {
+                // try to pick first array-valued prop
+                const arr = Object.keys(payload).find(k => Array.isArray(payload[k]));
+                items = arr ? payload[arr] : [];
+                total = items.length || 0;
+            }
+
+            setData(items || []);
             setTotalRows(Number(total) || 0);
         } catch (err) {
-            setError(err.message || 'Failed to fetch data');
+            console.debug('fetchData(farmers) failed', err);
+            setError(err?.response?.data?.message || err?.message || 'Failed to load farmers');
         } finally {
             setLoading(false);
         }
-    }, [fetchWithAuth, searchQuery, filterRegion, filterZone, filterWoreda, filterKebele, filterVillage, filterGender, filterIsActive, filterIncludeDeleted, filterCreatedFrom, filterCreatedTo, filterCreatedByName, filterPrimaryLanguage, filterEducationLevel]);
+    }, [fetchWithAuth, searchQuery, filterRegion, filterZone, filterWoreda, filterKebele, filterVillage, filterGender, filterIsActive, filterIncludeDeleted, filterCreatedFrom, filterCreatedTo]);
 
     const exportFarmers = async () => {
         setLoading(true); setError(null);
@@ -701,40 +697,59 @@ export default function Farmers() {
     };
 
     return (
-        <div className="p-4 md:p-8 bg-gray-100 min-h-screen">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-gray-800 flex items-center"><FaTractor className="inline-block mr-3 text-indigo-600" />Farmers</h1>
-                <div className="flex items-center space-x-2">
-                    <button onClick={() => setShowFilters(s => !s)} className="px-3 py-2 bg-gray-100 rounded-md hover:bg-gray-200 text-sm flex items-center gap-2">
-                        <FaSearch />
-                        <span>Filters</span>
-                    </button>
-                    <button onClick={handleAdd} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                        <FaPlus className="mr-2" /> New Farmer
-                    </button>
-                    <input ref={bulkInputRef} type="file" accept=",.csv,text/csv" className="hidden" onChange={e => setSelectedBulkFile(e.target.files?.[0] || null)} />
-                    <button onClick={() => bulkInputRef.current?.click()} className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-md shadow-md hover:bg-teal-700 flex items-center space-x-2">
-                        <FaFileCsv />
-                        <span>Bulk Upload</span>
-                    </button>
-                    <button onClick={downloadTemplate} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
-                        <FaDownload className="mr-2" /> Template
-                    </button>
-                    <button onClick={exportFarmers} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
-                        <FaFileCsv className="mr-2" /> Export
-                    </button>
-
-                    {selectedBulkFile && (
-                        <div className="flex items-center space-x-2 ml-4">
-                            <span className="text-sm text-gray-700">{selectedBulkFile.name}</span>
-                            <button onClick={uploadSelectedFile} disabled={uploading} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
-                                {uploading ? 'Uploading...' : 'Upload'}
-                            </button>
-                            <button onClick={() => setSelectedBulkFile(null)} disabled={uploading} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
-                        </div>
-                    )}
+        <>
+            {!inDashboard && (
+                <div style={{ height: HEADER_HEIGHT }} className="fixed top-0 left-0 right-0 z-40">
+                    <TopNav onToggleSidebar={() => setSidebarOpen(s => !s)} onToggleCollapse={() => {}} />
                 </div>
-            </div>
+            )}
+
+            {!inDashboard && (
+                <Sidebar
+                    isOpen={sidebarOpen}
+                    isCollapsed={false}
+                    active={'farmers'}
+                    onChange={() => {}}
+                    onClose={() => setSidebarOpen(false)}
+                    width={280}
+                    minWidth={82}
+                />
+            )}
+
+            <div style={{ paddingTop: inDashboard ? 0 : HEADER_HEIGHT }} className="p-4 md:p-8 bg-gray-100 min-h-screen">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mb-6 gap-3">
+                    <h1 className="text-3xl font-bold text-gray-800 flex items-center"><FaTractor className="inline-block mr-3 text-indigo-600" />Farmers</h1>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <button onClick={() => setShowFilters(s => !s)} className="px-3 py-2 bg-gray-100 rounded-md hover:bg-gray-200 text-sm flex items-center gap-2 w-full sm:w-auto justify-center">
+                            <FaSearch />
+                            <span>Filters</span>
+                        </button>
+                        <button onClick={handleAdd} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-sm">
+                            <FaPlus className="mr-2" /> New Farmer
+                        </button>
+                        <input ref={bulkInputRef} type="file" accept=",.csv,text/csv" className="hidden" onChange={e => setSelectedBulkFile(e.target.files?.[0] || null)} />
+                        <button onClick={() => bulkInputRef.current?.click()} className="px-3 py-2 text-sm font-medium bg-teal-600 text-white rounded-md shadow-md hover:bg-teal-700 flex items-center space-x-2 w-full sm:w-auto justify-center">
+                            <FaFileCsv />
+                            <span>Bulk Upload</span>
+                        </button>
+                        <button onClick={downloadTemplate} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm">
+                            <FaDownload className="mr-2" /> Template
+                        </button>
+                        <button onClick={exportFarmers} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm">
+                            <FaFileCsv className="mr-2" /> Export
+                        </button>
+
+                        {selectedBulkFile && (
+                            <div className="flex items-center space-x-2 ml-0 sm:ml-4">
+                                <span className="text-sm text-gray-700">{selectedBulkFile.name}</span>
+                                <button onClick={uploadSelectedFile} disabled={uploading} className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700">
+                                    {uploading ? 'Uploading...' : 'Upload'}
+                                </button>
+                                <button onClick={() => setSelectedBulkFile(null)} disabled={uploading} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Cancel</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             {/* horizontal divider similar to Farms list */}
             <div className="border-b border-gray-200 mb-6" />
 
@@ -910,5 +925,6 @@ export default function Farmers() {
             )}
             
         </div>
+    </>
     );
 }

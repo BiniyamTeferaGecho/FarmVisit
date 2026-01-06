@@ -753,27 +753,47 @@ const ScheduleModals = ({
           onSaveLayer={() => {
             // Build payload and ensure Location is included from any available source to avoid start failure.
             // Prefer modal-local `fillVisitFormData` (user edits) over reducer `state.layerForm` so typed values are not ignored.
-            const payload = { ...(selectedSchedule || {}), FarmType: 'LAYER', ...(fillVisitFormData?.layerForm || state.layerForm || {}) };
-            // fallback sources for Location (prefer modal-local values)
-            payload.Location = payload.Location || (fillVisitFormData && fillVisitFormData.layerForm && fillVisitFormData.layerForm.Location) || (state.layerForm && state.layerForm.Location) || selectedSchedule && (selectedSchedule.Location || selectedSchedule.location) || null;
-            // Final fallback: if payload lacks Location (race conditions), try reading the input directly from DOM
+            // Build payload and ensure coordinate is included from modal-local inputs rather than
+            // falling back to farm table Location values. We will save the modal value into
+            // `Coordination` to preserve explicit coordinates (lat,lon) and avoid using
+            // stored farm location names.
+            const basePayload = { ...(selectedSchedule || {}), FarmType: 'LAYER' };
+            const formLayer = (fillVisitFormData && fillVisitFormData.layerForm) ? fillVisitFormData.layerForm : (state.layerForm || {});
+            const payload = { ...basePayload, ...formLayer };
+
+            // Prefer modal-local Location value for coordinates. Map it to `Coordination`.
+            const modalLocation = (formLayer && (formLayer.Location || formLayer.location)) || '';
+            const stateLocation = (state.layerForm && (state.layerForm.Location || state.layerForm.location)) || '';
+            // Use modalLocation when present, otherwise prefer stateLocation, otherwise keep any existing Coordination
+            const coordValue = String(modalLocation || stateLocation || payload.Coordination || payload.coordination || '').trim() || null;
+
+            if (coordValue) {
+              payload.Coordination = coordValue;
+            }
+
+            // Do NOT overwrite payload.Location with farm table values. Leave Location untouched
+            // so backend receives explicit Coordination (lat,lon) when provided.
+
+            // Final fallback: if Coordination is missing, try reading the Location input directly from DOM
             try {
-              if (!payload.Location) {
+              if (!payload.Coordination) {
                 const el = (typeof document !== 'undefined') ? document.querySelector('input[name="Location"], textarea[name="Location"]') : null;
                 const v = el && el.value ? String(el.value).trim() : '';
-                if (v) payload.Location = v;
+                if (v) payload.Coordination = v;
               }
             } catch (e) { /* ignore DOM read errors */ }
-            // If Location is still missing, show an inline error in the Fill modal and block save/start.
-            const hasLocation = payload && (payload.Location || payload.location);
-            if (!hasLocation) {
+
+            // If Coordination is still missing, show an inline error in the Fill modal and block save/start.
+            const hasCoord = payload && (payload.Coordination || payload.coordination);
+            if (!hasCoord) {
               try {
-                dispatch({ type: 'SET_FILL_ERROR', payload: 'Location is required before saving/starting the visit. Please add a Location.' });
+                dispatch({ type: 'SET_FILL_ERROR', payload: 'Coordinates are required before saving/starting the visit. Please add Location (lat,lon) or use Get.' });
                 const focusEl = (typeof document !== 'undefined') ? document.querySelector('input[name="Location"], textarea[name="Location"]') : null;
                 if (focusEl && typeof focusEl.focus === 'function') focusEl.focus();
               } catch (e) { /* ignore dispatch/focus errors */ }
               return;
             }
+
             // clear any prior fill errors
             try { dispatch({ type: 'SET_FILL_ERROR', payload: null }); } catch (e) { /* ignore */ }
             try { console.debug('ScheduleModals.onSaveLayer payload', payload); } catch (e) { /* ignore */ }

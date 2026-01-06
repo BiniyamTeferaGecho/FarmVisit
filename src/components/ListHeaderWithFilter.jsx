@@ -46,10 +46,12 @@ export default function ListHeaderWithFilter({ title = '', icon = null, selectOp
 
   return (
     <div className="w-full flex items-center justify-between">
-      <h1 className="text-left text-2xl font-bold text-gray-800 dark:text-white flex items-center">
-        {icon ? <span className="mr-3 text-indigo-600 inline-flex items-center">{icon}</span> : null}
-        <span>{title}</span>
-      </h1>
+      {title ? (
+        <h1 className="text-left text-2xl font-bold text-gray-800 dark:text-white flex items-center">
+          {icon ? <span className="mr-3 text-indigo-600 inline-flex items-center">{icon}</span> : null}
+          <span>{title}</span>
+        </h1>
+      ) : <div />}
 
       <div className="relative" ref={containerRef}>
         <button
@@ -64,42 +66,91 @@ export default function ListHeaderWithFilter({ title = '', icon = null, selectOp
         </button>
 
         {open && (
-          <div className="absolute right-0 mt-2 w-screen max-w-sm sm:max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-300">Search</label>
-                <input value={search} onChange={e => setSearch(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search by name, code, owner..." />
-              </div>
+          <>
+            {/* Mobile: full-screen bottom sheet */}
+            <div className="fixed inset-0 z-50 sm:hidden" onClick={() => setOpen(false)}>
+              <div className="absolute inset-0 bg-black opacity-40" />
+              <div className="relative w-full bg-white dark:bg-gray-800 rounded-t-lg p-4 max-h-[90vh] overflow-auto flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{title}</h2>
+                  <button onClick={() => setOpen(false)} className="text-gray-600">Close</button>
+                </div>
 
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-300">Type</label>
-                <select value={selectValue} onChange={e => setSelectValue(e.target.value)} className="mt-1 block w-full form-select px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                  <option value="">Any</option>
-                  {Array.isArray(selectOptions) && selectOptions.map(opt => (
-                    <option key={opt.FarmTypeID || opt.id || opt.value} value={opt.FarmTypeID || opt.id || opt.value}>{opt.TypeName || opt.Type || opt.label || opt.name || opt.label}</option>
-                  ))}
-                </select>
-              </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-600 dark:text-gray-300">Search</label>
+                    <input value={search} onChange={e => setSearch(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search by name, code, owner..." />
+                  </div>
 
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-300">Created From</label>
-                <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md" />
-              </div>
+                  <div>
+                    <label className="text-xs text-gray-600 dark:text-gray-300">Type</label>
+                    <select value={selectValue} onChange={e => setSelectValue(e.target.value)} className="mt-1 block w-full form-select px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                      <option value="">Any</option>
+                      {Array.isArray(selectOptions) && selectOptions.map(opt => (
+                        <option key={opt.FarmTypeID || opt.id || opt.value} value={opt.FarmTypeID || opt.id || opt.value}>{opt.TypeName || opt.Type || opt.label || opt.name || opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
 
-              <div>
-                <label className="text-xs text-gray-600 dark:text-gray-300">Created To</label>
-                <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md" />
+                  <div>
+                    <label className="text-xs text-gray-600 dark:text-gray-300">Created From</label>
+                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md" />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-600 dark:text-gray-300">Created To</label>
+                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md" />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between">
+                  <button onClick={handleClear} type="button" className="text-sm text-gray-600 hover:underline">Clear Filters</button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setOpen(false)} type="button" className="px-3 py-2 bg-gray-100 rounded-md">Cancel</button>
+                    <button onClick={handleApply} type="button" className="px-3 py-2 bg-indigo-600 text-white rounded-md">Apply Filters</button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between">
-              <button onClick={handleClear} type="button" className="text-sm text-gray-600 hover:underline">Clear Filters</button>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setOpen(false)} type="button" className="px-3 py-2 bg-gray-100 rounded-md">Cancel</button>
-                <button onClick={handleApply} type="button" className="px-3 py-2 bg-indigo-600 text-white rounded-md">Apply Filters</button>
+            {/* Desktop: dropdown near the button */}
+            <div className="hidden sm:block absolute mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50 sm:max-w-xl sm:min-w-[420px] right-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-300">Search</label>
+                  <input value={search} onChange={e => setSearch(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search by name, code, owner..." />
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-300">Type</label>
+                  <select value={selectValue} onChange={e => setSelectValue(e.target.value)} className="mt-1 block w-full form-select px-3 py-2 border rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">Any</option>
+                    {Array.isArray(selectOptions) && selectOptions.map(opt => (
+                      <option key={opt.FarmTypeID || opt.id || opt.value} value={opt.FarmTypeID || opt.id || opt.value}>{opt.TypeName || opt.Type || opt.label || opt.name || opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-300">Created From</label>
+                  <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md" />
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-600 dark:text-gray-300">Created To</label>
+                  <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="mt-1 block w-full form-input px-3 py-2 border rounded-md" />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between">
+                <button onClick={handleClear} type="button" className="text-sm text-gray-600 hover:underline">Clear Filters</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setOpen(false)} type="button" className="px-3 py-2 bg-gray-100 rounded-md">Cancel</button>
+                  <button onClick={handleApply} type="button" className="px-3 py-2 bg-indigo-600 text-white rounded-md">Apply Filters</button>
+                </div>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

@@ -42,15 +42,22 @@ function useFetchStats(reloadKey) {
         const res = await fetchWithAuth({ url: '/farm-visit-schedule/statistics', method: 'get' });
         if (!mounted) return;
         const payload = res?.data || res || {};
-        setStats(payload.data || payload);
+          setStats(payload.data || payload);
       } catch (err) {
-        // Suppress noisy console errors for unauthenticated requests (401)
-        try {
-          const status = err?.response?.status || (err && err.message && err.message.toLowerCase().includes('unauthorized') ? 401 : null)
-          if (status === 401) return
-        } catch (e) { /* ignore */ }
-        // Non-auth errors: debug-level log only
-        console.debug('Failed to load stats', err);
+          // Suppress noisy console errors for unauthenticated requests (401/403).
+          // For server errors (500+) treat as non-fatal and present empty stats to the UI.
+          try {
+            const status = err?.response?.status || (err && err.message && err.message.toLowerCase().includes('unauthorized') ? 401 : null);
+            if (status === 401 || status === 403) return;
+            if (status >= 500) {
+              // Backend 500s are server-side; avoid noisy stack traces in the console
+              // and show empty stats until server is fixed.
+              if (mounted) setStats({});
+              return;
+            }
+          } catch (e) { /* ignore */ }
+          // Other errors (network, parse) — log at debug level only
+          console.debug('Failed to load stats', err);
       }
     })();
     return () => { mounted = false }

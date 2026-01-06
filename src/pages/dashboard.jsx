@@ -117,13 +117,13 @@ export default function Dashboard() {
   farmtypes: React.createElement(React.lazy(() => import('./FarmType')), { reloadKey }),
     lookups: <Lookups reloadKey={reloadKey} />,
     layerfarm: <LayerFarm reloadKey={reloadKey} />,
-    dairyfarm: React.createElement(React.lazy(() => import('./DairyFarm')), { reloadKey }),
-    farmvisit: React.createElement(React.lazy(() => import('./FarmVisit')), { reloadKey }),
-    advisorvisits: React.createElement(React.lazy(() => import('./AdvisorVisits')), { reloadKey }),
-    farmvisitschedule: React.createElement(React.lazy(() => import('./FarmVisitSchedule')), { reloadKey }),
-    farmers: React.createElement(React.lazy(() => import('./Farmers')), { reloadKey }),
-    employees: React.createElement(React.lazy(() => import('./Employee')), { reloadKey }),
-    farms: React.createElement(React.lazy(() => import('./Farms')), { reloadKey }),
+    dairyfarm: React.createElement(React.lazy(() => import('./DairyFarm')), { reloadKey, inDashboard: true }),
+    farmvisit: React.createElement(React.lazy(() => import('./FarmVisit')), { reloadKey, inDashboard: true }),
+    advisorvisits: React.createElement(React.lazy(() => import('./AdvisorVisits')), { reloadKey, inDashboard: true }),
+    farmvisitschedule: React.createElement(React.lazy(() => import('./FarmVisitSchedule')), { reloadKey, inDashboard: true }),
+    farmers: React.createElement(React.lazy(() => import('./Farmers')), { reloadKey, inDashboard: true }),
+    employees: React.createElement(React.lazy(() => import('./Employee')), { reloadKey, inDashboard: true }),
+    farms: React.createElement(React.lazy(() => import('./Farms')), { reloadKey, inDashboard: true }),
     profile: React.createElement(React.lazy(() => import('./profile')), { reloadKey }),
     reports: React.createElement(React.lazy(() => import('./Reports')), { reloadKey }),
   reports_farm: React.createElement(React.lazy(() => import('./reports/ReportFormFarm')), { reloadKey }),
@@ -169,6 +169,21 @@ export default function Dashboard() {
       setLoadingModule(false);
     }, 150);
   };
+
+  // Listen for sidebar-open-tab events so the Sidebar can request a tab
+  // open in desktop/in-flow scenarios. This ensures clicks always open
+  // the requested tab even if timing of navigation/search param updates
+  // differs between mobile and desktop render modes.
+  useEffect(() => {
+    function onSidebarOpenTab(e) {
+      try {
+        const key = e && (e.detail || e);
+        if (key) handleOpenTab(String(key));
+      } catch (err) { /* ignore */ }
+    }
+    window.addEventListener('sidebar-open-tab', onSidebarOpenTab);
+    return () => window.removeEventListener('sidebar-open-tab', onSidebarOpenTab);
+  }, []);
 
   // Keep the active tab in sync with the `?tab=` query parameter so
   // the selected tab is restored on reload and the URL updates when

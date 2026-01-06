@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthProvider'
 import ScheduleList from '../components/schedule/ScheduleList'
 import ScheduleModals from '../components/schedule/ScheduleModals'
 import { scheduleReducer, initialState } from '../reducers/scheduleReducer'
-import { fetchLookups, createSchedule } from '../services/api'
+import { fetchLookups, createSchedule, fillVisit, getFilledFormByScheduleId } from '../services/api'
 
 export default function AdvisorVisits() {
   const { user, fetchWithAuth } = useAuth()
@@ -114,18 +114,43 @@ export default function AdvisorVisits() {
           fetchWithAuth={fetchWithAuth}
           pageStartOffset={(page - 1) * pageSize}
           onView={(row) => {
-            try {
-              const id = row?.ScheduleID || row?.id || row?.ScheduleId;
-              if (!id) return;
-              const p = new URLSearchParams(window.location.search || '');
-              p.set('tab', 'farmvisitschedule');
-              p.set('open', 'view');
-              p.set('scheduleId', String(id));
-              const newUrl = `${window.location.pathname}?${p.toString()}`;
-              window.history.pushState({}, '', newUrl);
-              // notify Dashboard's useSearchParams to pick up the change
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            } catch (e) { console.debug('navigate to schedule view failed', e) }
+            (async () => {
+              try {
+                const id = row?.ScheduleID || row?.id || row?.ScheduleId;
+                if (!id) return;
+                // indicate loading for modal operations
+                schDispatch({ type: 'SET_LOADING', payload: true });
+
+                // Attempt to fetch filled-form data for this schedule (if available)
+                let payload = null;
+                try {
+                  payload = await getFilledFormByScheduleId(schDispatch, id, fetchWithAuth);
+                } catch (e) {
+                  // If fetching filled form fails, continue with basic schedule row
+                  console.debug('getFilledFormByScheduleId failed, opening read-only schedule with row only', e);
+                  payload = null;
+                }
+
+                const schedule = (payload && payload.schedule) ? payload.schedule : (payload && payload.data) ? payload.data : row;
+
+                // set selected schedule so other parts of the UI can reference it
+                schDispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
+
+                // If filled form data exists, populate layer/dairy form in reducer so read-only forms show values
+                if (payload && payload.form) {
+                  // payload.form expected to contain layerForm/dairyForm or similar shape
+                  schDispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: payload.form });
+                }
+
+                // Open the schedule modal in read-only mode
+                schDispatch({ type: 'OPEN_FORM', payload: { ...schedule, __readOnly: true } });
+              } catch (e) {
+                console.error('Failed to open schedule view inline', e);
+                schDispatch({ type: 'SET_MESSAGE', payload: e?.response?.data?.message || e?.message || 'Failed to load schedule' });
+              } finally {
+                schDispatch({ type: 'SET_LOADING', payload: false });
+              }
+            })();
           }}
           onEdit={(row) => {
             try {
@@ -144,16 +169,56 @@ export default function AdvisorVisits() {
           onSubmit={(row) => { console.log('submit', row) }}
           onFill={(row) => {
             try {
-              const id = row?.ScheduleID || row?.id || row?.ScheduleId;
-              if (!id) return;
-              const p = new URLSearchParams(window.location.search || '');
-              p.set('tab', 'farmvisitschedule');
-              p.set('open', 'fill');
-              p.set('scheduleId', String(id));
-              const newUrl = `${window.location.pathname}?${p.toString()}`;
-              window.history.pushState({}, '', newUrl);
-              window.dispatchEvent(new PopStateEvent('popstate'));
-            } catch (e) { console.debug('navigate to schedule fill failed', e) }
+              if (!row) return;
+              // mark the selected schedule so modal and other parts of reducer can reference it
+              schDispatch({ type: 'SET_SELECTED_SCHEDULE', payload: row });
+
+              // Prefill minimal visit form data depending on farm type,
+              // and include VisitPurpose + ProposedDate when available.
+              const farmType = (row.FarmType || row.FarmTypeCode || row.FarmTypeName || row.FarmTypeName || '').toString().toUpperCase();
+              const base = {
+                FarmID: row.FarmID || row.FarmId || (row.Farm && (row.Farm.FarmID || row.Farm.id)) || null,
+                FarmName: row.FarmName || (row.Farm && (row.Farm.FarmName || row.Farm.Name)) || null,
+                ScheduleID: row.ScheduleID || row.id || row.ScheduleId || null,
+                // Do not prefill Location from the Farms table or schedule row — prefer modal-provided coordinates
+                Location: null,
+              };
+
+              // Derive VisitPurpose from multiple possible fields
+              const visitPurpose = row.VisitPurpose || row.VisitType || row.VisitPurposeName || row.VisitCodeName || row.VisitPurposeName || '';
+
+              // Format ProposedDate for datetime-local input (local time)
+              let proposedDate = '';
+              try {
+                const raw = row.ProposedDate || row.ProposedDateTime || row.Proposed || row.VisitDate || row.VisitDateTime || row.ProposedDateLocal;
+                if (raw) {
+                  const d = new Date(raw);
+                  if (!isNaN(d.getTime())) {
+                    const tzOffset = d.getTimezoneOffset();
+                    const local = new Date(d.getTime() - tzOffset * 60000);
+                    proposedDate = local.toISOString().slice(0, 16);
+                  }
+                }
+              } catch (e) { /* ignore date parse errors */ }
+
+              const fillPayload = {};
+              if (farmType === 'LAYER') {
+                fillPayload.layerForm = { ...base, FarmType: 'LAYER', VisitPurpose: visitPurpose || undefined, ProposedDate: proposedDate || undefined };
+                fillPayload.dairyForm = null;
+              } else if (farmType === 'DAIRY') {
+                fillPayload.dairyForm = { ...base, FarmType: 'DAIRY', VisitPurpose: visitPurpose || undefined, ProposedDate: proposedDate || undefined };
+                fillPayload.layerForm = null;
+              } else {
+                // unknown farm type: still open modal with selected schedule but no specific form prefilled
+                fillPayload.layerForm = null;
+                fillPayload.dairyForm = null;
+              }
+
+              schDispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload: fillPayload });
+              schDispatch({ type: 'OPEN_FILL_MODAL', payload: row });
+            } catch (e) {
+              console.debug('open fill modal inline failed', e);
+            }
           }}
           onProcess={(row) => { console.log('process', row) }}
           onComplete={(row) => { console.log('complete', row) }}
@@ -175,7 +240,37 @@ export default function AdvisorVisits() {
         state={schState}
         dispatch={schDispatch}
         fetchWithAuth={fetchWithAuth}
-        closeModal={() => schDispatch({ type: 'CLOSE_FORM' })}
+        closeModal={(which) => {
+          try {
+            switch ((which || '').toString()) {
+              case 'schedule':
+                schDispatch({ type: 'CLOSE_FORM' });
+                break;
+              case 'delete':
+                schDispatch({ type: 'CLOSE_DELETE_MODAL' });
+                break;
+              case 'submit':
+                schDispatch({ type: 'CLOSE_SUBMIT_MODAL' });
+                break;
+              case 'process':
+                schDispatch({ type: 'CLOSE_APPROVAL_MODAL' });
+                break;
+              case 'complete':
+                schDispatch({ type: 'CLOSE_COMPLETE_MODAL' });
+                break;
+              case 'bulkUpload':
+                schDispatch({ type: 'CLOSE_BULK_MODAL' });
+                break;
+              case 'fillVisit':
+                schDispatch({ type: 'CLOSE_FILL_MODAL' });
+                break;
+              default:
+                schDispatch({ type: 'CLOSE_FORM' });
+            }
+          } catch (e) {
+            console.debug('closeModal dispatch failed', e);
+          }
+        }}
         onSave={async () => {
           try {
             // Basic client-side validation to avoid sending requests that will 400
@@ -239,7 +334,21 @@ export default function AdvisorVisits() {
         onProcessApproval={() => {}}
         onCompleteVisit={() => {}}
         onBulkUpload={() => {}}
-        onFillVisitSave={() => {}}
+        onFillVisitSave={async (payload) => {
+            try {
+              // dispatch loading state to reducer so modal shows any spinner
+              schDispatch({ type: 'SET_FILL_LOADING', payload: true });
+              await fillVisit(schDispatch, payload, fetchWithAuth);
+              // close fill modal and refresh list
+              schDispatch({ type: 'CLOSE_FILL_MODAL' });
+              setPage(1);
+            } catch (e) {
+              // errors are handled inside fillVisit (and re-thrown). Surface a console debug here.
+              console.error('Failed to save filled visit', e);
+            } finally {
+              schDispatch({ type: 'SET_FILL_LOADING', payload: false });
+            }
+        }}
         setFillVisitFormData={(payload) => schDispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload })}
         setFormData={(updater) => {
           if (typeof updater === 'function') {

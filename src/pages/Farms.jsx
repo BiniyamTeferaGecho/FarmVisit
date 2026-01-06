@@ -12,6 +12,8 @@ import ColumnHeaderFilter from '../components/ColumnHeaderFilter';
 import ColumnSelector from '../components/ColumnSelector';
 import { FaPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUndo, FaMapMarkerAlt, FaBuilding, FaUser, FaPhone, FaEnvelope, FaGlobe, FaInfoCircle, FaSearch, FaTimes, FaColumns } from 'react-icons/fa';
 import { toCsv } from '../utils/csv';
+import TopNav from '../components/TopNav';
+import Sidebar from '../components/Sidebar';
 
 const initialForm = {
     FarmName: '',
@@ -38,7 +40,10 @@ const validators = {
     farmStatus: v => !v || ['Active', 'Inactive', 'Under Construction'].includes(v),
 };
 
-export default function Farms() {
+export default function Farms({ inDashboard = false }) {
+    const HEADER_HEIGHT = 64;
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
     const { user, fetchWithAuth } = useAuth();
     const navigate = useNavigate();
 
@@ -885,13 +890,36 @@ export default function Farms() {
     // Farm form fields are rendered by `FarmForm` component (see ./FarmForm.jsx)
 
     return (
-        <main className="text-left flex-1 p-6 bg-gray-100 dark:bg-gray-900">
-            <div className="text-left bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+        <>
+            {!inDashboard && (
+                <div style={{ height: HEADER_HEIGHT }} className="fixed top-0 left-0 right-0 z-40">
+                    <TopNav onToggleSidebar={() => setSidebarOpen(s => !s)} onToggleCollapse={() => {}} />
+                </div>
+            )}
+
+            {!inDashboard && (
+                <Sidebar
+                    isOpen={sidebarOpen}
+                    isCollapsed={false}
+                    active={'farms'}
+                    onChange={() => {}}
+                    onClose={() => setSidebarOpen(false)}
+                    width={280}
+                    minWidth={82}
+                />
+            )}
+
+            <main style={{ paddingTop: inDashboard ? 0 : HEADER_HEIGHT }} className="text-left flex-1 p-6 bg-gray-100 dark:bg-gray-900">
+                <div className="text-left bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
                 <div className="text-left flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
                     <div className="w-full md:flex-1">
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center"><span className="mr-3 text-indigo-600"><FaBuilding /></span>Manage Farms</h2>
+                    </div>
+
+                    <div className="flex w-full sm:w-auto justify-end flex-col sm:flex-row sm:flex-nowrap items-stretch sm:items-center gap-2 mt-4 md:mt-0 md:ml-4">
                         <ListHeaderWithFilter
-                            title="Manage Farms"
-                            icon={<FaBuilding />}
+                            title=""
+                            icon={null}
                             selectOptions={farmTypes}
                             onApplyFilters={(filters) => {
                                 // merge with existing filters and refresh
@@ -917,28 +945,24 @@ export default function Farms() {
                                 fetchList({ pageIndex: 0, pageSize: pagination.pageSize });
                             }}
                         />
-                    </div>
-
-                    <div className="text-left flex items-center space-x-2 mt-4 md:mt-0 md:ml-4">
-                        <button onClick={openCreate} className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        <button onClick={openCreate} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-sm whitespace-nowrap">
                             <FaPlus className="mr-2" /> New Farm
                         </button>
-                        <div className="relative">
+                        <div className="relative w-full sm:w-auto">
                             <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleBulkFile} />
-                            <button className="flex items-center px-4 py-2 bg-teal-600 text-white rounded-lg shadow-md hover:bg-teal-700">
+                            <button className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-teal-600 text-white rounded-lg shadow-md hover:bg-teal-700 text-sm whitespace-nowrap">
                                 <FaFileCsv className="mr-2" /> {bulkFile ? 'File Selected' : 'Bulk Upload'}
                             </button>
                         </div>
                         {bulkFile && (
-                            <button onClick={uploadBulk} className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700">
+                            <button onClick={uploadBulk} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 text-sm whitespace-nowrap">
                                 Upload
                             </button>
                         )}
-                        <button onClick={downloadTemplate} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                        <button onClick={downloadTemplate} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm whitespace-nowrap">
                             <FaDownload className="mr-2" /> Template
                         </button>
-                        <div />
-                        <button onClick={exportFarms} className="flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600">
+                        <button onClick={exportFarms} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm whitespace-nowrap">
                             <FaFileCsv className="mr-2" /> Export
                         </button>
                     </div>
@@ -1173,19 +1197,23 @@ export default function Farms() {
                     <span>Total farms: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong></span>
                 </div>
                 {/* Pagination controls (bottom) */}
-                <div className="mt-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">Rows per page:</span>
-                        <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm">
-                            {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <span className="text-sm text-gray-600">Rows per page:</span>
+                            <select value={pagination.pageSize} onChange={e => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))} className="form-select rounded-md shadow-sm text-sm w-full sm:w-auto">
+                                {[10,20,50,100].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="text-sm text-gray-600 sm:ml-4">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
                     </div>
-                    <div className="text-sm text-gray-600">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
-                    <div className="flex items-center space-x-2">
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end w-full sm:w-auto">
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
+                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
                     </div>
                 </div>
             </div>
@@ -1265,5 +1293,6 @@ export default function Farms() {
                 changes={pendingSaveChanges}
             />
         </main>
+        </>
     );
 }

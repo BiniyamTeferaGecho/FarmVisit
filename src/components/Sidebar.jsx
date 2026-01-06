@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { FaHome, FaUsers, FaBriefcase, FaLayerGroup, FaClipboardList, FaCalendarAlt, FaClock, FaChartBar, FaCog, FaChevronDown, FaChevronRight, FaTags, FaBookOpen, FaPhone, FaUserPlus, FaBuilding, FaIndustry, FaSignOutAlt } from 'react-icons/fa';
 import { useAuth } from '../auth/AuthProvider';
-import { href, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const menu = [
     { key: 'dashboard', label: 'Dashboard', href: '/dashboard?tab=dashboard', icon: FaHome },
@@ -157,7 +157,6 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
             const target = item.href ? item.href : `/dashboard?tab=${item.key}`;
             // Prevent default anchor behavior if event present
             if (e && typeof e.preventDefault === 'function') e.preventDefault();
-            navigate(target);
             // Determine the tab key to notify the parent with. Prefer an explicit
             // `tab` query parameter from the href (this avoids mismatches where
             // menu item keys use dashes but the dashboard query uses underscores).
@@ -166,9 +165,23 @@ export default function Sidebar({ isOpen = false, isCollapsed = false, onClose, 
                 const url = new URL(target, window.location.origin);
                 const t = url.searchParams.get('tab');
                 if (t) tabKey = t;
-            } catch (e) { /* ignore invalid URL parsing */ }
+            } catch (err) { /* ignore invalid URL parsing */ }
             // Notify parent of the navigation so Dashboard can update active tab state.
-            onChange && onChange(tabKey);
+            try {
+                onChange && onChange(tabKey);
+            } catch (err) { /* ignore parent handler errors */ }
+            // Emit a custom event so other parts of the app (Dashboard) can react
+            // immediately in desktop/in-flow scenarios where a direct navigation
+            // may not trigger the expected handler timing.
+            try {
+                const ev = new CustomEvent('sidebar-open-tab', { detail: tabKey });
+                window.dispatchEvent(ev);
+            } catch (err) { /* ignore event dispatch errors */ }
+            // Navigate after notifying parent. Log for diagnostics on desktop.
+            try {
+                console.debug('Sidebar nav ->', { target, tabKey, isDesktop: window.innerWidth >= 1024 });
+            } catch (err) { /* ignore console errors */ }
+            navigate(target);
             if (window.innerWidth < 1024) {
                 // Delay closing the mobile sidebar slightly so navigation can settle
                 try {
