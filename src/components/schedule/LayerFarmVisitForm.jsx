@@ -89,6 +89,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
   const [imagePreviews, setImagePreviews] = useState([]);
   const createdBlobUrlsRef = useRef([]);
   const inputRef = useRef(null);
+  const savingRef = useRef(false);
   const [locationReadOnly, setLocationReadOnly] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState(null);
@@ -194,6 +195,8 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     }
 
   const handleSave = async () => {
+    // Prevent re-entrancy / double-submit
+    if (savingRef.current) return
     const errs = validate()
     // merge external errors (from parent) with local validation
     const merged = { ...(externalErrors || {}), ...errs }
@@ -210,16 +213,24 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
 
     // If parent provided an onSave handler, defer to it (keeps existing behavior)
     if (typeof onSave === 'function') {
+      savingRef.current = true
+      setInternalSaving(true)
       try {
         await onSave();
+        // close modal if caller didn't (common UI expectation)
+        if (typeof onCancel === 'function') onCancel()
       } catch (err) {
         console.error('parent onSave error', err);
         alert(err?.message || 'Save failed');
+      } finally {
+        setInternalSaving(false)
+        savingRef.current = false
       }
       return;
     }
 
     // Otherwise perform an upsert to the layer-farm API endpoint
+    savingRef.current = true
     setInternalSaving(true)
     try {
       const payload = { ...data };
@@ -271,6 +282,8 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         // notify parent if they want the response
         if (typeof onSave === 'function') onSave(res.data)
         else alert('Layer farm visit saved successfully')
+        // close modal after successful save
+        if (typeof onCancel === 'function') onCancel()
       } else {
         const msg = res && res.data && (res.data.message || (res.data.error && res.data.error.message))
         alert(msg || 'Failed to save layer farm visit')
@@ -281,6 +294,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
       alert(friendly)
     } finally {
       setInternalSaving(false)
+      savingRef.current = false
     }
   }
 

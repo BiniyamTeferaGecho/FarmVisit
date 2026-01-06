@@ -1442,7 +1442,7 @@ const FarmVisitSchedule = () => {
       <button
         onClick={() => openModal('schedule')}
         disabled={creatingScheduleLocked}
-        className={`fixed bottom-6 right-4 sm:hidden z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition ${creatingScheduleLocked ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'}`}
+        className={`fixed bottom-6 right-4 md:hidden z-50 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition ${creatingScheduleLocked ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'}`}
         aria-label="New schedule"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

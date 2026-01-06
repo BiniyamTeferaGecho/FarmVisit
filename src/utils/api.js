@@ -64,7 +64,7 @@ else if (typeof window !== 'undefined' && window.location && window.location.hos
   // when served from a host (e.g., Vercel), assume same-origin API path
   base = `${window.location.origin}`;
 } else {
-  // Local development default
+  // Local development default (backend listens on port 3000 in this repo)
   base = 'http://localhost:80';
 }
 
