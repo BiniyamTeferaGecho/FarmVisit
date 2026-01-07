@@ -418,7 +418,7 @@ export default function Farmers({ inDashboard = false }) {
         let cancelled = false
         ;(async () => {
             try {
-                const res1 = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Primary Language')}`, method: 'get' })
+                const res1 = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent('Primary Language')}`, method: 'get' })
                 const payload1 = res1?.data?.data || res1?.data || res1
                 let rows1 = []
                 if (Array.isArray(payload1)) rows1 = payload1
@@ -432,7 +432,7 @@ export default function Farmers({ inDashboard = false }) {
                 }).filter(Boolean)
                 if (!cancelled) setPrimaryLanguageOptions(opts1)
 
-                const res2 = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/${encodeURIComponent('Education Level')}`, method: 'get' })
+                const res2 = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent('Education Level')}`, method: 'get' })
                 const payload2 = res2?.data?.data || res2?.data || res2
                 let rows2 = []
                 if (Array.isArray(payload2)) rows2 = payload2
