@@ -767,22 +767,22 @@ export default function Farmers({ inDashboard = false }) {
                 />
             )}
 
-            <div style={{ paddingTop: inDashboard ? 0 : HEADER_HEIGHT }} className="p-4 md:p-8 bg-gray-100 min-h-screen">
+            <div style={{ paddingTop: inDashboard ? 0 : HEADER_HEIGHT }} className="relative p-4 md:p-8 bg-gray-100 min-h-screen">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mb-6 gap-3">
                     <h1 className="text-3xl font-bold text-gray-800 flex items-center"><FaTractor className="inline-block mr-3 text-indigo-600" />Farmers</h1>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                        <button onClick={handleAdd} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-sm">
+                        <button onClick={handleAdd} disabled={loading} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 text-sm">
                             <FaPlus className="mr-2" /> New Farmer
                         </button>
                         <input ref={bulkInputRef} type="file" accept=",.csv,text/csv" className="hidden" onChange={e => setSelectedBulkFile(e.target.files?.[0] || null)} />
-                        <button onClick={() => bulkInputRef.current?.click()} className="px-3 py-2 text-sm font-medium bg-teal-600 text-white rounded-md shadow-md hover:bg-teal-700 flex items-center space-x-2 w-full sm:w-auto justify-center">
+                        <button onClick={() => bulkInputRef.current?.click()} disabled={loading} className="px-3 py-2 text-sm font-medium bg-teal-600 text-white rounded-md shadow-md hover:bg-teal-700 flex items-center space-x-2 w-full sm:w-auto justify-center">
                             <FaFileCsv />
                             <span>Bulk Upload</span>
                         </button>
-                        <button onClick={downloadTemplate} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm">
+                        <button onClick={downloadTemplate} disabled={loading} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm">
                             <FaDownload className="mr-2" /> Template
                         </button>
-                        <button onClick={exportFarmers} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm">
+                        <button onClick={exportFarmers} disabled={loading} className="flex items-center justify-center w-full sm:w-auto px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg shadow-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm">
                             <FaFileCsv className="mr-2" /> Export
                         </button>
 
@@ -799,6 +799,12 @@ export default function Farmers({ inDashboard = false }) {
                 </div>
             {/* horizontal divider similar to Farms list */}
             <div className="border-b border-gray-200 mb-6" />
+
+            {loading && (
+                <div className="absolute inset-0 z-50 bg-white bg-opacity-60 flex items-center justify-center">
+                    <LoadingSpinner />
+                </div>
+            )}
 
             {/* Filters removed */}
 
@@ -880,12 +886,12 @@ export default function Farmers({ inDashboard = false }) {
                     )}
 
                     <div className="w-48">
-                        <input type="text" value={createdByFilter} onChange={e => setCreatedByFilter(e.target.value)} placeholder="Created By Advisor)" className="w-full px-3 py-2 border rounded-md text-sm" />
+                        <input type="text" value={createdByFilter} onChange={e => setCreatedByFilter(e.target.value)} placeholder="Created By Advisor)" className="w-full px-3 py-2 border rounded-md text-sm" disabled={loading} />
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <button type="button" onClick={handleSearch} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Search</button>
-                        <button type="button" onClick={handleClearSearch} className="px-3 py-2 bg-gray-200 text-gray-800 rounded-md text-sm">Clear</button>
+                        <button type="button" onClick={handleSearch} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Search</button>
+                        <button type="button" onClick={handleClearSearch} disabled={loading} className="px-3 py-2 bg-gray-200 text-gray-800 rounded-md text-sm">Clear</button>
                     </div>
                 </div>
             </div>
@@ -976,9 +982,9 @@ export default function Farmers({ inDashboard = false }) {
                                                                 return (
                                                                     <td key={cid} className="px-4 py-3 text-right">
                                                                         <div className="flex items-center justify-end gap-2">
-                                                                            <button onClick={() => handleView && handleView(row.FarmerID)} title="View" className="text-gray-600 hover:text-gray-800"><FaEye /></button>
-                                                                            {canEdit && <button onClick={() => handleEdit && handleEdit(row.FarmerID)} title="Edit" className="text-indigo-600 hover:text-indigo-800"><FaEdit /></button>}
-                                                                            {canDelete && <button onClick={() => handleDelete && handleDelete(row)} title="Delete" className="text-red-600 hover:text-red-800"><FaTrash /></button>}
+                                                                            <button onClick={() => handleView && handleView(row.FarmerID)} title="View" disabled={loading} className="text-gray-600 hover:text-gray-800"><FaEye /></button>
+                                                                            {canEdit && <button onClick={() => handleEdit && handleEdit(row.FarmerID)} title="Edit" disabled={loading} className="text-indigo-600 hover:text-indigo-800"><FaEdit /></button>}
+                                                                            {canDelete && <button onClick={() => handleDelete && handleDelete(row)} title="Delete" disabled={loading} className="text-red-600 hover:text-red-800"><FaTrash /></button>}
                                                                         </div>
                                                                     </td>
                                                                 );
@@ -1011,20 +1017,20 @@ export default function Farmers({ inDashboard = false }) {
                                             <nav aria-label="Page navigation example" className="flex items-center space-x-4 mt-4">
                                                 <ul className="flex -space-x-px text-sm">
                                                                 <li>
-                                                                    <button type="button" onClick={() => fetchData({ PageNumber: Math.max(1, current - 1), PageSize: pageSize })} disabled={prevDisabled} className={`flex items-center justify-center text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5 rounded-s-base text-sm px-3 h-9 focus:outline-none ${prevDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>Previous</button>
+                                                                    <button type="button" onClick={() => fetchData({ PageNumber: Math.max(1, current - 1), PageSize: pageSize })} disabled={prevDisabled || loading} className={`flex items-center justify-center text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5 rounded-s-base text-sm px-3 h-9 focus:outline-none ${(prevDisabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}>Previous</button>
                                                                 </li>
                                                     {pages.map(p => (
                                                         <li key={p}>
-                                                                        <button type="button" onClick={() => fetchData({ PageNumber: p, PageSize: pageSize })} aria-current={p === current ? 'page' : undefined} className={`flex items-center justify-center ${p === current ? 'text-fg-brand bg-neutral-tertiary-medium box-border border border-default-medium hover:text-fg-brand font-medium' : 'text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5'} text-sm ${p === current ? 'w-9 h-9 focus:outline-none' : 'w-9 h-9 focus:outline-none'}`}>{p}</button>
+                                                                        <button type="button" onClick={() => fetchData({ PageNumber: p, PageSize: pageSize })} aria-current={p === current ? 'page' : undefined} disabled={loading} className={`flex items-center justify-center ${p === current ? 'text-fg-brand bg-neutral-tertiary-medium box-border border border-default-medium hover:text-fg-brand font-medium' : 'text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5'} text-sm ${p === current ? 'w-9 h-9 focus:outline-none' : 'w-9 h-9 focus:outline-none'}`}>{p}</button>
                                                         </li>
                                                     ))}
                                                                 <li>
-                                                                    <button type="button" onClick={() => fetchData({ PageNumber: Math.min(totalPages, current + 1), PageSize: pageSize })} disabled={nextDisabled} className={`flex items-center justify-center text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5 rounded-e-base text-sm px-3 h-9 focus:outline-none ${nextDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>Next</button>
+                                                                    <button type="button" onClick={() => fetchData({ PageNumber: Math.min(totalPages, current + 1), PageSize: pageSize })} disabled={nextDisabled || loading} className={`flex items-center justify-center text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5 rounded-e-base text-sm px-3 h-9 focus:outline-none ${(nextDisabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}>Next</button>
                                                                 </li>
                                                 </ul>
                                                 <form className="w-32 mx-auto">
                                                     <label htmlFor="pageSize" className="sr-only">Select page size</label>
-                                                    <select id="pageSize" value={pageSize} onChange={e => { const v = Number(e.target.value); setPageSize(v); setPageIndex(0); setPaginationMeta(null); fetchData({ PageNumber: 1, PageSize: v }); }} className="block w-full px-3 py-2.5 bg-neutral-secondary-medium border border-default-medium text-heading text-sm leading-4 rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body">
+                                                    <select id="pageSize" value={pageSize} onChange={e => { const v = Number(e.target.value); setPageSize(v); setPageIndex(0); setPaginationMeta(null); fetchData({ PageNumber: 1, PageSize: v }); }} disabled={loading} className="block w-full px-3 py-2.5 bg-neutral-secondary-medium border border-default-medium text-heading text-sm leading-4 rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body">
                                                         <option value={10}>10 per page</option>
                                                         <option value={25}>25 per page</option>
                                                         <option value={50}>50 per page</option>
