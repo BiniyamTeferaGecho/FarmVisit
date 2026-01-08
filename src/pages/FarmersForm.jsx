@@ -343,6 +343,12 @@ function FarmersForm({ form, setForm, onFieldChange, fieldErrors, loading, onCan
         <InputField icon={<FaUser />} label="First Name" name="FirstName" value={form.FirstName} onChange={handleChange} error={fieldErrors?.FirstName} placeholder="First name" readOnly={readOnly} />
         <InputField icon={<FaUser />} label="Last Name" name="LastName" value={form.LastName} onChange={handleChange} error={fieldErrors?.LastName} placeholder="Last name" readOnly={readOnly} />
         <InputField icon={<FaUser />} label="Father's Name" name="FatherName" value={form.FatherName} onChange={handleChange} placeholder="Father's name" readOnly={readOnly} />
+        <SelectField icon={<FaUser />} label="Gender" name="Gender" value={form.Gender} onChange={handleChange} error={fieldErrors?.Gender} readOnly={readOnly}>
+          <option value="">Select gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </SelectField>
         <InputField icon={<FaIdCard />} label="National ID" name="NationalID" value={form.NationalID} onChange={handleChange} placeholder="National ID" readOnly={readOnly} />
         <InputField icon={<FaPhone />} label="Phone Number" name="PhoneNumber" value={form.PhoneNumber} onChange={handleChange} error={fieldErrors?.PhoneNumber} placeholder="0912345678" readOnly={readOnly} />
         <InputField icon={<FaPhone />} label="Alternate Phone" name="AlternatePhoneNumber" value={form.AlternatePhoneNumber} onChange={handleChange} placeholder="Alternate phone" readOnly={readOnly} />
