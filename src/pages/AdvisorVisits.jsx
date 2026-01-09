@@ -48,17 +48,17 @@ export default function AdvisorVisits() {
         // Include completed and drafts by default; adjust if filters request exclusion
         params.set('IncludeCompleted', String(1))
         params.set('IncludeDraft', String(1))
-        const url = `/farm-visit-schedule/list/user?${params.toString()}`
+        const url = `/farm-visit-schedule/list/user/v2?${params.toString()}`
         const res = await fetchWithAuth({ url, method: 'get' })
         const body = res?.data || res
         if (!mounted) return
         // New endpoint returns { success: true, data: rows, totalCount }
         if (body && body.success && Array.isArray(body.data)) {
           setItems(body.data)
-          setTotal(body.totalCount || (body.data && body.data.length) || 0)
+          setTotal(body.totalCount || body.TotalCount || body.total || (body.data && body.data.length) || 0)
           const uniq = Array.from(new Set((body.data || []).map(i => i.VisitStatus || i.VisitStatusName).filter(Boolean)))
           setStatuses(uniq)
-        } else if (Array.isArray(body)) {
+        } else if (body && Array.isArray(body)) {
           // fallback older shapes
           setItems(body)
           setTotal(body.length)

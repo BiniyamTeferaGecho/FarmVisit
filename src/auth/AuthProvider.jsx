@@ -103,9 +103,28 @@ export function AuthProvider({ children }) {
       try {
         const payload = decodeJwt(token);
         if (!payload) throw new Error('invalid token');
-        setUser(normalizeUser({ id: payload.sub, username: payload.username, roles: payload.roles || [], permissions: payload.permissions || [] }));
+        const minimal = normalizeUser({ id: payload.sub, username: payload.username, roles: payload.roles || [], permissions: payload.permissions || [] });
+        setUser(minimal);
+        // persist and configure axios
         localStorage.setItem('accessToken', token);
         try { setAuthToken(token); } catch (e) { /* ignore */ }
+        // Attempt to fetch EmployeeID if the backend exposes it
+        (async () => {
+          try {
+            const resp = await api.get('/users/me/employee-id', { headers: { Authorization: `Bearer ${token}` }, withCredentials: true });
+            const eid = resp?.data?.employeeId || resp?.data?.EmployeeID || resp?.data?.EmployeeId || resp?.data?.Employeeid || resp?.data;
+            if (eid) {
+              setUser(prev => {
+                const u = normalizeUser(prev || minimal);
+                u.employee = u.employee || {};
+                u.employee.id = u.employee.id || eid;
+                return u;
+              });
+            }
+          } catch (e) {
+            // ignore failures — server-side resolution still works as fallback
+          }
+        })();
       } catch (e) {
         setToken(null); setUser(null); localStorage.removeItem('accessToken');
       }
@@ -152,6 +171,21 @@ export function AuthProvider({ children }) {
             setUser(normalizeUser(userObj));
             try { localStorage.setItem('accessToken', access); } catch (e) { /* ignore */ }
             try { setAuthToken(access); } catch (e) { /* ignore */ }
+            // Fetch EmployeeID if backend provides it and user object lacks it
+            (async () => {
+              try {
+                const resp = await api.get('/users/me/employee-id', { headers: { Authorization: `Bearer ${access}` }, withCredentials: true });
+                const eid = resp?.data?.employeeId || resp?.data?.EmployeeID || resp?.data;
+                if (eid) {
+                  setUser(prev => {
+                    const u = normalizeUser(prev || userObj);
+                    u.employee = u.employee || {};
+                    u.employee.id = u.employee.id || eid;
+                    return u;
+                  });
+                }
+              } catch (e) { /* ignore */ }
+            })();
           } else {
             // Fallback: set token and let the decode effect populate a minimal user
             skipDecodeRef.current = true;
@@ -202,8 +236,24 @@ export function AuthProvider({ children }) {
       skipDecodeRef.current = true;
       setToken(accessToken);
       if (userObj && typeof userObj === 'object') {
-        setUser(normalizeUser(userObj));
+        const normalized = normalizeUser(userObj);
+        setUser(normalized);
         try { localStorage.setItem('accessToken', accessToken); } catch (e) { /* ignore */ }
+        // Try to fetch EmployeeID if not present on the provided user object
+        (async () => {
+          try {
+            const resp = await api.get('/users/me/employee-id', { headers: { Authorization: `Bearer ${accessToken}` }, withCredentials: true });
+            const eid = resp?.data?.employeeId || resp?.data?.EmployeeID || resp?.data;
+            if (eid) {
+              setUser(prev => {
+                const u = normalizeUser(prev || normalized);
+                u.employee = u.employee || {};
+                u.employee.id = u.employee.id || eid;
+                return u;
+              });
+            }
+          } catch (e) { /* ignore */ }
+        })();
       }
       try { setAuthToken(accessToken); } catch (e) { /* ignore */ }
       return;
