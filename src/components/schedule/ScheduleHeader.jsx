@@ -67,7 +67,14 @@ function useFetchStats(reloadKey) {
 
   const ScheduleHeader = ({
   onNew, onRefresh, onClear, onReset, onShowDrafts, onBulkUpload, onDownloadTemplate,
-  dateRange, onDateChange, farmType, onFarmTypeChange, onFilterChange,
+  // filter props
+  q, onQueryChange,
+  status, onStatusChange, statuses,
+  startDate, endDate, onDateChange,
+  sortBy, sortDir, onSortChange,
+  // completed toggle
+  showCompleted = false, onShowCompletedChange,
+  dateRange, onFilterChange, farmType, onFarmTypeChange,
   stats: parentStats, showDatePicker, onToggleDatePicker,
   newDisabled = false,
 }) => {
@@ -128,11 +135,13 @@ function useFetchStats(reloadKey) {
             <button onClick={handleAction(onRefresh, () => setReloadKey(k => k + 1))} className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600">
               <FaSync /> Refresh
             </button>
+            <button
+              onClick={() => onShowCompletedChange && onShowCompletedChange(!showCompleted)}
+              className={`flex items-center gap-2 px-3 py-2 ${showCompleted ? 'bg-yellow-50 text-yellow-800 border border-yellow-200' : 'bg-white text-gray-700 border border-gray-300'} rounded-lg shadow-sm`}
+            >
+              {showCompleted ? 'Hide Completed' : 'Show Completed'}
+            </button>
           </div>
-        </div>
-        
-        <div className={`${filtersOpen ? 'block' : 'hidden'} md:grid md:grid-cols-3 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700`}>
-          {/* Date Range, Farm Type and Clear/Reset controls moved to the page component (FarmVisitSchedule.jsx) */}
         </div>
       </div>
     </div>

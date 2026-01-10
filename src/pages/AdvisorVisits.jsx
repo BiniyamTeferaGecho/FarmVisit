@@ -1,16 +1,19 @@
 import React, { useEffect, useState, useReducer } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import ScheduleList from '../components/schedule/ScheduleList'
+import ScheduleHeader from '../components/schedule/ScheduleHeader'
 import ScheduleModals from '../components/schedule/ScheduleModals'
+import Pagination from '../components/common/Pagination'
 import { scheduleReducer, initialState } from '../reducers/scheduleReducer'
-import { fetchLookups, createSchedule, fillVisit, getFilledFormByScheduleId } from '../services/api'
+import { fetchLookups, createSchedule, fillVisit, getFilledFormByScheduleId, deleteSchedule, submitForApproval, processApproval, approveSchedule, rejectSchedule, completeVisit } from '../services/api'
 
 export default function AdvisorVisits() {
   const { user, fetchWithAuth } = useAuth()
   const advisorId = user && (user.UserID || user.userId || user.id || user.UserId)
 
   const [page, setPage] = useState(1)
-  const [pageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(10)
+  const [serverTotalPages, setServerTotalPages] = useState(null)
   const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -18,6 +21,7 @@ export default function AdvisorVisits() {
   const [status, setStatus] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [showCompleted, setShowCompleted] = useState(false)
   const [sortBy, setSortBy] = useState('VisitDate')
   const [sortDir, setSortDir] = useState('desc')
   const [statuses, setStatuses] = useState([])
@@ -40,22 +44,51 @@ export default function AdvisorVisits() {
       if (!advisorId) return
       setLoading(true)
       try {
-        // Use the new paginated per-user endpoint for advisors. The backend will derive UserID
+        // Use the new paginated per-user endpoint for advisors. The backend will derive UserID 
         // from the token if not explicitly provided. We still include page and pageSize.
         const params = new URLSearchParams()
         params.set('PageNumber', String(page))
         params.set('PageSize', String(pageSize))
-        // Include completed and drafts by default; adjust if filters request exclusion
-        params.set('IncludeCompleted', String(1))
+        // Include completed depending on page-level toggle
+        params.set('IncludeCompleted', String(showCompleted ? 1 : 0))
         params.set('IncludeDraft', String(1))
+        if (q) params.set('SearchTerm', String(q))
+        if (status) params.set('VisitStatus', String(status))
+        if (startDate) params.set('FromDate', String(startDate))
+        if (endDate) params.set('ToDate', String(endDate))
+        if (sortBy) params.set('SortColumn', String(sortBy))
+        if (sortDir) params.set('SortDirection', String(sortDir))
         const url = `/farm-visit-schedule/list/user/v2?${params.toString()}`
         const res = await fetchWithAuth({ url, method: 'get' })
         const body = res?.data || res
         if (!mounted) return
-        // New endpoint returns { success: true, data: rows, totalCount }
+        // New endpoint shapes:
+        // - { success: true, data: rows, totalCount }
+        // - { success: true, data: rows, pagination: { TotalCount, PageNumber, PageSize } }
         if (body && body.success && Array.isArray(body.data)) {
           setItems(body.data)
-          setTotal(body.totalCount || body.TotalCount || body.total || (body.data && body.data.length) || 0)
+          // prefer explicit totals returned by the API
+          const totalFromTop = body.totalCount || body.TotalCount || body.total
+          const totalFromPagination = body.pagination && (body.pagination.TotalCount || body.pagination.totalCount || body.pagination.TotalRecords)
+          // Prefer explicit totals from the API. Avoid clobbering the existing `total` state
+          // with the current page's row count when the API did not provide a total --
+          // this prevents the pager from disappearing immediately after changing pageSize.
+          let resolvedTotal = total
+          if (totalFromTop) resolvedTotal = totalFromTop
+          else if (totalFromPagination) resolvedTotal = totalFromPagination
+          else if (!total || total === 0) resolvedTotal = (body.data && body.data.length) || 0
+          setTotal(resolvedTotal)
+          // if server returned pagination page info, sync local page and serverTotalPages
+          if (body.pagination) {
+            const pn = parseInt(body.pagination.CurrentPage || body.pagination.PageNumber || body.pagination.pageNumber || body.pagination.Page || page, 10) || page
+            const ps = parseInt(body.pagination.PageSize || body.pagination.pageSize || body.pagination.Size || pageSize, 10) || pageSize
+            if (pn !== page) setPage(pn)
+            // don't override client-side pageSize automatically, but capture server's total pages
+            const tp = parseInt(body.pagination.TotalPages || body.pagination.totalPages || body.pagination.Total || null, 10) || null
+            setServerTotalPages(tp)
+          } else {
+            setServerTotalPages(null)
+          }
           const uniq = Array.from(new Set((body.data || []).map(i => i.VisitStatus || i.VisitStatusName).filter(Boolean)))
           setStatuses(uniq)
         } else if (body && Array.isArray(body)) {
@@ -71,40 +104,37 @@ export default function AdvisorVisits() {
     }
     load()
     return () => { mounted = false }
-  }, [advisorId, fetchWithAuth, page, pageSize, q, status, startDate, endDate, sortBy, sortDir])
+  }, [advisorId, fetchWithAuth, page, pageSize, q, status, startDate, endDate, sortBy, sortDir, showCompleted])
 
   const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize))
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-        <h3 className="text-lg font-medium">My Scheduled Visits</h3>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              try {
-                // Open schedule modal inline (no redirect)
-                schDispatch({ type: 'OPEN_FORM', payload: advisorId ? { AdvisorID: String(advisorId) } : null })
-              } catch (e) { console.debug('failed to open new schedule inline', e) }
-            }}
-            className="px-3 py-1 bg-indigo-600 text-white rounded text-sm"
-          >
-            New Schedule
-          </button>
-          <input value={q} onChange={e => { setQ(e.target.value); setPage(1) }} placeholder="Search farm or purpose" className="p-1 border rounded text-sm" />
-          <select value={status} onChange={e => { setStatus(e.target.value); setPage(1) }} className="p-1 border rounded text-sm">
-            <option value="">All status</option>
-            {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1) }} className="p-1 border rounded text-sm" />
-          <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1) }} className="p-1 border rounded text-sm" />
-          <select value={sortBy + '|' + sortDir} onChange={e => { const [sby, sdir] = e.target.value.split('|'); setSortBy(sby); setSortDir(sdir); setPage(1) }} className="p-1 border rounded text-sm">
-            <option value="VisitDate|desc">Date (newest)</option>
-            <option value="VisitDate|asc">Date (oldest)</option>
-            <option value="FarmName|asc">Farm (A→Z)</option>
-            <option value="FarmName|desc">Farm (Z→A)</option>
-          </select>
-        </div>
+      <div className="mb-3">
+        <ScheduleHeader
+          onNew={() => {
+            try {
+              schDispatch({ type: 'OPEN_FORM', payload: advisorId ? { AdvisorID: String(advisorId) } : null })
+            } catch (e) { console.debug('failed to open new schedule inline', e) }
+          }}
+          onRefresh={() => { setPage(1) }}
+          q={q}
+          onQueryChange={(v) => { setQ(v); setPage(1) }}
+          status={status}
+          onStatusChange={(v) => { setStatus(v); setPage(1) }}
+          statuses={statuses}
+          startDate={startDate}
+          endDate={endDate}
+          onDateChange={(from, to) => { setStartDate(from || ''); setEndDate(to || ''); setPage(1) }}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSortChange={(sby, sdir) => { setSortBy(sby || 'VisitDate'); setSortDir(sdir || 'desc'); setPage(1) }}
+          showCompleted={showCompleted}
+          onShowCompletedChange={(v) => { setShowCompleted(Boolean(v)); setPage(1) }}
+          onClear={() => {
+            setQ(''); setStatus(''); setStartDate(''); setEndDate(''); setSortBy('VisitDate'); setSortDir('desc'); setShowCompleted(false); setPage(1)
+          }}
+        />
       </div>
 
       <div className="overflow-x-auto bg-white rounded shadow">
@@ -165,8 +195,8 @@ export default function AdvisorVisits() {
               window.dispatchEvent(new PopStateEvent('popstate'));
             } catch (e) { console.debug('navigate to schedule edit failed', e) }
           }}
-          onDelete={(row) => { console.log('delete', row) }}
-          onSubmit={(row) => { console.log('submit', row) }}
+          onDelete={(row) => { schDispatch({ type: 'OPEN_DELETE_MODAL', payload: row }) }}
+          onSubmit={(row) => { schDispatch({ type: 'OPEN_SUBMIT_MODAL', payload: row }) }}
           onFill={(row) => {
             try {
               if (!row) return;
@@ -220,20 +250,31 @@ export default function AdvisorVisits() {
               console.debug('open fill modal inline failed', e);
             }
           }}
-          onProcess={(row) => { console.log('process', row) }}
-          onComplete={(row) => { console.log('complete', row) }}
+          onProcess={(row) => { schDispatch({ type: 'OPEN_APPROVAL_MODAL', payload: row }) }}
+          onComplete={(row) => { schDispatch({ type: 'OPEN_COMPLETE_MODAL', payload: row }) }}
           recentlyFilled={{}}
           confirmedFilled={{}}
         />
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-sm">
-        <div>{total} visits</div>
+      <div className="mt-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-2 py-1 border rounded bg-white">Prev</button>
-          <div className="px-2">{page} / {totalPages}</div>
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-2 py-1 border rounded bg-white">Next</button>
+          <label htmlFor="pageSize" className="text-sm text-gray-600">Show</label>
+          <select
+            id="pageSize"
+            value={pageSize}
+            onChange={(e) => { const v = Number(e.target.value); setPageSize(v); setPage(1); }}
+            className="border rounded px-2 py-1 text-sm bg-white"
+            aria-label="Select page size"
+          >
+            <option value={10}>10 / page</option>
+            <option value={20}>20 / page</option>
+            <option value={50}>50 / page</option>
+            <option value={100}>100 / page</option>
+          </select>
         </div>
+
+        <Pagination page={page} setPage={setPage} total={total} pageSize={pageSize} maxButtons={7} />
       </div>
       {/* Inline Schedule modal rendered locally so Advisor can create without navigating tabs */}
       <ScheduleModals
@@ -329,10 +370,58 @@ export default function AdvisorVisits() {
         setApprovalData={(payload) => schDispatch({ type: 'SET_APPROVAL_DATA', payload })}
         setProcessData={(payload) => schDispatch({ type: 'SET_PROCESS_DATA', payload })}
         setCompleteData={(payload) => schDispatch({ type: 'SET_COMPLETE_DATA', payload })}
-        onDeleteConfirm={() => {}}
-        onSubmitApproval={() => {}}
-        onProcessApproval={() => {}}
-        onCompleteVisit={() => {}}
+        onDeleteConfirm={async () => {
+          try {
+            const target = schState.deleteTarget || schState.selectedSchedule;
+            const id = target && (target.ScheduleID || target.id || target.ScheduleId);
+            if (!id) return schDispatch({ type: 'SET_MESSAGE', payload: 'No schedule selected to delete.' });
+            await deleteSchedule(schDispatch, id, fetchWithAuth);
+            schDispatch({ type: 'CLOSE_DELETE_MODAL' });
+            setPage(1);
+          } catch (e) {
+            console.error('Failed to delete schedule', e);
+          }
+        }}
+        onSubmitApproval={async () => {
+          try {
+            const target = schState.submitTarget || schState.selectedSchedule;
+            const id = target && (target.ScheduleID || target.id || target.ScheduleId);
+            if (!id) return schDispatch({ type: 'SET_MESSAGE', payload: 'No schedule selected to submit.' });
+            // submitManagerId may be stored in reducer.submitManagerId
+            const managerId = schState.submitManagerId || null;
+            await submitForApproval(schDispatch, id, managerId, fetchWithAuth);
+            schDispatch({ type: 'CLOSE_SUBMIT_MODAL' });
+            setPage(1);
+          } catch (e) {
+            console.error('Failed to submit schedule', e);
+          }
+        }}
+        onProcessApproval={async () => {
+          try {
+            const target = schState.approvalTarget || schState.selectedSchedule;
+            const id = target && (target.ScheduleID || target.id || target.ScheduleId);
+            if (!id) return schDispatch({ type: 'SET_MESSAGE', payload: 'No schedule selected to process.' });
+            const approvalData = schState.approvalData || {};
+            await processApproval(schDispatch, id, approvalData, fetchWithAuth);
+            schDispatch({ type: 'CLOSE_APPROVAL_MODAL' });
+            setPage(1);
+          } catch (e) {
+            console.error('Failed to process approval', e);
+          }
+        }}
+        onCompleteVisit={async () => {
+          try {
+            const target = schState.completeTarget || schState.selectedSchedule;
+            const id = target && (target.ScheduleID || target.id || target.ScheduleId);
+            if (!id) return schDispatch({ type: 'SET_MESSAGE', payload: 'No schedule selected to complete.' });
+            const completeData = schState.completeData || {};
+            await completeVisit(schDispatch, id, completeData, fetchWithAuth);
+            schDispatch({ type: 'CLOSE_COMPLETE_MODAL' });
+            setPage(1);
+          } catch (e) {
+            console.error('Failed to complete visit', e);
+          }
+        }}
         onBulkUpload={() => {}}
         onFillVisitSave={async (payload) => {
             try {

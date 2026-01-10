@@ -1070,13 +1070,41 @@ export default function Farmers({ inDashboard = false }) {
 
             {isDeleteConfirmOpen && (
                 <ConfirmModal
+                    open={isDeleteConfirmOpen}
                     title="Confirm Deletion"
-                    message={`Are you sure you want to delete ${deleteTarget?.FirstName} ${deleteTarget?.LastName}?`}
-                    onConfirm={() => {
-                        console.log("Deleting", deleteTarget);
-                        setDeleteConfirmOpen(false);
+                    message={`Are you sure you want to delete ${deleteTarget?.FirstName || ''} ${deleteTarget?.LastName || ''}?`}
+                    onConfirm={async () => {
+                        try {
+                            setDeleteConfirmOpen(false);
+                            if (!deleteTarget) return;
+                            const id = deleteTarget.FarmerID || deleteTarget.farmerId || deleteTarget.id;
+                            if (!id) {
+                                setError('Invalid farmer selected for deletion');
+                                return;
+                            }
+                            setLoading(true);
+                            const res = await fetchWithAuth({ url: `/farmers/${encodeURIComponent(id)}`, method: 'delete' });
+                            const payload = res?.data || res;
+                            // If API returns success flag handle it
+                            if (payload && (payload.success === false || payload.success === 'false')) {
+                                setError(payload.message || 'Failed to delete farmer');
+                                return;
+                            }
+                            // Remove deleted farmer from local state if present
+                            setData(prev => Array.isArray(prev) ? prev.filter(f => String(f.FarmerID || f.farmerId || f.id) !== String(id)) : prev);
+                            // update totals and possibly refresh page
+                            setTotalRows(prev => Math.max(0, (Number(prev) || 0) - 1));
+                        } catch (err) {
+                            console.error('Delete farmer failed', err);
+                            const msg = err?.response?.data?.message || err?.message || 'Failed to delete farmer';
+                            setError(msg);
+                        } finally {
+                            setLoading(false);
+                        }
                     }}
                     onCancel={() => setDeleteConfirmOpen(false)}
+                    confirmLabel="Delete"
+                    cancelLabel="Cancel"
                 />
             )}
             {showFarmerSaveConfirm && (

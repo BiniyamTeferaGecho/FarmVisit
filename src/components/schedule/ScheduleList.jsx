@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 import api from '../../services/api';
+import { validateCompleteRequirements } from '../../utils/visitValidation';
 import { 
   Pencil, 
   Trash2, 
@@ -14,8 +15,6 @@ import {
   Check
 } from 'lucide-react';
 import { Eye } from 'lucide-react';
-import { validateCompleteRequirements } from '../../utils/visitValidation';
-
 const renderStatus = (visitStatus, approvalStatus) => {
   const v = (visitStatus || '').toString().trim().toLowerCase();
   const a = (approvalStatus || '').toString().trim().toLowerCase();
@@ -211,7 +210,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
         <thead className="bg-gray-50 dark:bg-gray-700">
           <tr>
             <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">#</th>
-            {['Farm Name', 'Advisor', 'Scheduled Date', 'Farm Type', 'Visit Type', 'Visit Status', 'Approval Status', 'Actions'].map(header => (
+            {['Farm Name', 'Visit Code', 'Advisor', 'Scheduled Date', 'Farm Type', 'Visit Type', 'Visit Status', 'Approval Status', 'Actions'].map(header => (
               <th key={header} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 {header}
               </th>
@@ -256,7 +255,8 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
               <tr key={id} className={`transition-colors duration-500`}>
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{idx}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{schedule.FarmName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{advisorMap[schedule.AdvisorID] || 'Loading...'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{schedule.VisitCode || schedule.VisitCodeName || schedule.VisitCodeDisplay || '—'}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{advisorMap[schedule.AdvisorID] || 'Loading...'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                   {(() => {
                     const dateStr = schedule.ScheduleDate || schedule.ProposedDate || schedule.ProposedDateTime || schedule.ProposedDateTimeLocal || null;

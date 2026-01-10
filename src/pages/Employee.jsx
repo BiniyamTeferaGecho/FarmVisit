@@ -568,7 +568,7 @@ export default function Employee({ inDashboard = false }) {
                 </div>
             </Modal>
 
-            <ConfirmModal open={showDelete} title="Confirm Deletion" onClose={() => setShowDelete(false)} onConfirm={doDelete}>
+            <ConfirmModal open={showDelete} title="Confirm Deletion" onCancel={() => setShowDelete(false)} onConfirm={doDelete}>
                 Are you sure you want to delete employee {deleteTarget?.FirstName} {deleteTarget?.FatherName}? This action cannot be undone.
             </ConfirmModal>
             {showSaveConfirm && (
