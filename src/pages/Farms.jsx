@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import ColumnHeaderFilter from '../components/ColumnHeaderFilter';
 import ColumnSelector from '../components/ColumnSelector';
+import Pagination from '../components/common/Pagination';
 import { FaPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUndo, FaMapMarkerAlt, FaBuilding, FaUser, FaPhone, FaEnvelope, FaGlobe, FaInfoCircle, FaSearch, FaTimes, FaColumns } from 'react-icons/fa';
 import { toCsv } from '../utils/csv';
 import TopNav from '../components/TopNav';
@@ -89,7 +90,7 @@ export default function Farms({ inDashboard = false }) {
     const [columnFilters, setColumnFilters] = useState({});
 
     // Column visibility selector
-    const defaultFarmCols = ['farmCode','rowNumber','farmName','type','owner','contact','createdBy','region','status','actions'];
+    const defaultFarmCols = ['rowNumber','farmCode','farmName','type','owner','contact','createdBy','region','status','actions'];
     const [visibleCols, setVisibleCols] = useState(() => {
         try {
             if (typeof window !== 'undefined') {
@@ -1040,6 +1041,7 @@ export default function Farms({ inDashboard = false }) {
                     <table className="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
                         <thead className="bg-gray-50 dark:bg-gray-700 text-xs text-gray-700 dark:text-gray-300 uppercase">
                             <tr>
+                                {visibleCols.has('rowNumber') && (<th className="px-4 py-3">#</th>)}
                                 {visibleCols.has('farmCode') && (
                                     <th className="px-4 py-3">
                                         <ColumnHeaderFilter
@@ -1052,7 +1054,6 @@ export default function Farms({ inDashboard = false }) {
                                         />
                                     </th>
                                 )}
-                                {visibleCols.has('rowNumber') && (<th className="px-4 py-3">#</th>)}
                                 {visibleCols.has('farmName') && (
                                     <th className="px-4 py-3">
                                         <ColumnHeaderFilter
@@ -1172,8 +1173,8 @@ export default function Farms({ inDashboard = false }) {
                                     try { console.debug('Farms pagination debug', { totalRows, listLength: list.length, pageIndex, pageSize, start, returnedLength: list.length }); } catch(e) {}
                                     return list.map((it, idx) => (
                                         <tr key={it.FarmID || start + idx} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                            {visibleCols.has('farmCode') && (<td className="px-4 py-3">{it.FarmCode || it.Code || ''}</td>)}
                                             {visibleCols.has('rowNumber') && (<td className="px-4 py-3">{start + idx + 1}</td>)}
+                                            {visibleCols.has('farmCode') && (<td className="px-4 py-3">{it.FarmCode || it.Code || ''}</td>)}
                                             {visibleCols.has('farmName') && (<td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{it.FarmName || ''}</td>)}
                                             {visibleCols.has('type') && (<td className="px-4 py-3">{(() => { const idKey = (it?.FarmTypeID || it?.farmTypeID || it?.FarmType || '')?.toString(); return (idKey && farmTypeNameCache[idKey]) ? farmTypeNameCache[idKey] : (it.FarmTypeName || it.FarmType || it.Type || it.FarmTypeCode || ''); })()}</td>)}
                                             {visibleCols.has('owner') && (<td className="px-4 py-3">{it.FarmOwner || it.OwnerName || it.Owner || it.FarmerName || it.ContactPerson || ''}</td>)}
@@ -1216,11 +1217,17 @@ export default function Farms({ inDashboard = false }) {
                         <div className="text-sm text-gray-600 sm:ml-4">Page {pagination.pageIndex + 1} of {Math.max(1, Math.ceil(totalRows / pagination.pageSize))}</div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-end w-full sm:w-auto">
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0 || loading} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0 || loading} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1) || loading} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1) || loading} className="w-full sm:w-auto px-3 py-2 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+                    <div className="flex items-center gap-2 justify-end w-full sm:w-auto">
+                        <Pagination
+                            page={Math.max(1, (pagination.pageIndex || 0) + 1)}
+                            setPage={(p) => {
+                                const np = Number(p) || 1
+                                setPagination(prev => ({ ...prev, pageIndex: Math.max(0, np - 1) }))
+                            }}
+                            total={Number(totalRows || 0)}
+                            pageSize={Number(pagination.pageSize || 10)}
+                            totalPages={Math.max(1, Math.ceil((Number(totalRows || 0) || 0) / Number(pagination.pageSize || 10)))}
+                        />
                     </div>
                 </div>
             </div>

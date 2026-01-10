@@ -8,6 +8,7 @@ import AlertModal from '../components/AlertModal';
 import EmployeeForm, { SelectField } from './EmployeeForm';
 import { FaUserPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUserCog, FaUndo, FaIdCard, FaVenusMars, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBuilding, FaUserTie, FaSearch, FaTimes, FaColumns } from 'react-icons/fa';
 import ColumnSelector from '../components/ColumnSelector';
+import Pagination from '../components/common/Pagination';
 import TopNav from '../components/TopNav';
 import Sidebar from '../components/Sidebar';
 import { toCsv } from '../utils/csv';
@@ -535,10 +536,13 @@ export default function Employee({ inDashboard = false }) {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 justify-end w-full sm:w-auto">
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: 0 }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))} disabled={pagination.pageIndex === 0} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.min(p.pageIndex + 1, Math.max(0, Math.ceil(totalRows / p.pageSize) - 1)) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-                        <button onClick={() => setPagination(p => ({ ...p, pageIndex: Math.max(0, Math.ceil(totalRows / p.pageSize) - 1) }))} disabled={pagination.pageIndex >= Math.max(0, Math.ceil(totalRows / pagination.pageSize) - 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+                        <Pagination
+                            page={pagination.pageIndex + 1}
+                            setPage={(p) => setPagination(prev => ({ ...prev, pageIndex: Number.isFinite(p) ? (Number(p) - 1) : 0 }))}
+                            total={Number(totalRows || 0)}
+                            pageSize={pagination.pageSize}
+                            totalPages={Math.max(1, Math.ceil((totalRows || 0) / pagination.pageSize))}
+                        />
                     </div>
                 </div>
             </div>

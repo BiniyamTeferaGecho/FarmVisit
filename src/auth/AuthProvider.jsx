@@ -278,7 +278,9 @@ export function AuthProvider({ children }) {
     if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('application/json')) {
-      return res.json();
+      const body = await res.json();
+      // Return an axios-like response shape so callers can uniformly access `res.data`
+      return { data: body, status: res.status };
     }
     // Not JSON (likely an HTML error page) — return the raw text for better debugging
     const text = await res.text();

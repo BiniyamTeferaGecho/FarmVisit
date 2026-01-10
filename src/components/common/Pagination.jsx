@@ -45,7 +45,7 @@ export default function Pagination({ page, setPage, total = 0, pageSize = 10, ma
         <button
           onClick={() => setPage(p => Math.max(1, p - 1))}
           disabled={page <= 1}
-          className={`${btnBase} bg-white ${page <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+            className={`${btnBase} bg-white ${page <= 1 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
         >Prev</button>
 
         <div className="flex items-center gap-1">
@@ -59,7 +59,7 @@ export default function Pagination({ page, setPage, total = 0, pageSize = 10, ma
                 key={p}
                 onClick={() => setPage(Number(p))}
                 aria-current={isActive ? 'page' : undefined}
-                className={`${btnBase} ${isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-gray-50'}`}
+                className={`${btnBase} ${isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-gray-50 cursor-pointer'}`}
               >{p}</button>
             )
           })}
@@ -68,7 +68,7 @@ export default function Pagination({ page, setPage, total = 0, pageSize = 10, ma
         <button
           onClick={() => setPage(p => Math.min(totalPages, p + 1))}
           disabled={page >= totalPages}
-          className={`${btnBase} bg-white ${page >= totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
+            className={`${btnBase} bg-white ${page >= totalPages ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}
         >Next</button>
       </div>
       <div className="sm:hidden text-sm text-gray-600">{page} / {totalPages}</div>

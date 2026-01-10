@@ -340,8 +340,8 @@ const DashboardHome = () => {
             {advisorPerfLoading ? <div className="text-sm text-gray-500">Loading...</div> : (
               advisorPerf && advisorPerf.length > 0 ? (
                 <div>
-                  <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
+                  <div className="h-72" style={{ minWidth: 0, minHeight: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <BarChart data={advisorPerf.slice((advisorPage-1)*advisorPageSize, (advisorPage)*advisorPageSize)} margin={{ top: 28, right: 12, left: 0, bottom: 48 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="AdvisorName" tick={{ fontSize: 12 }} interval={0} angle={-30} textAnchor="end" height={60} />

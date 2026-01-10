@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaPlus, FaFileCsv, FaDownload, FaSync, FaEdit, FaTrash, FaSearch, FaChevronUp, FaChevronDown, FaSort, FaFileExcel, FaFilePdf, FaEye, FaTrashAlt, FaTimes, FaUser, FaPhone, FaEnvelope, FaIdCard, FaMapMarkerAlt, FaTractor, FaMoneyBillWave, FaUserGraduate, FaLanguage, FaColumns } from 'react-icons/fa';
 import ColumnSelector from '../components/ColumnSelector';
 import TopNav from '../components/TopNav';
+import Pagination from '../components/common/Pagination';
 import Sidebar from '../components/Sidebar';
 import ConfirmModal from '../components/ConfirmModal';
 import Modal from '../components/Modal';
@@ -999,45 +1000,48 @@ export default function Farmers({ inDashboard = false }) {
                                         </tbody>
                                     </table>
 
-                                    {/* Page navigation (example styling) */}
+                                    {/* Page navigation (uses shared Pagination component) */}
                                     {(() => {
-                                        const totalPages = (paginationMeta && paginationMeta.totalPages) ? paginationMeta.totalPages : Math.max(1, Math.ceil((Number(totalRows) || 0) / (pageSize || 10)));
-                                        const current = (paginationMeta && paginationMeta.currentPage) ? paginationMeta.currentPage : (pageIndex + 1);
-                                        const maxPagesToShow = 7;
-                                        let start = Math.max(1, current - Math.floor(maxPagesToShow / 2));
-                                        let end = Math.min(totalPages, start + maxPagesToShow - 1);
-                                        if (end - start + 1 < maxPagesToShow) start = Math.max(1, end - maxPagesToShow + 1);
-                                        const pages = [];
-                                        for (let p = start; p <= end; p++) pages.push(p);
+                                        const totalPagesComputed = (paginationMeta && paginationMeta.totalPages) ? paginationMeta.totalPages : Math.max(1, Math.ceil((Number(totalRows) || 0) / (pageSize || 10)));
+                                        const currentComputed = (paginationMeta && paginationMeta.currentPage) ? paginationMeta.currentPage : (pageIndex + 1);
 
-                                        const prevDisabled = current <= 1;
-                                        const nextDisabled = current >= totalPages;
+                                        const handleSetPage = (p) => {
+                                            // Accept either a page number or an updater function (compatible with
+                                            // the Pagination component which may call setPage(updater)).
+                                            let requestedPage = null
+                                            if (typeof p === 'function') {
+                                                const current = (paginationMeta && paginationMeta.currentPage) ? paginationMeta.currentPage : (pageIndex + 1)
+                                                try { requestedPage = Number(p(current)) } catch (e) { requestedPage = current }
+                                            } else {
+                                                requestedPage = Number(p)
+                                            }
+                                            if (!requestedPage || Number.isNaN(requestedPage)) requestedPage = 1
+                                            requestedPage = Math.max(1, requestedPage)
+                                            setPageIndex(Math.max(0, requestedPage - 1))
+                                            setPaginationMeta(prev => ({ ...(prev || {}), currentPage: requestedPage }))
+                                            fetchData({ PageNumber: requestedPage, PageSize: pageSize })
+                                        }
 
                                         return (
-                                            <nav aria-label="Page navigation example" className="flex items-center space-x-4 mt-4">
-                                                <ul className="flex -space-x-px text-sm">
-                                                                <li>
-                                                                    <button type="button" onClick={() => fetchData({ PageNumber: Math.max(1, current - 1), PageSize: pageSize })} disabled={prevDisabled || loading} className={`flex items-center justify-center text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5 rounded-s-base text-sm px-3 h-9 focus:outline-none ${(prevDisabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}>Previous</button>
-                                                                </li>
-                                                    {pages.map(p => (
-                                                        <li key={p}>
-                                                                        <button type="button" onClick={() => fetchData({ PageNumber: p, PageSize: pageSize })} aria-current={p === current ? 'page' : undefined} disabled={loading} className={`flex items-center justify-center ${p === current ? 'text-fg-brand bg-neutral-tertiary-medium box-border border border-default-medium hover:text-fg-brand font-medium' : 'text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5'} text-sm ${p === current ? 'w-9 h-9 focus:outline-none' : 'w-9 h-9 focus:outline-none'}`}>{p}</button>
-                                                        </li>
-                                                    ))}
-                                                                <li>
-                                                                    <button type="button" onClick={() => fetchData({ PageNumber: Math.min(totalPages, current + 1), PageSize: pageSize })} disabled={nextDisabled || loading} className={`flex items-center justify-center text-body bg-neutral-secondary-medium border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading shadow-xs font-medium leading-5 rounded-e-base text-sm px-3 h-9 focus:outline-none ${(nextDisabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}>Next</button>
-                                                                </li>
-                                                </ul>
-                                                <form className="w-32 mx-auto">
-                                                    <label htmlFor="pageSize" className="sr-only">Select page size</label>
-                                                    <select id="pageSize" value={pageSize} onChange={e => { const v = Number(e.target.value); setPageSize(v); setPageIndex(0); setPaginationMeta(null); fetchData({ PageNumber: 1, PageSize: v }); }} disabled={loading} className="block w-full px-3 py-2.5 bg-neutral-secondary-medium border border-default-medium text-heading text-sm leading-4 rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body">
-                                                        <option value={10}>10 per page</option>
-                                                        <option value={25}>25 per page</option>
-                                                        <option value={50}>50 per page</option>
-                                                        <option value={100}>100 per page</option>
-                                                    </select>
-                                                </form>
-                                            </nav>
+                                            <div className="mt-4 flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm text-gray-600">Rows per page:</span>
+                                                        <select id="pageSize" value={pageSize} onChange={e => { const v = Number(e.target.value); setPageSize(v); setPageIndex(0); setPaginationMeta(null); fetchData({ PageNumber: 1, PageSize: v }); }} disabled={loading} className="block px-3 py-2 bg-white border rounded-md text-sm">
+                                                            <option value={10}>10</option>
+                                                            <option value={25}>25</option>
+                                                            <option value={50}>50</option>
+                                                            <option value={100}>100</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="text-sm text-gray-600 hidden sm:block">
+                                                        Page {Number(currentComputed)} of {Number(totalPagesComputed)} · Total farmers: <strong className="ml-1">{Number(totalRows || 0).toLocaleString()}</strong>
+                                                    </div>
+                                                </div>
+
+                                                <Pagination page={Number(currentComputed)} setPage={handleSetPage} total={Number(totalRows) || 0} pageSize={pageSize} totalPages={Number(totalPagesComputed)} />
+                                            </div>
                                         )
                                     })()}
 
@@ -1070,41 +1074,13 @@ export default function Farmers({ inDashboard = false }) {
 
             {isDeleteConfirmOpen && (
                 <ConfirmModal
-                    open={isDeleteConfirmOpen}
                     title="Confirm Deletion"
-                    message={`Are you sure you want to delete ${deleteTarget?.FirstName || ''} ${deleteTarget?.LastName || ''}?`}
-                    onConfirm={async () => {
-                        try {
-                            setDeleteConfirmOpen(false);
-                            if (!deleteTarget) return;
-                            const id = deleteTarget.FarmerID || deleteTarget.farmerId || deleteTarget.id;
-                            if (!id) {
-                                setError('Invalid farmer selected for deletion');
-                                return;
-                            }
-                            setLoading(true);
-                            const res = await fetchWithAuth({ url: `/farmers/${encodeURIComponent(id)}`, method: 'delete' });
-                            const payload = res?.data || res;
-                            // If API returns success flag handle it
-                            if (payload && (payload.success === false || payload.success === 'false')) {
-                                setError(payload.message || 'Failed to delete farmer');
-                                return;
-                            }
-                            // Remove deleted farmer from local state if present
-                            setData(prev => Array.isArray(prev) ? prev.filter(f => String(f.FarmerID || f.farmerId || f.id) !== String(id)) : prev);
-                            // update totals and possibly refresh page
-                            setTotalRows(prev => Math.max(0, (Number(prev) || 0) - 1));
-                        } catch (err) {
-                            console.error('Delete farmer failed', err);
-                            const msg = err?.response?.data?.message || err?.message || 'Failed to delete farmer';
-                            setError(msg);
-                        } finally {
-                            setLoading(false);
-                        }
+                    message={`Are you sure you want to delete ${deleteTarget?.FirstName} ${deleteTarget?.LastName}?`}
+                    onConfirm={() => {
+                        console.log("Deleting", deleteTarget);
+                        setDeleteConfirmOpen(false);
                     }}
                     onCancel={() => setDeleteConfirmOpen(false)}
-                    confirmLabel="Delete"
-                    cancelLabel="Cancel"
                 />
             )}
             {showFarmerSaveConfirm && (
