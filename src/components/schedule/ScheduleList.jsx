@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 import api from '../../services/api';
+import Pagination from '../common/Pagination';
 import { validateCompleteRequirements } from '../../utils/visitValidation';
 import { 
   Pencil, 
@@ -93,11 +94,98 @@ const ActionButton = ({ onClick, icon: Icon, title, disabled = false, disabledRe
   </div>
 );
 
-const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {}, confirmedFilled = {}, pageStartOffset = 0 }) => {
+const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {}, confirmedFilled = {}, pageStartOffset = 0, page, setPage, total, pageSize, totalPages, maxButtons }) => {
   const [advisorMap, setAdvisorMap] = useState({});
   const [latestMap, setLatestMap] = useState({});
   const [approvalFilter, setApprovalFilter] = useState('All');
   const [visitStatusFilter, setVisitStatusFilter] = useState('All');
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const LOCAL_KEY = 'schedule.visibleColumns.v1';
+  const defaultCols = ['farmName', 'advisor', 'scheduledDate', 'farmType', 'visitType', 'visitStatus', 'approvalStatus'];
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      // ignore
+    }
+    // Default: hide visitCode
+    return defaultCols;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(visibleColumns));
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [visibleColumns]);
+
+  const columnDefs = [
+    { key: 'farmName', label: 'Farm Name', render: (s) => s.FarmName || (s.Farm && (s.Farm.FarmName || s.Farm.Name)) || '—' },
+    { key: 'visitCode', label: 'Visit Code', render: (s) => s.VisitCode || s.VisitCodeName || s.VisitCodeDisplay || '—' },
+    { key: 'advisor', label: 'Advisor', render: (s) => advisorMap[s.AdvisorID] || 'Loading...' },
+    { key: 'scheduledDate', label: 'Scheduled Date', render: (s) => {
+      const dateStr = s.ScheduleDate || s.ProposedDate || s.ProposedDateTime || s.ProposedDateTimeLocal || null;
+      if (!dateStr) return '—';
+      try {
+        const parsed = parseISO(String(dateStr));
+        return isValid(parsed) ? format(parsed, 'MMM dd, yyyy') : 'Invalid Date';
+      } catch (e) { return 'Invalid Date'; }
+    }},
+    { key: 'farmType', label: 'Farm Type', render: (s) => s.FarmType || s.FarmTypeCode || '—' },
+    { key: 'visitType', label: 'Visit Type', render: (s) => s.VisitPurpose || s.VisitType || '—' },
+    { key: 'visitStatus', label: 'Visit Status', render: (s) => {
+      const id = s.id ?? s.ScheduleID;
+      const latest = latestMap[id] || {};
+      const visitStatus = latest.VisitStatus ?? s.VisitStatus;
+      const approvalStatus = latest.ApprovalStatus ?? s.ApprovalStatus;
+      return visitStatus ? renderStatus(visitStatus, approvalStatus) : <span className="text-sm text-gray-600">—</span>;
+    }},
+    { key: 'approvalStatus', label: 'Approval Status', render: (s) => {
+      const id = s.id ?? s.ScheduleID;
+      const latest = latestMap[id] || {};
+      const approvalStatus = latest.ApprovalStatus ?? s.ApprovalStatus;
+      return renderApprovalBadge(approvalStatus);
+    }},
+  ];
+
+  const toggleColumn = (key) => {
+    setVisibleColumns(prev => {
+      if (prev.includes(key)) return prev.filter(k => k !== key);
+      return [...prev, key];
+    });
+  };
+
+  const selectorRef = useRef(null);
+
+  // close selector on outside click or Escape key
+  useEffect(() => {
+    if (!showColumnSelector) return undefined;
+    const onDown = (e) => {
+      try {
+        if (selectorRef.current && !selectorRef.current.contains(e.target)) {
+          setShowColumnSelector(false);
+        }
+      } catch (err) {
+        // ignore
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowColumnSelector(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showColumnSelector]);
 
   useEffect(() => {
     try {
@@ -206,15 +294,37 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
 
   return (
     <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-xl shadow-md">
+      {/* Header bar with integrated Columns selector */}
+      <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b dark:border-gray-600 rounded-t-xl flex justify-end items-center">
+        <div className="relative" ref={selectorRef}>
+          <button type="button" onClick={() => setShowColumnSelector(s => !s)} className="px-3 py-1 bg-gray-100 dark:bg-gray-800 dark:text-gray-200 rounded text-sm">Columns</button>
+          {showColumnSelector ? (
+            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border rounded shadow p-3 z-40">
+              {columnDefs.map(col => (
+                <label key={col.key} className="flex items-center gap-2 text-sm mb-2">
+                  <input type="checkbox" checked={visibleColumns.includes(col.key)} onChange={() => toggleColumn(col.key)} />
+                  <span className="select-none">{col.label}</span>
+                </label>
+              ))}
+              <div className="text-right mt-2">
+                <button type="button" className="px-2 py-1 text-sm text-gray-600" onClick={() => setVisibleColumns(columnDefs.map(c => c.key))}>Show all</button>
+                <button type="button" className="ml-2 px-2 py-1 text-sm text-gray-600" onClick={() => setVisibleColumns([])}>Hide all</button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-700">
           <tr>
             <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">#</th>
-            {['Farm Name', 'Visit Code', 'Advisor', 'Scheduled Date', 'Farm Type', 'Visit Type', 'Visit Status', 'Approval Status', 'Actions'].map(header => (
-              <th key={header} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                {header}
+            {columnDefs.map(col => visibleColumns.includes(col.key) ? (
+              <th key={col.key} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                {col.label}
               </th>
-            ))}
+            ) : null)}
+            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -254,25 +364,11 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
             return (
               <tr key={id} className={`transition-colors duration-500`}>
                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{idx}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{schedule.FarmName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{schedule.VisitCode || schedule.VisitCodeName || schedule.VisitCodeDisplay || '—'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{advisorMap[schedule.AdvisorID] || 'Loading...'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                  {(() => {
-                    const dateStr = schedule.ScheduleDate || schedule.ProposedDate || schedule.ProposedDateTime || schedule.ProposedDateTimeLocal || null;
-                    if (!dateStr) return '—';
-                    try {
-                      const parsed = parseISO(String(dateStr));
-                      return isValid(parsed) ? format(parsed, 'MMM dd, yyyy') : 'Invalid Date';
-                    } catch (e) {
-                      return 'Invalid Date';
-                    }
-                  })()}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{schedule.FarmType || schedule.FarmTypeCode || '—'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{schedule.VisitPurpose || schedule.VisitType || '—'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{visitStatus ? renderStatus(visitStatus, approvalStatus) : <span className="text-sm text-gray-600">—</span>}</td>
-                <td className="px-6 py-4 whitespace-nowrap">{renderApprovalBadge(approvalStatus)}</td>
+                {columnDefs.map(col => visibleColumns.includes(col.key) ? (
+                  <td key={col.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                    {col.render(schedule)}
+                  </td>
+                ) : null)}
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center gap-2">
                     <ActionButton onClick={() => onEdit(schedule)} icon={Pencil} title="Edit" disabled={isApproved} disabledReason={isApproved ? 'Schedule approved — editing disabled' : ''} />
@@ -290,7 +386,12 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
         </tbody>
       </table>
 
-      
+      {/* Optional pagination: render when parent provides pagination handlers/metadata */}
+      {(typeof page !== 'undefined' && typeof setPage === 'function') ? (
+        <div className="mt-3 p-4 bg-white dark:bg-gray-800 border-t dark:border-t-gray-700">
+          <Pagination page={page} setPage={setPage} total={Number(total || (schedules && schedules.length) || 0)} pageSize={pageSize || (schedules && schedules.length) || 10} maxButtons={maxButtons || 7} totalPages={totalPages || Math.max(1, Math.ceil((Number(total || 0) || 0) / Number(pageSize || (schedules && schedules.length) || 10)))} />
+        </div>
+      ) : null}
     </div>
   );
 };

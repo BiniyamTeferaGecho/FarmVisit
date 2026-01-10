@@ -88,11 +88,46 @@ export const scheduleReducer = (state, action) => {
       // success payloads are surfaced via message for the UI
       return { ...state, message: action.payload, loading: false };
     case 'SET_LIST':
-      return { ...state, list: action.payload, loading: false };
+      // Normalize various API shapes into an array so components can safely call .map
+      {
+        const p = action.payload;
+        let listArr = [];
+        if (Array.isArray(p)) listArr = p;
+        else if (p && Array.isArray(p.items)) listArr = p.items;
+        else if (p && Array.isArray(p.data)) listArr = p.data;
+        else if (p && Array.isArray(p.recordset)) listArr = p.recordset;
+        else if (p && typeof p === 'object') {
+          // try to find a first array-valued property
+          for (const k of Object.keys(p)) {
+            if (Array.isArray(p[k])) { listArr = p[k]; break; }
+          }
+        }
+        return { ...state, list: listArr, loading: false };
+      }
     case 'SET_PAGINATION':
       return { ...state, schedulePage: action.payload.currentPage || action.payload.current || state.schedulePage, schedulePageSize: action.payload.pageSize || action.payload.pageSize || state.schedulePageSize, scheduleTotalCount: action.payload.totalCount || action.payload.total || state.scheduleTotalCount, scheduleTotalPages: action.payload.totalPages || state.scheduleTotalPages };
     case 'SET_LOOKUP_DATA':
-      return { ...state, employees: action.payload.employees, farms: action.payload.farms, managers: action.payload.managers || state.managers, advisors: action.payload.advisors || state.advisors };
+      {
+        const normalize = (v) => {
+          if (!v) return [];
+          if (Array.isArray(v)) return v;
+          if (v && Array.isArray(v.items)) return v.items;
+          if (v && Array.isArray(v.data)) return v.data;
+          if (v && Array.isArray(v.recordset)) return v.recordset;
+          // find first array-valued prop
+          if (v && typeof v === 'object') {
+            for (const k of Object.keys(v)) if (Array.isArray(v[k])) return v[k];
+          }
+          return [];
+        };
+        return {
+          ...state,
+          employees: normalize(action.payload.employees) || [],
+          farms: normalize(action.payload.farms) || [],
+          managers: normalize(action.payload.managers) || state.managers,
+          advisors: normalize(action.payload.advisors) || state.advisors,
+        };
+      }
     case 'SET_FILTER_OPTIONS':
       return { ...state, filterOptions: action.payload || {} };
     case 'SET_DATE_RANGE':

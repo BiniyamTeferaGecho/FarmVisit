@@ -1272,6 +1272,11 @@ const FarmVisitSchedule = () => {
             recentlyFilled={recentlyFilled}
             confirmedFilled={confirmedFilled}
             pageStartOffset={((state.schedulePage || 1) - 1) * (state.schedulePageSize || 20)}
+            page={state.schedulePage || 1}
+            setPage={(n) => { try { dispatch({ type: 'SET_PAGINATION', payload: { currentPage: n, pageSize: state.schedulePageSize || 20, totalCount: state.scheduleTotalCount || 0, totalPages: state.scheduleTotalPages || 1 } }); } catch (e) { /* ignore */ } handleSearch({ PageNumber: n }); }}
+            total={state.scheduleTotalCount}
+            pageSize={state.schedulePageSize}
+            totalPages={state.scheduleTotalPages}
             onEdit={(schedule) => {
               dispatch({ type: 'SET_FORM_DATA', payload: schedule });
               dispatch({ type: 'SET_SELECTED_SCHEDULE', payload: schedule });
@@ -1381,33 +1386,7 @@ const FarmVisitSchedule = () => {
               openModal('complete', schedule);
             }}
           />
-          {/* Simple pagination controls */}
-          <div className="mt-4 flex items-center justify-between">
-            <div className="text-sm text-gray-600">{state.scheduleTotalCount} items</div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const prev = Math.max(1, (state.schedulePage || 1) - 1);
-                  // Optimistic update so UI reflects new page immediately
-                  dispatch({ type: 'SET_PAGINATION', payload: { currentPage: prev, pageSize: state.schedulePageSize || 20, totalCount: state.scheduleTotalCount || 0, totalPages: state.scheduleTotalPages || 1 } });
-                  handleSearch({ PageNumber: prev });
-                }}
-                disabled={(state.schedulePage || 1) <= 1}
-                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
-              >Prev</button>
-              <div className="text-sm">Page {state.schedulePage || 1} of {state.scheduleTotalPages || 1}</div>
-              <button
-                onClick={() => {
-                  const next = Math.min((state.scheduleTotalPages || 1), (state.schedulePage || 1) + 1);
-                  // Optimistic update so UI reflects new page immediately
-                  dispatch({ type: 'SET_PAGINATION', payload: { currentPage: next, pageSize: state.schedulePageSize || 20, totalCount: state.scheduleTotalCount || 0, totalPages: state.scheduleTotalPages || 1 } });
-                  handleSearch({ PageNumber: next });
-                }}
-                disabled={(state.schedulePage || 1) >= (state.scheduleTotalPages || 1)}
-                className="px-3 py-1 bg-gray-100 rounded disabled:opacity-50"
-              >Next</button>
-            </div>
-          </div>
+          {/* Pagination is rendered inside ScheduleList when page/setPage are provided */}
         </div>
       )}
 

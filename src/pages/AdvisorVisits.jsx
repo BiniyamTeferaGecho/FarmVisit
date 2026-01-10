@@ -143,6 +143,11 @@ export default function AdvisorVisits() {
           schedules={items}
           fetchWithAuth={fetchWithAuth}
           pageStartOffset={(page - 1) * pageSize}
+          page={page}
+          setPage={setPage}
+          total={total}
+          pageSize={pageSize}
+          totalPages={totalPages}
           onView={(row) => {
             (async () => {
               try {
@@ -274,7 +279,8 @@ export default function AdvisorVisits() {
           </select>
         </div>
 
-        <Pagination page={page} setPage={setPage} total={total} pageSize={pageSize} maxButtons={7} />
+        {/* Pagination rendered by ScheduleList when page/setPage provided */}
+        <div />
       </div>
       {/* Inline Schedule modal rendered locally so Advisor can create without navigating tabs */}
       <ScheduleModals
