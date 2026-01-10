@@ -676,25 +676,63 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
     setLocLoading(true);
     setLocError(null);
     try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude.toFixed(6);
-          const lng = pos.coords.longitude.toFixed(6);
-          const coord = `${lat}, ${lng}`;
+      // If Permissions API is available, check geolocation permission to give a friendlier message
+      const tryGet = (opts) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Geolocation timeout')), (opts && opts.timeout) || 10000);
+        navigator.geolocation.getCurrentPosition((p) => { clearTimeout(timer); resolve(p); }, (e) => { clearTimeout(timer); reject(e); }, opts || { enableHighAccuracy: false, maximumAge: 0, timeout: 10000 });
+      });
+
+      (async () => {
+        try {
+          if (navigator.permissions && typeof navigator.permissions.query === 'function') {
+            try {
+              const perm = await navigator.permissions.query({ name: 'geolocation' });
+              if (perm && perm.state === 'denied') {
+                setLocError('Location permission denied. Please enable location access in your browser settings.');
+                setLocLoading(false);
+                return;
+              }
+            } catch (pe) {
+              // ignore permission query errors and fall back to requesting position
+            }
+          }
+
+          // Try a quick, low-accuracy read first (faster on many devices)
+          let pos = null;
           try {
-            if (typeof onChange === 'function') onChange({ ...data, Location: coord });
-            setLocationAutoFilled(true);
-            setLocationAutoFilledAt(new Date().toISOString());
-          } catch (e) { /* ignore */ }
-          setLocationReadOnly(true);
+            pos = await tryGet({ enableHighAccuracy: false, maximumAge: 0, timeout: 10000 });
+          } catch (firstErr) {
+            // If quick read fails due to timeout, try with high accuracy once
+            try {
+              pos = await tryGet({ enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+            } catch (secondErr) {
+              throw secondErr || firstErr;
+            }
+          }
+
+          if (pos && pos.coords) {
+            const lat = pos.coords.latitude.toFixed(6);
+            const lng = pos.coords.longitude.toFixed(6);
+            // normalize to `lat,lon` (no spaces) so server/client parsing is consistent
+            const coord = `${lat},${lng}`;
+            try {
+              if (typeof onChange === 'function') onChange({ ...data, Location: coord });
+              setLocationAutoFilled(true);
+              setLocationAutoFilledAt(new Date().toISOString());
+            } catch (e) { /* ignore */ }
+            setLocationReadOnly(true);
+            setLocLoading(false);
+            return;
+          }
+
+          setLocError('Failed to retrieve location');
           setLocLoading(false);
-        },
-        (err) => {
-          setLocError(err?.message || 'Failed to retrieve location');
+        } catch (geoErr) {
+          const msg = geoErr && (geoErr.message || (geoErr.code ? String(geoErr.code) : null)) ? (geoErr.message || 'Failed to retrieve location') : 'Failed to retrieve location';
+          setLocError(msg);
           setLocLoading(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
+        }
+      })();
     } catch (e) {
       setLocError('Unable to request geolocation');
       setLocLoading(false);

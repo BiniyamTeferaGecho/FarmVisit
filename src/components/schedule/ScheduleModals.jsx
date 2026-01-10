@@ -384,6 +384,33 @@ const ScheduleModals = ({
     return () => { try { window.removeEventListener('fill:location:changed', handler); } catch (e) { /* ignore */ } };
   }, []);
 
+  // Some parents provide `setFillVisitFormData` as a direct-dispatch function
+  // (e.g. `payload => schDispatch({ type: 'SET_FILL_VISIT_FORM_DATA', payload })`) while
+  // the FillVisitModal expects a setter that accepts an updater function like
+  // `prev => ({ ...prev, layerForm: { ...prev.layerForm, [k]: v } })`. Wrap the
+  // provided setter so both calling styles are supported.
+  const safeSetFillVisitFormData = (payloadOrUpdater) => {
+    try {
+      if (typeof setFillVisitFormData !== 'function') return;
+      if (typeof payloadOrUpdater === 'function') {
+        // Construct a representation of current fill state to pass into updater
+        const current = (state && (state.fillData || state.layerForm || state.dairyForm)) ? {
+          ...(state.fillData || {}),
+          layerForm: state.layerForm,
+          dairyForm: state.dairyForm,
+        } : { layerForm: state.layerForm, dairyForm: state.dairyForm };
+        const result = payloadOrUpdater(current);
+        // If the caller's setter expects a payload, call it with the resulting payload
+        setFillVisitFormData(result);
+      } else {
+        // Direct payload — pass through
+        setFillVisitFormData(payloadOrUpdater);
+      }
+    } catch (e) {
+      try { console.error('safeSetFillVisitFormData error', e); } catch (er) { /* ignore */ }
+    }
+  };
+
   // When the schedule modal opens for creation and the current user is an advisor,
   // fetch the advisor's display name and set the AdvisorID on the form (read-only behavior).
   // No login-based advisor prefill: advisor must be chosen explicitly by the user.
@@ -653,11 +680,11 @@ const ScheduleModals = ({
 
       <Modal open={isSubmitModalOpen} title="Submit for Approval" onClose={() => closeModal('submit')}>
         <SelectField 
-            label="Select Manager for Approval"
-            name="managerId" 
-            value={approvalData.managerId} 
-            onChange={(e) => setApprovalData(prev => ({ ...prev, managerId: e.target.value }))}
-            icon={<User size={16} className="text-gray-400" />}
+          label="Select Manager for Approval"
+          name="managerId" 
+          value={approvalData.managerId} 
+          onChange={(e) => setApprovalData({ ...(approvalData || {}), managerId: e.target.value })}
+          icon={<User size={16} className="text-gray-400" />}
         >
           <option value="">Select Manager</option>
           {(managers && managers.length ? managers : employees).map(m => {
@@ -728,16 +755,16 @@ const ScheduleModals = ({
           target={selectedSchedule}
           layerForm={fillVisitFormData?.layerForm ?? state.layerForm ?? {}}
           dairyForm={fillVisitFormData?.dairyForm ?? state.dairyForm ?? {}}
-          onLayerFormChange={(eOrData) => {
+            onLayerFormChange={(eOrData) => {
             // support both DOM events (from simple inputs) and direct data objects (from child forms that send the whole form state)
             if (!eOrData) return;
             if (eOrData.target) {
               const { name, value, type, checked } = eOrData.target || {};
               const val = type === 'checkbox' ? checked : value;
-              setFillVisitFormData(prev => ({ ...(prev || {}), layerForm: { ...(prev?.layerForm || {}), [name]: val } }));
+                safeSetFillVisitFormData(prev => ({ ...(prev || {}), layerForm: { ...(prev?.layerForm || {}), [name]: val } }));
             } else if (typeof eOrData === 'object') {
               // merge keys from supplied object into the layerForm
-              setFillVisitFormData(prev => ({ ...(prev || {}), layerForm: { ...(prev?.layerForm || {}), ...eOrData } }));
+                safeSetFillVisitFormData(prev => ({ ...(prev || {}), layerForm: { ...(prev?.layerForm || {}), ...eOrData } }));
             }
           }}
           onDairyFormChange={(eOrData) => {
@@ -745,9 +772,9 @@ const ScheduleModals = ({
             if (eOrData.target) {
               const { name, value, type, checked } = eOrData.target || {};
               const val = type === 'checkbox' ? checked : value;
-              setFillVisitFormData(prev => ({ ...(prev || {}), dairyForm: { ...(prev?.dairyForm || {}), [name]: val } }));
+                safeSetFillVisitFormData(prev => ({ ...(prev || {}), dairyForm: { ...(prev?.dairyForm || {}), [name]: val } }));
             } else if (typeof eOrData === 'object') {
-              setFillVisitFormData(prev => ({ ...(prev || {}), dairyForm: { ...(prev?.dairyForm || {}), ...eOrData } }));
+                safeSetFillVisitFormData(prev => ({ ...(prev || {}), dairyForm: { ...(prev?.dairyForm || {}), ...eOrData } }));
             }
           }}
           onSaveLayer={() => {

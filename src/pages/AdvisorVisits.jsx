@@ -147,6 +147,7 @@ export default function AdvisorVisits() {
           setPage={setPage}
           total={total}
           pageSize={pageSize}
+          showPager={false}
           totalPages={totalPages}
           onView={(row) => {
             (async () => {
@@ -279,8 +280,7 @@ export default function AdvisorVisits() {
           </select>
         </div>
 
-        {/* Pagination rendered by ScheduleList when page/setPage provided */}
-        <div />
+        <Pagination page={page} setPage={setPage} total={total} pageSize={pageSize} maxButtons={7} totalPages={totalPages} />
       </div>
       {/* Inline Schedule modal rendered locally so Advisor can create without navigating tabs */}
       <ScheduleModals
@@ -393,8 +393,9 @@ export default function AdvisorVisits() {
             const target = schState.submitTarget || schState.selectedSchedule;
             const id = target && (target.ScheduleID || target.id || target.ScheduleId);
             if (!id) return schDispatch({ type: 'SET_MESSAGE', payload: 'No schedule selected to submit.' });
-            // submitManagerId may be stored in reducer.submitManagerId
-            const managerId = schState.submitManagerId || null;
+            // prefer manager selected in approvalData (modal) then fallback to legacy submitManagerId
+            const managerId = (schState.approvalData && (schState.approvalData.managerId || schState.approvalData.managerId === 0 ? schState.approvalData.managerId : null)) || schState.submitManagerId || null;
+            if (!managerId) return schDispatch({ type: 'SET_MESSAGE', payload: 'Please select a manager before submitting.' });
             await submitForApproval(schDispatch, id, managerId, fetchWithAuth);
             schDispatch({ type: 'CLOSE_SUBMIT_MODAL' });
             setPage(1);

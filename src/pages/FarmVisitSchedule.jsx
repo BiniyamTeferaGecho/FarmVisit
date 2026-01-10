@@ -6,6 +6,7 @@ import { scheduleReducer, initialState } from '../reducers/scheduleReducer';
 import ScheduleHeader from '../components/schedule/ScheduleHeader';
 import { format } from 'date-fns';
 import ScheduleList from '../components/schedule/ScheduleList';
+import Pagination from '../components/common/Pagination';
 import ScheduleModals from '../components/schedule/ScheduleModals';
 import api from '../services/api';
 import apiClient from '../utils/api';
@@ -1274,6 +1275,7 @@ const FarmVisitSchedule = () => {
             pageStartOffset={((state.schedulePage || 1) - 1) * (state.schedulePageSize || 20)}
             page={state.schedulePage || 1}
             setPage={(n) => { try { dispatch({ type: 'SET_PAGINATION', payload: { currentPage: n, pageSize: state.schedulePageSize || 20, totalCount: state.scheduleTotalCount || 0, totalPages: state.scheduleTotalPages || 1 } }); } catch (e) { /* ignore */ } handleSearch({ PageNumber: n }); }}
+            showPager={false}
             total={state.scheduleTotalCount}
             pageSize={state.schedulePageSize}
             totalPages={state.scheduleTotalPages}
@@ -1386,7 +1388,9 @@ const FarmVisitSchedule = () => {
               openModal('complete', schedule);
             }}
           />
-          {/* Pagination is rendered inside ScheduleList when page/setPage are provided */}
+          <div className="mt-4">
+            <Pagination page={state.schedulePage || 1} setPage={(n) => { try { dispatch({ type: 'SET_PAGINATION', payload: { currentPage: n, pageSize: state.schedulePageSize || 20, totalCount: state.scheduleTotalCount || 0, totalPages: state.scheduleTotalPages || 1 } }); } catch (e) { /* ignore */ } handleSearch({ PageNumber: n }); }} total={state.scheduleTotalCount} pageSize={state.schedulePageSize} maxButtons={7} totalPages={state.scheduleTotalPages} />
+          </div>
         </div>
       )}
 

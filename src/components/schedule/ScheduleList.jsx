@@ -94,7 +94,7 @@ const ActionButton = ({ onClick, icon: Icon, title, disabled = false, disabledRe
   </div>
 );
 
-const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {}, confirmedFilled = {}, pageStartOffset = 0, page, setPage, total, pageSize, totalPages, maxButtons }) => {
+const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess, onComplete, onView, fetchWithAuth, recentlyFilled = {}, confirmedFilled = {}, pageStartOffset = 0, page, setPage, total, pageSize, totalPages, maxButtons, showPager = true }) => {
   const [advisorMap, setAdvisorMap] = useState({});
   const [latestMap, setLatestMap] = useState({});
   const [approvalFilter, setApprovalFilter] = useState('All');
@@ -387,7 +387,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, onSubmit, onFill, onProcess
       </table>
 
       {/* Optional pagination: render when parent provides pagination handlers/metadata */}
-      {(typeof page !== 'undefined' && typeof setPage === 'function') ? (
+      {(showPager !== false && typeof page !== 'undefined' && typeof setPage === 'function') ? (
         <div className="mt-3 p-4 bg-white dark:bg-gray-800 border-t dark:border-t-gray-700">
           <Pagination page={page} setPage={setPage} total={Number(total || (schedules && schedules.length) || 0)} pageSize={pageSize || (schedules && schedules.length) || 10} maxButtons={maxButtons || 7} totalPages={totalPages || Math.max(1, Math.ceil((Number(total || 0) || 0) / Number(pageSize || (schedules && schedules.length) || 10)))} />
         </div>
