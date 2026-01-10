@@ -48,6 +48,7 @@ const FarmVisitSchedule = () => {
   const [reloadKey, setReloadKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [creatingScheduleLocked, setCreatingScheduleLocked] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [visitStatusFilter, setVisitStatusFilter] = useState('');
   const [approvalStatusFilter, setApprovalStatusFilter] = useState('');
   const creatingScheduleLockRef = React.useRef(false);
@@ -1123,6 +1124,8 @@ const FarmVisitSchedule = () => {
         onRefresh={() => handleSearch()}
         onNew={() => openModal('schedule')}
         newDisabled={creatingScheduleLocked}
+        showCompleted={showCompleted}
+        onShowCompletedChange={(v) => { setShowCompleted(Boolean(v)); handleSearch({ IncludeCompleted: v ? 1 : 0, PageNumber: 1 }); }}
         onShowDrafts={() => api.fetchDrafts(dispatch, apiClient).then(() => dispatch({ type: 'OPEN_DRAFTS_MODAL' }))}
         onBulkUpload={() => openModal('bulkUpload')}
         onDownloadTemplate={api.downloadCsvTemplate}
