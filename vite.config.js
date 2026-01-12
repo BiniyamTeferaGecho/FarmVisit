@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: {
       // Proxy /api to local backend to avoid CORS during development
       '/api': {
-        target: process.env.VITE_PROXY_API_TARGET || 'http://localhost:80',
+        target: process.env.VITE_PROXY_API_TARGET || 'http://localhost:80' || 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, '/api')

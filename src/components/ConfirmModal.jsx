@@ -6,6 +6,20 @@ import { createPortal } from 'react-dom';
 // list of updated fields and will NOT render `children` (keeps focus on the changes).
 export default function ConfirmModal({ open, title, message, changes = [], children, onCancel, onConfirm, confirmLabel = 'Confirm', cancelLabel = 'Cancel', loading = false }) {
   if (!open) return null;
+  // Wrap onConfirm to properly handle async handlers and avoid unhandled
+  // promise rejections when callers pass an `async` function. Errors are
+  // forwarded to the console; callers should handle UI-level error state.
+  const handleConfirm = async () => {
+    if (!onConfirm) return;
+    try {
+      // Await in case onConfirm returns a promise
+      await onConfirm();
+    } catch (e) {
+      // Avoid unhandled rejection bubbling. Caller already receives the
+      // error via their own try/catch, but log here for easier debugging.
+      console.error('ConfirmModal onConfirm error', e);
+    }
+  };
   const hasChanges = Array.isArray(changes) && changes.length > 0;
   const content = (
     <div className="text-left fixed inset-0 z-60 flex items-center justify-center">
@@ -48,7 +62,7 @@ export default function ConfirmModal({ open, title, message, changes = [], child
 
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" onClick={onCancel} className="px-4 py-2 rounded bg-gray-100">{cancelLabel}</button>
-          <button type="button" onClick={onConfirm} disabled={loading} className="px-4 py-2 rounded bg-indigo-600 text-white">{loading ? 'Saving...' : confirmLabel}</button>
+          <button type="button" onClick={handleConfirm} disabled={loading} className="px-4 py-2 rounded bg-indigo-600 text-white">{loading ? 'Saving...' : confirmLabel}</button>
         </div>
       </div>
     </div>

@@ -34,6 +34,15 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
     const { fetchWithAuth } = useAuth();
     const [regionOptions, setRegionOptions] = useState([]);
     const [regionLoading, setRegionLoading] = useState(false);
+    const [zoneOptions, setZoneOptions] = useState([]);
+    const [zoneLoading, setZoneLoading] = useState(false);
+    const [selectedZoneId, setSelectedZoneId] = useState(null);
+    const [weredaOptions, setWeredaOptions] = useState([]);
+    const [weredaLoading, setWeredaLoading] = useState(false);
+    const [selectedWeredaId, setSelectedWeredaId] = useState(null);
+    const [cityOptions, setCityOptions] = useState([]);
+    const [cityLoading, setCityLoading] = useState(false);
+    const [selectedRegionId, setSelectedRegionId] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -48,9 +57,10 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
                 else if (Array.isArray(payload.recordset)) rows = payload.recordset;
                 else if (Array.isArray(payload.data)) rows = payload.data;
                 const opts = (rows || []).map(r => {
+                    const id = r?.LookupID || r?.LookupId || r?.id || null;
                     const value = r?.LookupValue ?? r?.Value ?? r?.lookupValue ?? r?.value ?? null;
                     const label = r?.LookupLabel ?? r?.Label ?? r?.Name ?? value ?? '';
-                    return value ? { value: String(value), label: String(label) } : null;
+                    return value ? { id: id ? String(id) : null, value: String(value), label: String(label) } : null;
                 }).filter(Boolean);
                 if (!cancelled) setRegionOptions(opts);
             } catch (e) {
@@ -59,6 +69,117 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
         })();
         return () => { cancelled = true };
     }, [fetchWithAuth]);
+
+    // Keep selectedRegionId in sync with the current form value when editing
+    useEffect(() => {
+        if (form && form.Region) {
+            const sel = (regionOptions || []).find(o => o.value === form.Region || o.label === form.Region)
+            setSelectedRegionId(sel && sel.id ? sel.id : null)
+        }
+    }, [form.Region, regionOptions]);
+
+    // When selectedRegionId changes, load zones
+    useEffect(() => {
+        let cancelled = false
+        const regionId = selectedRegionId
+        if (!regionId) {
+            setZoneOptions([])
+            setSelectedZoneId(null)
+            setWeredaOptions([])
+            setSelectedWeredaId(null)
+            setCityOptions([])
+            return
+        }
+        ;(async () => {
+            try {
+                setZoneLoading(true)
+                const res = await fetchWithAuth({ url: `/lookups/location-hierarchy?RegionID=${encodeURIComponent(regionId)}`, method: 'get' })
+                const rows = res?.data?.data || res?.data || []
+                const opts = (rows || []).map(r => ({ id: r.LookupID || r.LookupId || r.id || null, value: r.LookupValue || r.LookupLabel || r.Value || r.value || '', label: r.LookupValue || r.LookupLabel || r.Value || r.value || '' }))
+                if (!cancelled) {
+                    setZoneOptions(opts)
+                    setSelectedZoneId(null)
+                    setWeredaOptions([])
+                    setSelectedWeredaId(null)
+                    setCityOptions([])
+                }
+            } catch (e) {
+                if (!cancelled) setZoneOptions([])
+            } finally { if (!cancelled) setZoneLoading(false) }
+        })()
+        return () => { cancelled = true }
+    }, [selectedRegionId, fetchWithAuth])
+
+    // Keep selectedZoneId in sync when form.Zone or zoneOptions change
+    useEffect(() => {
+        if (form && form.Zone) {
+            const sel = (zoneOptions || []).find(o => o.value === form.Zone || o.label === form.Zone)
+            setSelectedZoneId(sel && sel.id ? sel.id : null)
+        }
+    }, [form.Zone, zoneOptions])
+
+    // When selectedZoneId changes, load weredas
+    useEffect(() => {
+        let cancelled = false
+        const regionId = selectedRegionId
+        const zoneId = selectedZoneId
+        if (!zoneId) {
+            setWeredaOptions([])
+            setSelectedWeredaId(null)
+            setCityOptions([])
+            return
+        }
+        ;(async () => {
+            try {
+                setWeredaLoading(true)
+                const qs = `RegionID=${encodeURIComponent(regionId || '')}&ZoneID=${encodeURIComponent(zoneId)}`
+                const res = await fetchWithAuth({ url: `/lookups/location-hierarchy?${qs}`, method: 'get' })
+                const rows = res?.data?.data || res?.data || []
+                const opts = (rows || []).map(r => ({ id: r.LookupID || r.LookupId || r.id || null, value: r.LookupValue || r.LookupLabel || r.Value || r.value || '', label: r.LookupValue || r.LookupLabel || r.Value || r.value || '' }))
+                if (!cancelled) {
+                    setWeredaOptions(opts)
+                    setSelectedWeredaId(null)
+                    setCityOptions([])
+                }
+            } catch (e) {
+                if (!cancelled) setWeredaOptions([])
+            } finally { if (!cancelled) setWeredaLoading(false) }
+        })()
+        return () => { cancelled = true }
+    }, [selectedZoneId, selectedRegionId, fetchWithAuth])
+
+    // Keep selectedWeredaId in sync when form.Wereda or weredaOptions change
+    useEffect(() => {
+        if (form && form.Wereda) {
+            const sel = (weredaOptions || []).find(o => o.value === form.Wereda || o.label === form.Wereda)
+            setSelectedWeredaId(sel && sel.id ? sel.id : null)
+        }
+    }, [form.Wereda, weredaOptions])
+
+    // When selectedWeredaId changes, load cities
+    useEffect(() => {
+        let cancelled = false
+        const regionId = selectedRegionId
+        const zoneId = selectedZoneId
+        const weredaId = selectedWeredaId
+        if (!weredaId) {
+            setCityOptions([])
+            return
+        }
+        ;(async () => {
+            try {
+                setCityLoading(true)
+                const qs = `RegionID=${encodeURIComponent(regionId || '')}&ZoneID=${encodeURIComponent(zoneId || '')}&WeredaID=${encodeURIComponent(weredaId)}`
+                const res = await fetchWithAuth({ url: `/lookups/location-hierarchy?${qs}`, method: 'get' })
+                const rows = res?.data?.data || res?.data || []
+                const opts = (rows || []).map(r => ({ id: r.LookupID || r.LookupId || r.id || null, value: r.LookupValue || r.LookupLabel || r.Value || r.value || '', label: r.LookupValue || r.LookupLabel || r.Value || r.value || '' }))
+                if (!cancelled) setCityOptions(opts)
+            } catch (e) {
+                if (!cancelled) setCityOptions([])
+            } finally { if (!cancelled) setCityLoading(false) }
+        })()
+        return () => { cancelled = true }
+    }, [selectedWeredaId, selectedZoneId, selectedRegionId, fetchWithAuth])
 
     const handleChange = (e) => {
         if (typeof onFieldChange === 'function') return onFieldChange(e);
@@ -85,7 +206,7 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
                         valueDisplay={form.OwnerName}
                         valueId={form.FarmerID}
                         onSelect={(display, id) => {
-                            // update both OwnerName (display text) and FarmerID
+                            // update both OwnerName (display text) and FarmerID 
                             setForm(s => ({ ...s, OwnerName: display, FarmerID: id }));
                         }}
                     />
@@ -93,15 +214,56 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
                 </div>
                 <InputField icon={<FaPhone />} label="Contact Phone" name="ContactPhone" value={form.ContactPhone} onChange={handleChange} error={fieldErrors.ContactPhone} placeholder="0912345678" />
                 <InputField icon={<FaMapMarkerAlt />} label="Address" name="Address" value={form.Address} onChange={handleChange} placeholder="123 Main St" />
-                <SelectField icon={<FaMapMarkerAlt />} label="Region" name="Region" value={form.Region} onChange={handleChange} error={fieldErrors.Region}>
+                <SelectField icon={<FaMapMarkerAlt />} label="Region" name="Region" value={form.Region} onChange={(e) => {
+                    const val = e.target.value
+                    const sel = (regionOptions || []).find(o => o.value === val)
+                    // reset downstream selections
+                    setZoneOptions([]); setWeredaOptions([]); setCityOptions([])
+                    setSelectedZoneId(null); setSelectedWeredaId(null); setSelectedRegionId(sel && sel.id ? sel.id : null)
+                    // set the form region to the lookup value (string)
+                    handleChange({ target: { name: 'Region', value: val } })
+                }} onFocus={() => { /* region options are preloaded on mount */ }} loading={regionLoading} error={fieldErrors.Region}>
                     <option value="">Select region</option>
                     {(regionOptions || []).map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                 </SelectField>
-                <InputField icon={<FaMapMarkerAlt />} label="Zone" name="Zone" value={form.Zone} onChange={handleChange} placeholder="e.g. North Shewa" />
-                <InputField icon={<FaMapMarkerAlt />} label="Wereda" name="Wereda" value={form.Wereda} onChange={handleChange} placeholder="e.g. Debre Berhan" />
-                <InputField icon={<FaMapMarkerAlt />} label="City/Town" name="CityTown" value={form.CityTown} onChange={handleChange} placeholder="e.g. Addis Ababa" />
+                {/* Zone/Sub-City select - lazy loaded based on selected region */}
+                <SelectField icon={<FaMapMarkerAlt />} label="Zone" name="Zone" value={form.Zone} onChange={(e) => {
+                    const val = e.target.value
+                    const sel = (zoneOptions || []).find(o => o.value === val || o.id === val)
+                    setSelectedZoneId(sel && sel.id ? sel.id : null)
+                    handleChange({ target: { name: 'Zone', value: val } })
+                }} loading={zoneLoading} error={fieldErrors.Zone}>
+                    <option value="">Select Zone/Sub-City</option>
+                    {(zoneOptions || []).map(opt => (
+                        <option key={opt.id || opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </SelectField>
+
+                    {/* zones are loaded via the effect watching `selectedRegionId` */}
+
+                <SelectField icon={<FaMapMarkerAlt />} label="Wereda" name="Wereda" value={form.Wereda} onChange={(e) => {
+                    const val = e.target.value
+                    const sel = (weredaOptions || []).find(o => o.value === val || o.id === val)
+                    setSelectedWeredaId(sel && sel.id ? sel.id : null)
+                    handleChange({ target: { name: 'Wereda', value: val } })
+                }} loading={weredaLoading} error={fieldErrors.Wereda}>
+                    <option value="">Select Wereda</option>
+                    {(weredaOptions || []).map(opt => (
+                        <option key={opt.id || opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </SelectField>
+
+                <SelectField icon={<FaMapMarkerAlt />} label="City/Town" name="CityTown" value={form.CityTown} onChange={(e) => {
+                    const val = e.target.value
+                    handleChange({ target: { name: 'CityTown', value: val } })
+                }} loading={cityLoading} error={fieldErrors.CityTown}>
+                    <option value="">Select city / town</option>
+                    {(cityOptions || []).map(opt => (
+                        <option key={opt.id || opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </SelectField>
                 <InputField icon={<FaGlobe />} label="Farm Size (ha)" name="FarmSize" value={form.FarmSize} onChange={handleChange} type="number" step="0.01" placeholder="100.00" />
                 <InputField icon={<FaMapMarkerAlt />} label="GPS Location" name="GPSLocation" value={form.GPSLocation} onChange={handleChange} placeholder="lat,lon or GeoJSON" />
             </div>

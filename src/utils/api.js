@@ -65,7 +65,7 @@ else if (typeof window !== 'undefined' && window.location && window.location.hos
   base = `${window.location.origin}`;
 } else {
   // Local development default (backend listens on port 3000 in this repo)
-  base = 'http://localhost:80';
+  base = 'http://localhost:80' || 'http://localhost:3000';
 }
 
 // Canonicalize base so it ends with a single '/api' (avoid '/api/api')
