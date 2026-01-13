@@ -1,6 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, UploadCloud, ClipboardList, Thermometer, Droplet, AlertTriangle, Pill, Microscope } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider'
+import { getActiveApiBase } from '../../utils/api'
+
+// Shared helper to request lookup items robustly (tries fetchWithAuth then axios fallback)
+const tryRequest = async (fetchWithAuth, opts) => {
+  try {
+    if (typeof fetchWithAuth === 'function') return await fetchWithAuth(opts)
+    const api = await import('../../utils/api').then(m => m.default).catch(() => null)
+    if (!api) throw new Error('No HTTP client available')
+    return await api.request(opts)
+  } catch (err) {
+    return err
+  }
+}
+
+const extractItemsGeneric = (res) => {
+  if (!res) return []
+  const d = res.data !== undefined ? res.data : res
+  if (d && Array.isArray(d.data)) return d.data
+  if (Array.isArray(d)) return d
+  if (d && Array.isArray(d.recordset)) return d.recordset
+  if (d && Array.isArray(d.items)) return d.items
+  return []
+}
+
+const fetchLookupOptions = async (typeName, fetchWithAuth) => {
+  const endpoints = [
+    { url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' },
+    { url: '/lookups/by-type', method: 'GET', params: { typeName } },
+    { url: '/lookups/by-type', method: 'GET', params: { lookupTypeId: null, typeName } },
+  ]
+  let items = []
+  for (const ep of endpoints) {
+    try {
+      const resp = await tryRequest(fetchWithAuth, ep)
+      if (resp instanceof Error) continue
+      const got = extractItemsGeneric(resp)
+      if (got && got.length) { items = got; break }
+    } catch (e) { /* ignore and try next */ }
+  }
+  return items
+}
 
 const SectionCard = ({ title, icon, children }) => (
   <div className="bg-white shadow-md rounded-lg p-6 mb-6"> 
@@ -76,40 +117,19 @@ const CompoundFeedMultiSelect = ({ name, value, onChange, readOnly = false }) =>
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Compound Feed Source';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Compound Feed Source', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadCompoundFeedOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadCompoundFeedOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   // parse stored value into array
@@ -207,40 +227,21 @@ const FeedingSystemSelect = ({ name, value, onChange, readOnly = false }) => {
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Feeding System';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Feeding System', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadFeedingSystemOptions error', err);
-        if (mounted) setError('Failed to load options');
+        console.debug('loadFeedingSystemOptions error', err)
+        if (mounted) setError('Failed to load options')
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) setLoading(false)
       }
-    };
-    load();
-    return () => { mounted = false };
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -288,40 +289,19 @@ const WateringSystemSelect = ({ name, value, onChange, readOnly = false }) => {
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Watering System';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Watering System', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadWateringSystemOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadWateringSystemOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -368,40 +348,19 @@ const MilkSupplyToSelect = ({ name, value, onChange, readOnly = false }) => {
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Milk Supply To';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Milk Supply To', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadMilkSupplyToOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadMilkSupplyToOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -448,40 +407,19 @@ const VentilationSelect = ({ name, value, onChange, readOnly = false }) => {
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Ventilation';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Ventilation', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadVentilationOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadVentilationOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -528,40 +466,19 @@ const LightIntensitySelect = ({ name, value, onChange, readOnly = false }) => {
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Light Intensity';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Light Intensity', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadLightIntensityOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadLightIntensityOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -608,40 +525,19 @@ const BeddingTypeSelect = ({ name, value, onChange, readOnly = false }) => {
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Bedding Type';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Bedding Type', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadBeddingTypeOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadBeddingTypeOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -688,40 +584,19 @@ const SpaceAvailabilitySelect = ({ name, value, onChange, readOnly = false }) =>
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Space Availability';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Space Availability', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadSpaceAvailabilityOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadSpaceAvailabilityOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -802,40 +677,19 @@ const CompanySelect = ({ name, value, onChange, readOnly = false }) => {
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Company';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Company', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadCompanyOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadCompanyOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -882,40 +736,19 @@ const FeedingMechanismSelect = ({ name, value, onChange, readOnly = false }) => 
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Feeding Mechanism';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Feeding Mechanism', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadFeedingMechanismOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadFeedingMechanismOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const optionValue = (it) => {
@@ -964,40 +797,19 @@ const HomeMixingIngredientsSelect = ({ name, value, onChange, readOnly = false }
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'Home Mixing Ingredients';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('Home Mixing Ingredients', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadHomeMixingOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadHomeMixingOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const selectedVals = Array.isArray(value) ? value : (String(value || '').split(/[,;|]+/).map(s => s.trim()).filter(Boolean));
@@ -1094,40 +906,19 @@ const HowMuchFeedingPerDaySelect = ({ name, value, onChange, readOnly = false })
 
   useEffect(() => {
     let mounted = true;
-    const extractItems = (body) => {
-      if (!body) return [];
-      if (Array.isArray(body)) return body;
-      if (Array.isArray(body.data)) return body.data;
-      if (body.data && Array.isArray(body.data.items)) return body.data.items;
-      if (Array.isArray(body.items)) return body.items;
-      return [];
-    };
-
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        let res = null;
-        const typeName = 'How Much Feeding Per Day';
-        if (typeof fetchWithAuth === 'function') {
-          res = await fetchWithAuth({ url: `/lookups/by-type-name/${encodeURIComponent(typeName)}`, method: 'GET' });
-        } else {
-          const base = window.location.origin;
-          const r = await fetch(`${base}/api/lookups/by-type-name/${encodeURIComponent(typeName)}`, { credentials: 'include' });
-          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-          res = await r.json();
-        }
-        const items = extractItems(res) || [];
-        if (mounted) setOptions(items);
+        const items = await fetchLookupOptions('How Much Feeding Per Day', fetchWithAuth)
+        if (mounted) setOptions(items || [])
       } catch (err) {
-        console.debug('loadHowMuchFeedingOptions error', err);
-        if (mounted) setError('Failed to load options');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => { mounted = false };
+        console.debug('loadHowMuchFeedingOptions error', err)
+        if (mounted) setError('Failed to load options')
+      } finally { if (mounted) setLoading(false) }
+    }
+    load()
+    return () => { mounted = false }
   }, [fetchWithAuth]);
 
   const selectedVals = Array.isArray(value) ? value : (String(value || '').split(/[,;|]+/).map(s => s.trim()).filter(Boolean));
@@ -1214,6 +1005,10 @@ const HowMuchFeedingPerDaySelect = ({ name, value, onChange, readOnly = false })
 
 const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnly = false, locationReadOnlyInModal = false, externalErrors = {} }) => {
   const data = form ?? {};
+  const auth = useAuth();
+  const { fetchWithAuth } = auth || {};
+  const [showForceModal, setShowForceModal] = useState(false);
+  const [forceModalMessage, setForceModalMessage] = useState('');
   const [imagePreviews, setImagePreviews] = useState([]);
   const createdBlobUrlsRef = useRef([]);
   const inputRef = useRef(null);
@@ -1467,9 +1262,54 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
       }
       return;
     }
+    // Pre-check: if creating (no DairyFarmVisitId) and ScheduleID present,
+    // call backend to see if a visit already exists. If one exists, show modal
+    // asking user whether to ForceCreate (create revision) or cancel.
+    if (!data.DairyFarmVisitId && data.ScheduleID) {
+      try {
+        let res = null;
+        if (typeof fetchWithAuth === 'function') {
+          res = await fetchWithAuth({ url: `/dairy-farm/by-schedule/${encodeURIComponent(data.ScheduleID)}`, method: 'GET' });
+        } else {
+          const apiBase = (typeof getActiveApiBase === 'function') ? getActiveApiBase() : (window.location.origin ? `${window.location.origin}/api` : '/api');
+          const r = await fetch(`${apiBase}/dairy-farm/by-schedule/${encodeURIComponent(data.ScheduleID)}`, { credentials: 'include' });
+          if (r.ok) res = await r.json(); else res = { ok: false, status: r.status };
+        }
+
+        const existingArr = (res && res.data && Array.isArray(res.data)) ? res.data : (res && Array.isArray(res) ? res : (res && res.data && Array.isArray(res.data.data) ? res.data.data : []));
+        if (Array.isArray(existingArr) && existingArr.length > 0) {
+          const existing = existingArr[0];
+          const visitCode = existing.VisitCode || existing.VisitCodeName || existing.Code || null;
+          const msg = existing.Message || (res && res.data && (res.data.message || res.data.Message)) || 'An existing dairy farm visit exists for this schedule.';
+          const confirmMsg = `An existing dairy visit was found${visitCode ? ` (Code: ${visitCode})` : ''}.\n\n${msg}\n\nCreate a new revision (Force create) or Cancel.`;
+          setForceModalMessage(confirmMsg);
+          setShowForceModal(true);
+          // abort save now — wait for user to confirm modal which will call onSave
+          return;
+        }
+      } catch (e) {
+        console.debug('pre-check existing dairy visit error', e);
+      }
+    }
+
     if (typeof onSave === 'function') {
       try { await onSave(); } catch (e) { console.error('parent onSave error', e); }
     }
+  }
+
+  const handleForceModalConfirm = async () => {
+    setShowForceModal(false);
+    const updated = { ...(data || {}), ForceCreate: true };
+    if (typeof onChange === 'function') onChange(updated);
+    // small delay to allow parent to propagate change
+    await new Promise(r => setTimeout(r, 50));
+    if (typeof onSave === 'function') {
+      try { await onSave(); } catch (e) { console.error('parent onSave error', e); }
+    }
+  }
+
+  const handleForceModalCancel = () => {
+    setShowForceModal(false);
   }
  
   return (
@@ -1755,6 +1595,18 @@ const DairyFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
               <div className="flex items-center space-x-3">
                 <button onClick={handleSaveInternal} disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:bg-indigo-300">{loading ? 'Saving...' : 'Save Visit'}</button>
                 <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showForceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
+              <h3 className="text-lg font-semibold mb-3">Existing dairy visit found</h3>
+              <div className="text-sm text-gray-700 whitespace-pre-wrap mb-4">{forceModalMessage}</div>
+              <div className="flex justify-end space-x-3">
+                <button onClick={handleForceModalCancel} className="px-3 py-2 bg-gray-200 rounded-md">Cancel</button>
+                <button onClick={handleForceModalConfirm} className="px-3 py-2 bg-indigo-600 text-white rounded-md">Create Revision</button>
               </div>
             </div>
           </div>
