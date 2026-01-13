@@ -774,6 +774,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
             ) : locError ? (
               <div className="text-sm text-red-600 mt-1">{locError}</div>
             ) : null}
+            <label htmlFor="Breed" className="block text-sm font-medium text-gray-700 text-left mb-1">Type of Breed</label>
             <div className="relative">
               <select
                 id="Breed"
@@ -787,6 +788,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
                   <option value="" disabled>Loading breeds…</option>
                 ) : (breedOptions && breedOptions.length ? (
                   <>
+                  
                     <option value="">Select Breed</option>
                     {breedOptions.map(b => {
                       const lookupValue = (b.LookupValue || b.lookupValue || '').toString();

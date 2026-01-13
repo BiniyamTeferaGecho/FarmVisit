@@ -245,15 +245,25 @@ export default function Employee({ inDashboard = false }) {
         setShowSaveConfirm(false);
         setLoading(true);
         try {
+                const url = pendingSaveIsEdit && editingId ? `/advisor/${editingId}` : `/advisor`;
+                // Debug: log the outgoing payload and target URL to help diagnose server 500s
+                try { console.debug('Employee.save ->', { url, payload: pendingSavePayload }); } catch (e) { /* ignore logging errors */ }
                 if (pendingSaveIsEdit && editingId) {
-                // Backend expects POST for update at /api/advisor/:id
-                await api.post(`/advisor/${editingId}`, pendingSavePayload);
-            } else {
-                await api.post(`/advisor`, pendingSavePayload);
-            }
+                    // Backend expects POST for update at /api/advisor/:id
+                    await api.post(url, pendingSavePayload);
+                } else {
+                    await api.post(url, pendingSavePayload);
+                }
             setShowForm(false); fetchList();
         } catch (err) {
-            setError(getErrorMessage(err) || 'Save failed');
+            // Log full error to console to aid debugging during dev
+            try { console.error('Employee.save error', err); } catch (e) { /* ignore */ }
+            // Prefer any server-provided details (err.response.data) when available
+            const serverDetails = err && err.response && err.response.data ? err.response.data : null;
+            const friendly = getErrorMessage(err) || 'Save failed';
+            // Include serialized server details for the UI modal (helps when backend returns helpful diagnostics)
+            const detailedMsg = serverDetails ? `${friendly} — ${JSON.stringify(serverDetails)}` : friendly;
+            setError(detailedMsg);
             if (err?.response?.status === 401) navigate('/login');
         } finally { setLoading(false); setPendingSavePayload(null); setPendingSaveIsEdit(false); }
     };
