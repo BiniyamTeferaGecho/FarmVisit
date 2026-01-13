@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import { Plus, RefreshCw, Edit, Trash2, Check, Eye, Printer } from 'lucide-react'
 import { FaSync, FaColumns } from 'react-icons/fa'
 import ColumnSelector from '../components/ColumnSelector'
+import Pagination from '../components/common/Pagination'
 
 
 export default function LayerFarm() {
@@ -72,6 +73,9 @@ export default function LayerFarm() {
   const [pageSize, setPageSize] = useState(10)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sortColumn, setSortColumn] = useState('CreatedAt')
+  const [sortDirection, setSortDirection] = useState('DESC')
   const [summary, setSummary] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [showModal, setShowModal] = useState(false)
@@ -378,15 +382,32 @@ export default function LayerFarm() {
     try {
       const p = requestedPage ?? pageNumber
       const s = requestedSize ?? pageSize
-      // no filters: use default list endpoint
+      // include search + sort params from component state unless overridden by opts
+      const qSearch = (typeof opts.search !== 'undefined') ? opts.search : searchTerm
+      const qSortCol = (typeof opts.sortColumn !== 'undefined') ? opts.sortColumn : sortColumn
+      const qSortDir = (typeof opts.sortDirection !== 'undefined') ? opts.sortDirection : sortDirection
 
-      // default: fetch layer-farm visits (existing behavior)
-      // Include paging params so the backend can route to the search proc and return the requested page
-      const res = await fetchWithAuth({ url: '/layer-farm', method: 'get', params: { pageNumber: p, pageSize: s } })
-      const data = res?.data?.data || res?.data || []
-      if (Array.isArray(data)) setVisits(data)
-      else setVisits([])
-      // populate scheduleMap for VisitCode display
+      // build query string since fetchWithAuth doesn't accept `params`
+      const qs = [`pageNumber=${encodeURIComponent(p)}`, `pageSize=${encodeURIComponent(s)}`]
+      if (qSearch) qs.push(`SearchTerm=${encodeURIComponent(qSearch)}`)
+      if (qSortCol) qs.push(`SortColumn=${encodeURIComponent(qSortCol)}`)
+      if (qSortDir) qs.push(`SortDirection=${encodeURIComponent(qSortDir)}`)
+      const query = qs.length ? `?${qs.join('&')}` : ''
+      const res = await fetchWithAuth({ url: `/layer-farm/paged${query}`, method: 'get' })
+        const data = res?.data?.data || res?.data || []
+        const total = res?.data?.totalCount ?? res?.data?.total ?? null
+        const pages = res?.data?.totalPages ?? res?.data?.totalPages ?? null
+        const current = res?.data?.currentPage ?? res?.data?.currentPage ?? p
+        const returnedPageSize = res?.data?.pageSize ?? res?.data?.pageSize ?? s
+
+        if (Array.isArray(data)) setVisits(data)
+        else setVisits([])
+        if (total != null) setTotalCount(Number(total))
+        if (pages != null) setTotalPages(Number(pages))
+        if (current != null) setPageNumber(Number(current))
+        if (returnedPageSize != null) setPageSize(Number(returnedPageSize))
+
+        // populate scheduleMap for VisitCode display
       try {
         const ids = (Array.isArray(data) ? data : []).map(d => d.ScheduleID || d.scheduleId || null).filter(Boolean);
         const uniq = Array.from(new Set(ids.map(String)));
@@ -437,8 +458,9 @@ export default function LayerFarm() {
       const qs = new URLSearchParams(location.search || '')
       const qVisit = qs.get('scheduleId') || qs.get('visitId') || (location.state && (location.state.scheduleId || location.state.visitId))
       const qFarmType = qs.get('farmType') || (location.state && location.state.farmType)
-      const qAdvisor = qs.get('AdvisorID') || (location.state && location.state.AdvisorID) || qs.get('advisor')
-      const qFarm = qs.get('FarmID') || (location.state && location.state.FarmID) || qs.get('farm')
+      // Accept either GUID-based IDs or friendly names in querystring for deep links
+      const qAdvisor = qs.get('AdvisorID') || qs.get('AdvisorName') || qs.get('advisor') || qs.get('advisorName') || (location.state && (location.state.AdvisorID || location.state.AdvisorName))
+      const qFarm = qs.get('FarmID') || qs.get('FarmName') || qs.get('farm') || qs.get('farmName') || (location.state && (location.state.FarmID || location.state.FarmName))
       const qPurpose = qs.get('VisitPurpose') || (location.state && location.state.VisitPurpose) || qs.get('purpose')
       const qAssign = qs.get('AssignTo') || (location.state && location.state.AssignTo) || qs.get('assignTo')
 
@@ -591,9 +613,20 @@ export default function LayerFarm() {
         }
       }
 
+      // Helper to detect GUID-style identifiers
+      const isGuid = (v) => typeof v === 'string' && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v)
+
       if (qFarmType) setForm(f => ({ ...f, FarmType: qFarmType }))
-      if (qAdvisor) setForm(f => ({ ...f, AdvisorID: qAdvisor }))
-      if (qFarm) setForm(f => ({ ...f, FarmID: qFarm }))
+      if (qAdvisor) {
+        // If advisory value looks like an ID, prefill AdvisorID; otherwise use it as a search term (advisor name)
+        if (isGuid(qAdvisor)) setForm(f => ({ ...f, AdvisorID: qAdvisor }))
+        else { setSearchTerm(qAdvisor); setForm(f => ({ ...f, AdvisorID: '' })) }
+      }
+      if (qFarm) {
+        // If farm value looks like an ID, prefill FarmID; otherwise treat it as FarmName and apply to search
+        if (isGuid(qFarm)) setForm(f => ({ ...f, FarmID: qFarm }))
+        else { setSearchTerm(qFarm); setForm(f => ({ ...f, FarmID: '' })) }
+      }
       if (qPurpose) setForm(f => ({ ...f, VisitPurpose: qPurpose }))
       if (qAssign) setForm(f => ({ ...f, AssignTo: qAssign }))
     } catch (e) {
@@ -850,6 +883,36 @@ export default function LayerFarm() {
 
       {message && <div className={`mb-4 p-3 rounded ${message.type==='error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{message.text}</div>}
 
+      <div className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex-1 flex items-center gap-2">
+          <input
+            type="search"
+            placeholder="Search visits by farm, code, advisor..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setPageNumber(1); fetchVisits({ page: 1, size: pageSize, search: searchTerm }) } }}
+            className="form-input w-full px-3 py-2 border rounded-md"
+          />
+          <button onClick={() => { setPageNumber(1); fetchVisits({ page: 1, size: pageSize, search: searchTerm }) }} className="px-3 py-2 bg-indigo-600 text-white rounded">Search</button>
+          <button onClick={() => { setSearchTerm(''); setPageNumber(1); fetchVisits({ page: 1, size: pageSize, search: '' }) }} className="px-3 py-2 bg-gray-200 rounded">Clear</button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm">Sort</label>
+            <select value={sortColumn} onChange={(e) => { setSortColumn(e.target.value); setPageNumber(1); fetchVisits({ page: 1, size: pageSize, sortColumn: e.target.value, sortDirection }) }} className="px-2 py-1 border rounded bg-white">
+            <option value="CreatedAt">Created</option>
+            <option value="VisitCode">Visit Code</option>
+            <option value="FarmName">Farm Name</option>
+            <option value="CreatedBy">Advisor / Employee</option>
+            <option value="VisitStatus">Visit Status</option>
+          </select>
+          <select value={sortDirection} onChange={(e) => { setSortDirection(e.target.value); setPageNumber(1); fetchVisits({ page: 1, size: pageSize, sortColumn, sortDirection: e.target.value }) }} className="px-2 py-1 border rounded bg-white">
+            <option value="DESC">Desc</option>
+            <option value="ASC">Asc</option>
+          </select>
+        </div>
+      </div>
+
       <div className="bg-white p-6 rounded-lg shadow-sm">
         <div className="bg-white rounded-lg shadow overflow-auto">
           <div className="flex items-center justify-end mb-2">
@@ -1006,19 +1069,18 @@ export default function LayerFarm() {
 
         <div className="flex items-center justify-between mt-3">
           <div className="text-sm text-gray-600">{summary ? `Total: ${totalCount} visits` : `${visits.length} items`}</div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm">Per page:</label>
-            <select value={pageSize} onChange={onPageSizeChange} className="px-2 py-1 border rounded bg-white text-sm">
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-            <button onClick={async () => { const next = 1; setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber <= 1} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">First</button>
-            <button onClick={async () => { const next = Math.max(1, pageNumber - 1); setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber <= 1} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Prev</button>
-            <span className="text-sm">Page {pageNumber} / {totalPages || 1}</span>
-            <button onClick={async () => { const next = Math.min(totalPages || 1, pageNumber + 1); setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber >= (totalPages || 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Next</button>
-            <button onClick={async () => { const next = totalPages || 1; setPageNumber(next); await fetchVisits({ page: next, size: pageSize }) }} disabled={pageNumber >= (totalPages || 1)} className="px-2 py-1 text-sm border border-gray-300 rounded-md bg-white hover:bg-gray-50">Last</button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm">Per page:</label>
+              <select value={pageSize} onChange={onPageSizeChange} className="px-2 py-1 border rounded bg-white text-sm">
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+
+            <Pagination page={pageNumber || 1} setPage={async (n) => { try { setPageNumber(n); await fetchVisits({ page: n, size: pageSize }) } catch (e) { console.debug('pagination setPage error', e) } }} total={Number(totalCount || 0)} pageSize={pageSize} maxButtons={7} totalPages={totalPages || null} />
           </div>
         </div>
 

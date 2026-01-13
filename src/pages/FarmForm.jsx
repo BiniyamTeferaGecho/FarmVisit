@@ -49,7 +49,8 @@ function FarmForm({ form, setForm, onFieldChange, fieldErrors, farmTypes = [], l
         (async () => {
             try {
                 setRegionLoading(true);
-                const res = await fetchWithAuth({ url: `http://localhost:80/api/lookups/by-type-name/Region`, method: 'get' });
+                // Use a relative URL so mobile devices and proxies resolve to the current API host
+                const res = await fetchWithAuth({ url: `/lookups/by-type-name/Region`, method: 'get' });
                 const payload = res?.data?.data || res?.data || res;
                 let rows = [];
                 if (Array.isArray(payload)) rows = payload;
