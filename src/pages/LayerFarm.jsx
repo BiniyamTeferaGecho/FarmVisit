@@ -163,15 +163,7 @@ export default function LayerFarm() {
         return
       }
     }
-    if (form.AgeInWeeks !== '' && form.EggProductionPercent !== '') {
-      const age = Number(form.AgeInWeeks)
-      const prod = Number(form.EggProductionPercent)
-      if (!Number.isNaN(age) && age < 18 && !Number.isNaN(prod) && prod > 10) {
-        setFieldErrors({ AgeInWeeks: 'Age < 18 weeks requires egg production <= 10%', CurrEggProdinPercent: 'Egg production must be <= 10% for age < 18' })
-        setShowModal(true)
-        return
-      }
-    }
+
  
     setSaving(true); setMessage(null)
     const wasEditing = Boolean(editingId)

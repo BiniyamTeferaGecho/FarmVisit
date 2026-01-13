@@ -160,11 +160,7 @@ const LayerFarmVisitForm = ({ form, onChange, onSave, onCancel, loading, readOnl
         errs.FlockSize = 'Flock size must be a number > 0'
       }
 
-      // AgeInWeeks 18-100
-      const age = toNum(data.AgeInWeeks)
-      if (age !== null && !Number.isNaN(age)) {
-        if (age < 18 || age > 100) errs.AgeInWeeks = 'Age in weeks must be between 18 and 100'
-      }
+
 
       // CurrEggProdinPercent 0-100
       const eggProd = toNum(data.CurrEggProdinPercent || data.EggProductionPercent)

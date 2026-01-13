@@ -269,12 +269,21 @@ export function AuthProvider({ children }) {
     const headers = opts.headers || {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const url = (opts.url && opts.url.startsWith('http')) ? opts.url : `${API_BASE}${opts.url.startsWith('/') ? '' : '/'}${opts.url}`;
-    const res = await fetch(url, {
-      method: opts.method || 'GET',
-      headers: { 'Content-Type': 'application/json', ...headers },
-      body: opts.data ? JSON.stringify(opts.data) : undefined,
-      credentials: 'include'
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: opts.method || 'GET',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: opts.data ? JSON.stringify(opts.data) : undefined,
+        credentials: 'include'
+      });
+    } catch (err) {
+      // Network-level error (DNS, CORS, TLS, offline). Attach URL for easier debugging.
+      const e = new Error(`Network request failed for ${url}: ${err && err.message ? err.message : String(err)}`);
+      e.url = url;
+      e.originalError = err;
+      throw e;
+    }
     if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
     const ct = res.headers.get('content-type') || '';
     if (ct.includes('application/json')) {

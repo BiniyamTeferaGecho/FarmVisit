@@ -6,6 +6,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AlertModal from '../components/AlertModal';
 import EmployeeForm, { SelectField } from './EmployeeForm';
+import api from '../utils/api';
 import { FaUserPlus, FaFileCsv, FaDownload, FaSync, FaChartBar, FaEdit, FaTrash, FaUserCog, FaUndo, FaIdCard, FaVenusMars, FaPhone, FaEnvelope, FaMapMarkerAlt, FaBuilding, FaUserTie, FaSearch, FaTimes, FaColumns } from 'react-icons/fa';
 import ColumnSelector from '../components/ColumnSelector';
 import Pagination from '../components/common/Pagination';
@@ -46,7 +47,7 @@ const validators = {
 export default function Employee({ inDashboard = false }) {
     const HEADER_HEIGHT = 64;
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { user, fetchWithAuth } = useAuth();
+    const { user } = useAuth();
     const navigate = useNavigate();
 
     const [list, setList] = useState([]);
@@ -114,7 +115,7 @@ export default function Employee({ inDashboard = false }) {
             const size = pageSize || pagination.pageSize || 10
             let url = `/advisor?page=${pageNumber}&pageSize=${size}`
             if (search && String(search).trim() !== '') url += `&search=${encodeURIComponent(String(search))}`
-            const res = await fetchWithAuth({ url, method: 'get' });
+            const res = await api.get(url);
             const payload = res.data?.data || res.data;
             if (Array.isArray(payload)) {
                 setList(payload);
@@ -149,7 +150,7 @@ export default function Employee({ inDashboard = false }) {
         try {
             // Ensure employees list is present so Manager select shows options
             if (!Array.isArray(list) || list.length === 0) await fetchList();
-            const res = await fetchWithAuth({ url: `/advisor/${id}`, method: 'get' });
+            const res = await api.get(`/advisor/${id}`);
             const d = res.data?.data || res.data;
             if (d) {
                 setForm({
@@ -244,10 +245,11 @@ export default function Employee({ inDashboard = false }) {
         setShowSaveConfirm(false);
         setLoading(true);
         try {
-            if (pendingSaveIsEdit && editingId) {
-                await fetchWithAuth({ url: `/advisor/${editingId}`, method: 'patch', data: pendingSavePayload });
+                if (pendingSaveIsEdit && editingId) {
+                // Backend expects POST for update at /api/advisor/:id
+                await api.post(`/advisor/${editingId}`, pendingSavePayload);
             } else {
-                await fetchWithAuth({ url: `/advisor`, method: 'post', data: pendingSavePayload });
+                await api.post(`/advisor`, pendingSavePayload);
             }
             setShowForm(false); fetchList();
         } catch (err) {
@@ -261,7 +263,7 @@ export default function Employee({ inDashboard = false }) {
         if (!deleteTarget) return;
         setLoading(true); setError(null);
         try {
-            await fetchWithAuth({ url: `/advisor/${deleteTarget.EmployeeID}/delete`, method: 'post', data: { DeletedBy: user?.UserID || user?.id } });
+            await api.post(`/advisor/${deleteTarget.EmployeeID}/delete`, { DeletedBy: user?.UserID || user?.id });
             setShowDelete(false); setDeleteTarget(null); fetchList();
         } catch (err) { setError(getErrorMessage(err) || 'Delete failed') } finally { setLoading(false) }
     };
@@ -297,7 +299,7 @@ export default function Employee({ inDashboard = false }) {
                     ManagerID: cols[17] || null,
                 };
             }).filter(Boolean);
-            await fetchWithAuth({ url: `/advisor/bulk`, method: 'post', data: { EmployeeData: rows, CreatedBy: user?.UserID || user?.id } });
+            await api.post(`/advisor/bulk`, { EmployeeData: rows, CreatedBy: user?.UserID || user?.id });
             setBulkFile(null); fetchList();
         } catch (err) { setError(getErrorMessage(err) || 'Bulk upload failed') } finally { setLoading(false) }
     };
@@ -315,7 +317,7 @@ export default function Employee({ inDashboard = false }) {
     const previewNext = async () => {
         setLoading(true); setError(null);
         try {
-            const res = await fetchWithAuth({ url: `/advisor/preview-next-number`, method: 'get' });
+            const res = await api.get(`/advisor/preview-next-number`);
             setPreviewNumber(res.data?.data?.EmployeeNumber || res.data);
         } catch (err) { setError(getErrorMessage(err) || 'Preview failed') } finally { setLoading(false) }
     };
@@ -338,7 +340,7 @@ export default function Employee({ inDashboard = false }) {
         if (!managerFor) return;
         setLoading(true); setError(null);
         try {
-            await fetchWithAuth({ url: `/advisor/${managerFor.EmployeeID}/change-manager`, method: 'post', data: { NewManagerID: managerIdInput, UpdatedBy: user?.UserID || user?.id } });
+            await api.post(`/advisor/${managerFor.EmployeeID}/change-manager`, { NewManagerID: managerIdInput, UpdatedBy: user?.UserID || user?.id });
             setManagerModalOpen(false); setManagerFor(null); fetchList();
         } catch (err) { setError(getErrorMessage(err) || 'Change manager failed') } finally { setLoading(false) }
     };
@@ -346,7 +348,7 @@ export default function Employee({ inDashboard = false }) {
     const restoreEmployee = async (emp) => {
         setLoading(true); setError(null);
         try {
-            await fetchWithAuth({ url: `/advisor/${emp.EmployeeID}/restore`, method: 'post', data: { RestoredBy: user?.UserID || user?.id } });
+            await api.post(`/advisor/${emp.EmployeeID}/restore`, { RestoredBy: user?.UserID || user?.id });
             fetchList();
         } catch (err) { setError(getErrorMessage(err) || 'Restore failed') } finally { setLoading(false) }
     };
@@ -359,7 +361,7 @@ export default function Employee({ inDashboard = false }) {
     const generateReport = async () => {
         setLoading(true); setError(null);
         try {
-            const res = await fetchWithAuth({ url: `/advisor/report`, method: 'get' });
+            const res = await api.get(`/advisor/report`);
             const rows = (res.data && res.data.data) ? res.data.data : (res.data || []);
             const csvText = toCsv(Array.isArray(rows) ? rows : []);
             const blob = new Blob([csvText], { type: 'text/csv' });
@@ -370,7 +372,7 @@ export default function Employee({ inDashboard = false }) {
     const fetchStats = async () => {
         setLoading(true); setError(null);
         try {
-            const res = await fetchWithAuth({ url: `/advisor/stats/overview`, method: 'get' });
+            const res = await api.get(`/advisor/stats/overview`);
             setStats(res.data?.data || res.data);
         } catch (err) { setError(getErrorMessage(err) || 'Stats failed') } finally { setLoading(false) }
     };
